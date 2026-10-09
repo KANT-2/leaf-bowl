@@ -30,8 +30,6 @@ export interface Product {
   isOnSale?: boolean;
 }
 
-/** 관리자가 수정할 수 있는 항목. 보낸 항목만 바뀐다 */
-export type ProductUpdate = Partial<Pick<Product, "name" | "description" | "price" | "tag" | "isNew" | "isOnSale">>;
 
 export interface Dressing {
   name: string;
