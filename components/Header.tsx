@@ -11,9 +11,9 @@ export default function Header() {
       </Link>
       <HeaderNav />
       <div className="header-actions">
-        <CartButton />
-        <span className="header-divider" aria-hidden="true" />
         <AccountLink />
+        <span className="header-divider" aria-hidden="true" />
+        <CartButton />
       </div>
     </header>
   );
