@@ -1,8 +1,7 @@
 // PATCH /api/admin/products/salad-0 → 메뉴 1개 수정 (카탈로그 기준)
 // 본문 예: { "price": 11900, "status": "soldout" }  보낸 항목만 바뀐다.
 // 전체 저장(PUT /api/admin/catalog)과 같은 저장소·revision 규칙을 쓴다. 관리자 로그인 확인은 후속.
-import { z } from "zod";
-import { productSchema } from "@/lib/admin/catalog";
+import { catalogSchema, productSchema } from "@/lib/admin/catalog";
 import { readCatalog, writeCatalog } from "@/lib/admin/store";
 import { BodyTooLarge, jsonError, readLimited, sameOrigin } from "@/lib/admin/server";
 
@@ -33,7 +32,7 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/admin/prod
     if (!target) return jsonError("상품을 찾을 수 없습니다.", 404);
 
     const next = { ...catalog, products: catalog.products.map((p) => (p.id === id ? { ...p, ...parsed.data } : p)) };
-    const valid = z.object({ products: z.array(productSchema) }).safeParse(next);
+    const valid = catalogSchema.safeParse(next);
     if (!valid.success) return jsonError(valid.error.issues[0]?.message ?? "수정할 내용을 확인해주세요.");
 
     const saved = await writeCatalog(next, revision);

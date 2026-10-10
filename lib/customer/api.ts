@@ -172,7 +172,10 @@ export function toReviewItem(catalog: Catalog, r: CatalogReview): ReviewItem {
 function newestFirst(reviews: CatalogReview[]): CatalogReview[] {
   return reviews
     .map((r, i) => ({ r, i }))
-    .sort((a, b) => (b.r.createdAt ?? "").localeCompare(a.r.createdAt ?? "") || b.i - a.i)
+    .sort((a, b) => {
+      const timestamp = (r: CatalogReview) => Date.parse(r.createdAt ?? r.date.replaceAll(".", "-")) || 0;
+      return timestamp(b.r) - timestamp(a.r) || a.i - b.i;
+    })
     .map(({ r }) => r);
 }
 
@@ -197,7 +200,7 @@ export function home(catalog: Catalog): Home {
       .filter((s) => s.visible)
       .map((s) => ({ title: s.title, description: s.description, image: s.image, productId: s.productId ? customerIdOf(s.productId) : null })),
     best: catalog.products.filter((p) => p.type === "salad" && p.badge === "BEST" && isVisible(p)).map(toSummary),
-    latestReviews: newestFirst((catalog.reviews ?? []).filter((r) => !r.deleted))
+    latestReviews: newestFirst((catalog.reviews ?? []).filter((r) => !r.deleted && (!r.productId || catalog.products.some((p) => p.id === r.productId && isVisible(p)))))
       .slice(0, 3)
       .map((r) => toReviewItem(catalog, r)),
   };
@@ -210,5 +213,5 @@ export function parsePaging(params: URLSearchParams): { page: number; size: numb
   if (!/^\d+$/.test(page) || !/^\d+$/.test(size)) return null;
   const p = Number(page);
   const s = Number(size);
-  return p >= 1 && s >= 1 && s <= 50 ? { page: p, size: s } : null;
+  return Number.isSafeInteger(p) && p >= 1 && Number.isSafeInteger(s) && s >= 1 && s <= 50 ? { page: p, size: s } : null;
 }
