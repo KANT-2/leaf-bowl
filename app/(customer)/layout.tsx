@@ -3,7 +3,6 @@ import { connection } from "next/server";
 import { readCatalog } from "@/lib/admin/store";
 import CustomerCatalogProvider from "@/components/CustomerCatalogProvider";
 import type { Metadata, Viewport } from "next";
-import AnnouncementBar from "@/components/AnnouncementBar";
 import AuthProvider from "@/components/AuthProvider";
 import CartDrawer from "@/components/CartDrawer";
 import CartProvider from "@/components/CartProvider";
@@ -40,7 +39,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
 
             <ReviewWriteProvider>
               <CartProvider>
-                <AnnouncementBar />
+                <div className="announcement">
+                  FRESH EVERY DAY · 오늘의 신선함을, 당신의 한 끼로
+                </div>
                 <Header />
                 {children}
                 <Footer hours={hours} />

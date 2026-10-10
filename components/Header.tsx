@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AccountLink from "./AccountLink";
 import CartButton from "./CartButton";
 import HeaderNav from "./HeaderNav";
 
@@ -9,7 +10,11 @@ export default function Header() {
         leaf &amp; bowl<span className="logo-sub">YOUR DAILY GREENS</span>
       </Link>
       <HeaderNav />
-      <CartButton />
+      <div className="header-actions">
+        <CartButton />
+        <span className="header-divider" aria-hidden="true" />
+        <AccountLink />
+      </div>
     </header>
   );
 }
