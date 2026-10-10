@@ -12,6 +12,7 @@ import {
 } from "react";
 import { useCart } from "./CartProvider";
 import { useToast } from "./ToastProvider";
+import IngredientIcon from "./IngredientIcon";
 import type { Ingredient } from "@/lib/data/ingredients";
 import { useReducedMotion } from "@/lib/hooks";
 import {
@@ -681,9 +682,14 @@ function BowlMatchBody({ingredients}:{ingredients:Ingredient[]}) {
               strokeLinecap="round"
             />
           </svg>
-          <div className="bowl-bits" aria-hidden="true">
+          <div
+            className={`bowl-bits${selected.length > 6 ? " bowl-bits-full" : ""}`}
+            aria-hidden="true"
+          >
             {selected.map((i) => (
-              <span key={i.id}>{i.emoji}</span>
+              <span className="bowl-bit" key={i.id}>
+                <IngredientIcon id={i.id} />
+              </span>
             ))}
           </div>
         </div>
@@ -691,6 +697,7 @@ function BowlMatchBody({ingredients}:{ingredients:Ingredient[]}) {
           {selected.length ? (
             selected.map((i) => (
               <span className="ingredient-chip" key={i.id}>
+                <IngredientIcon id={i.id} />
                 {i.name}
                 <button
                   type="button"
@@ -770,7 +777,8 @@ function BowlMatchBody({ingredients}:{ingredients:Ingredient[]}) {
             <div className="result-chips">
               {selected.map((i) => (
                 <span key={i.id}>
-                  {i.emoji} {i.name}
+                  <IngredientIcon id={i.id} />
+                  {i.name}
                 </span>
               ))}
             </div>

@@ -84,12 +84,16 @@
 .bm .clear-yes, .bm .clear-no { font-size: 11px; padding: 5px 10px; border-radius: 20px; border: 1px solid #bbcab6; }
 .bm .clear-yes { background: var(--color-brand); color: var(--color-cream); border-color: var(--color-brand); }
 .bm .clear-no { background: var(--color-cream); color: #637561; }
-.bm .bowl-illustration { position: relative; max-width: 230px; height: 143px; margin: 7px auto; }
+.bm .bowl-illustration { position: relative; width: min(100%, 230px); aspect-ratio: 3 / 2; margin: 7px auto; }
 .bm .bowl-illustration svg { width: 100%; height: 100%; }
-.bm .bowl-bits { position: absolute; top: 37px; left: 50%; transform: translateX(-50%); width: 140px; display: flex; flex-wrap: wrap; justify-content: center; font-size: 22px; line-height: 1.2; max-height: 63px; overflow: hidden; }
+.bm .bowl-bits { position: absolute; top: 10%; left: 16%; width: 68%; height: 55%; display: flex; flex-wrap: wrap; justify-content: center; align-content: center; }
+.bm .bowl-bit { flex: none; width: min(36px, 25%); aspect-ratio: 1; }
+.bm .bowl-bits-full .bowl-bit { width: calc(100% / 6); }
+.bm .ingredient-icon, .bm-result .ingredient-icon { display: block; flex: none; width: 22px; height: 22px; object-fit: contain; }
+.bm .bowl-bit .ingredient-icon { width: 100%; height: 100%; }
 .bm .selected-ingredients { min-height: 110px; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 7px; margin: 4px 0 22px; }
 .bm .empty-bowl { text-align: center; font-size: 11px; line-height: 1.9; color: #b0bbab; width: 100%; margin: 14px 0; }
-.bm .ingredient-chip { border: 1px solid var(--color-line); border-radius: 20px; padding: 7px 9px; font-size: 10px; background: #f1f5e6; }
+.bm .ingredient-chip { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--color-line); border-radius: 20px; padding: 5px 9px; font-size: 10px; background: #f1f5e6; }
 .bm .ingredient-chip button { padding: 0 0 0 5px; font-size: 12px; color: #637561; }
 .bm .bowl-footer { border-top: 1px solid var(--color-line); padding-top: 18px; }
 .bm .bowl-footer > div { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
@@ -114,7 +118,7 @@
 .bm-result .result-photo { display: block; width: 220px; max-width: 100%; height: auto; aspect-ratio: 1; margin: 20px auto 8px; object-fit: contain; padding: 4%; }
 .bm-result .result-note { font-size: 9px; line-height: 1.8; }
 .bm-result .result-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 15px 0 25px; }
-.bm-result .result-chips span { padding: 8px 11px; background: var(--color-soft); color: #4a6150; border-radius: 20px; font-size: 11px; }
+.bm-result .result-chips span { display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; background: var(--color-soft); color: #4a6150; border-radius: 20px; font-size: 11px; }
 .bm-result .field { margin: 15px 0; }
 .bm-result .field > span { font-weight: 400; margin-bottom: 9px; }
 .bm-result .allergen-box { background: var(--color-pale); padding: 14px; border-radius: 7px; font-size: 10px; line-height: 1.9; color: #637561; margin: 17px 0; }
@@ -151,7 +155,7 @@
   .bm .swipe-actions .skip { width: 57px; height: 57px; }
   .bm .swipe-help { font-size: 9px; margin-top: 17px; }
   .bm .my-bowl { width: min(100%, 360px); padding: 22px; margin-top: 24px; }
-  .bm .bowl-illustration { height: 120px; margin-top: 0; margin-bottom: 0; }
+  .bm .bowl-illustration { width: min(100%, 180px); margin-top: 0; margin-bottom: 0; }
   .bm .selected-ingredients { min-height: 0; margin-bottom: 18px; }
   .bm .empty-bowl { margin: 8px 0; }
   .bm .bowl-top h2 { font-size: 22px; }
