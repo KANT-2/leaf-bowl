@@ -181,7 +181,10 @@ test("주문 생성 거부 사례", async () => {
   );
   await expect(await place(cookie, "order-aaaa-0003", { ...ok, total: 1 }), 400);
   await expect(await place(cookie, "order-aaaa-0004", { ...ok, items: [{ ...ok.items[0], price: 1 }] }), 400);
-  await expect(await place(cookie, "order-aaaa-0005", { ...ok, desiredDate: "2026-10-09" }), 400, /오늘 이후/);
+  await expect(await place(cookie, "order-aaaa-0005", { ...ok, desiredDate: "2026-10-09" }), 400, /받을 날짜/);
+  await expect(await place(cookie, "order-aaaa-0011", { ...ok, desiredDate: "2026-10-25" }), 400, /받을 날짜/); // 14일 초과
+  await expect(await place(cookie, "order-aaaa-0012", { ...ok, desiredSlot: "자정" }), 400, /시간대/);
+  await expect(await place(cookie, "order-aaaa-0013", { ...ok, desiredSlot: "21:00–22:00" }), 400, /시간대/); // 운영시간 밖
   await expect(await place(cookie, "order-aaaa-0006", { ...ok, items: [{ ...ok.items[0], quantity: 1 }] }), 400, /최소 주문/);
   await expect(await place(cookie, "order-aaaa-0007", { ...ok, items: [{ ...ok.items[0], productId: 99 }] }), 400);
   const bad = await routes.orders.POST(new Request(BASE + "/api/v1/orders", { method: "POST", headers: { cookie, "idempotency-key": "order-aaaa-0008" }, body: "{not json" }));

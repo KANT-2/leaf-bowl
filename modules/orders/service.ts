@@ -1,6 +1,8 @@
 import type { Catalog } from "@/lib/admin/catalog";
+import { getDeliveryHours, type DeliveryHours } from "@/lib/data/delivery";
 import { decodeCursor, encodeCursor } from "../shared/cursor";
 import { AppError } from "../shared/errors";
+import { assertDeliverySlot } from "./delivery";
 import { priceOrder } from "./pricing";
 import { requestHash } from "./request-hash";
 import { DuplicateRequestError, type OrdersRepository } from "./repository";
@@ -12,6 +14,8 @@ export interface OrdersServiceDeps {
   repository: OrdersRepository;
   /** 가격 계산 기준이 되는 카탈로그. 지금은 관리자 JSON 저장소, DB 이후에는 DB 조회 */
   getCatalog: () => Promise<Catalog>;
+  /** 배달 운영 시간. 지금은 고정 값, DB 이후에는 DB 조회 (lib/data/delivery.ts) */
+  getHours?: () => Promise<DeliveryHours>;
   now?: () => Date;
 }
 
@@ -19,12 +23,12 @@ const SAME_KEY_DIFFERENT_BODY = "같은 요청 번호로 다른 내용의 주문
 const NOT_FOUND = "주문을 찾을 수 없습니다.";
 const CHANGED_BY_OTHER = "다른 관리자가 먼저 변경했습니다. 새로 고친 뒤 다시 시도해주세요.";
 
-/** 한국 시간 기준 오늘 (YYYY-MM-DD) */
-function todayInSeoul(now: Date): string {
-  return new Date(now.getTime() + 9 * 3600_000).toISOString().slice(0, 10);
-}
-
-export function createOrdersService({ repository, getCatalog, now = () => new Date() }: OrdersServiceDeps) {
+export function createOrdersService({
+  repository,
+  getCatalog,
+  getHours = getDeliveryHours,
+  now = () => new Date(),
+}: OrdersServiceDeps) {
   async function ownOrder(customerSessionId: string, id: string): Promise<OrderRecord> {
     const order = await repository.findById(id);
     // 다른 사람의 주문은 존재 여부도 알려주지 않는다
@@ -48,9 +52,7 @@ export function createOrdersService({ repository, getCatalog, now = () => new Da
       const existing = await repository.findByRequest(customerSessionId, idempotencyKey);
       if (existing) return sameRequest(existing, hash);
 
-      if (input.desiredDate < todayInSeoul(now())) {
-        throw new AppError(400, "받을 날짜는 오늘 이후여야 합니다.");
-      }
+      assertDeliverySlot(input, await getHours(), now());
       const priced = priceOrder(await getCatalog(), input.items);
       try {
         const order = await repository.create({
