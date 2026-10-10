@@ -31,7 +31,11 @@ svg { width: 24px; height: 24px; }
 .rs-link.ghost:hover { background: var(--color-soft); }
 
 /* 공지 · 헤더 */
-.announcement { height: 33px; background: var(--color-brand); color: #f5f7e9; display: flex; justify-content: center; gap: 16px; align-items: center; font-size: 12px; letter-spacing: .3px; }
+.announcement { height: 33px; background: var(--color-brand); color: #f5f7e9; font-size: 12px; letter-spacing: .3px; }
+.announcement-inner { height: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.announcement-text { flex: 1; text-align: center; }
+.announcement-account { color: #f5f7e9; opacity: .85; white-space: nowrap; }
+.announcement-account:hover { opacity: 1; text-decoration: underline; }
 .header { height: 94px; display: flex; align-items: center; justify-content: space-between; gap: 30px; border-bottom: 1px solid #dce2d6; }
 .logo { display: block; font: 700 30px/1.1 var(--font-serif); letter-spacing: -1px; color: var(--color-ink); white-space: nowrap; }
 .logo-sub { display: block; margin-top: 7px; font: 400 11px/1.4 Arial, sans-serif; letter-spacing: 1.6px; }
@@ -39,9 +43,6 @@ svg { width: 24px; height: 24px; }
 .header nav a { padding: 4px 0; }
 .header nav a[aria-current="page"] { color: var(--color-brand); font-weight: 600; box-shadow: inset 0 -2px 0 var(--color-brand); }
 .match-link { color: var(--color-brand); }
-.account-link { display: flex; align-items: center; gap: 6px; font-size: 15px; white-space: nowrap; color: var(--color-ink); }
-.account-link[aria-current="page"] { color: var(--color-brand); font-weight: 600; }
-.account-link svg { width: 20px; height: 20px; }
 .cart-button { display: flex; align-items: center; gap: 8px; font-size: 15px; white-space: nowrap; }
 .cart-button .cart-text { color: var(--color-ink); font-size: 15px; }
 .cart-count { background: var(--color-brand); color: #fff; border-radius: 50%; min-width: 19px; height: 19px; padding: 0 4px; display: grid; place-items: center; font-size: 11px; line-height: 1; }
@@ -154,7 +155,6 @@ footer > div { display: flex; justify-content: space-between; gap: 25px; color: 
   .header nav { order: 3; width: 100%; gap: 16px; font-size: 14px; justify-content: space-between; padding-top: 6px; padding-bottom: 15px; }
   .header nav .match-link { display: none; }
   .cart-button svg { display: none; }
-  .account-link .account-text { display: none; }
   .section { padding-top: 43px; padding-bottom: 30px; }
   .section-title { margin-bottom: 22px; gap: 10px; }
   .section-title h2 { font-size: 24px; }
