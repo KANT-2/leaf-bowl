@@ -61,10 +61,12 @@ export function createMemoryOrdersRepository(now: () => Date = () => new Date())
       }
       return copy(o);
     },
-    async list({ status, limit, after }) {
+    async list({ status, customerSessionId, from, to, limit, after }) {
       const afterAt = after ? Date.parse(after.createdAt) : 0;
       return [...orders.values()]
         .filter((o) => !status || o.status === status)
+        .filter((o) => !customerSessionId || o.customerSessionId === customerSessionId)
+        .filter((o) => (!from || o.createdAt >= from) && (!to || o.createdAt < to))
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0))
         .filter(
           (o) =>

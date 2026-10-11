@@ -43,6 +43,8 @@ fs.mkdirSync(shots, { recursive: true });
       assert.equal(saved.date, kstDate(Date.parse(saved.createdAt)).replaceAll("-", "."));
       assert.ok(Math.abs(Date.parse(saved.createdAt) - Date.now()) < 60000);
 
+      const login = await context.request.post(base + "/api/v1/auth/login", { data: { loginId: process.env.FRONT5_ADMIN_LOGIN_ID || "quality-admin", password: process.env.FRONT5_ADMIN_PASSWORD || "quality-password" } });
+      assert.equal(login.status(), 200, await login.text());
       await page.goto(base + "/admin");
       await page.getByRole("button", { name: "고객 리뷰 관리", exact: true }).click();
       await page.locator(".managed-review").getByText("· 2026.10.13 00:10", { exact: true }).waitFor();

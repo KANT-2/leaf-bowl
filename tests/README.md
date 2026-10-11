@@ -27,3 +27,5 @@ FRONT5_BASE_URL=http://localhost:3337 npm exec --package=playwright -- node test
 시간대 테스트는 UTC·서울·로스앤젤레스 브라우저에서 UTC 배송 요청/응답·체험 주문 저장과 KST 결제/주문 내역을 확인한다. 별도 테스트 서버의 메모리 주문 API에 주문 3건을 생성하므로 운영 서버에서 실행하지 않는다. 화면 캡처는 `docs/screenshots/delivery-timezone/`에 저장한다.
 
 전체 시간대 테스트는 세 브라우저 시간대에서 KST 자정의 고객 리뷰·관리자 리뷰·매출 갱신 시각, 미리보기 예약 날짜와 30분 마감 기준, 실제 서버 리뷰 API의 UTC 저장·KST 날짜를 확인한다. 별도 테스트 서버에 리뷰 3건을 저장한다. 카탈로그 화면/미리보기 응답은 격리된 데이터로 대체하며 운영 서버에서 실행하지 않는다. 테스트 서버를 `TZ=America/Los_Angeles`로 실행하면 서버 시스템 시간대에 대한 독립성도 확인할 수 있다.
+
+관리자 시간대 검증은 PR #82의 관리자 권한 검사에 맞춰 실제 로그인 API를 먼저 호출한다. 기본 계정은 위 테스트 서버 환경변수와 같으며, 다른 계정은 `FRONT5_ADMIN_LOGIN_ID`·`FRONT5_ADMIN_PASSWORD`로 전달한다.

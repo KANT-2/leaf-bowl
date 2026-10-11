@@ -54,12 +54,35 @@ export function statusView(o: OrderRecord) {
 }
 
 export function adminListItemView(o: OrderRecord) {
+  const delivery = deliveryWindowKST(o.desiredStartAt.toISOString(), o.desiredEndAt.toISOString())!;
   return {
     id: o.id,
     status: o.status,
     version: o.version,
     ordererName: o.ordererName,
+    desiredStartAt: o.desiredStartAt.toISOString(),
+    desiredEndAt: o.desiredEndAt.toISOString(),
+    desiredDate: delivery.day,
+    desiredSlot: delivery.timeLabel,
     total: o.total,
     createdAt: o.createdAt.toISOString(),
+  };
+}
+
+/** 관리자 상세: 연락처와 처리 이력까지 포함한다 (관리자 세션에서만 내려간다) */
+export function adminDetailView(o: OrderRecord) {
+  return {
+    ...detailView(o),
+    version: o.version,
+    phone: o.phone,
+    cancelReason: o.cancelReason,
+    canceledAt: o.canceledAt?.toISOString() ?? null,
+    history: o.history.map((h) => ({
+      fromStatus: h.fromStatus,
+      toStatus: h.toStatus,
+      changedBy: h.changedBy,
+      reason: h.reason,
+      createdAt: h.createdAt.toISOString(),
+    })),
   };
 }

@@ -3,8 +3,10 @@ import { z } from 'zod';
 import { catalogSchema } from '@/lib/admin/catalog';
 import { readCatalog, writeCatalog } from '@/lib/admin/store';
 import { jsonError, sameOrigin, readLimited, BodyTooLarge } from '@/lib/admin/server';
+import { adminGate } from '@/modules/identity/legacy-admin';
 
-export async function GET() { await connection(); try {
+export async function GET(request: Request) { await connection(); const denied = await adminGate(request); if (denied)
+    return denied; try {
     return Response.json(await readCatalog(), { headers: { 'Cache-Control': 'no-store' } });
 }
 catch (e) {
@@ -12,7 +14,8 @@ catch (e) {
     return jsonError('메뉴를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.', 503);
 } }
 export async function PUT(request: Request) { if (!sameOrigin(request))
-    return jsonError('허용되지 않은 요청입니다.', 403); try {
+    return jsonError('허용되지 않은 요청입니다.', 403); const denied = await adminGate(request); if (denied)
+    return denied; try {
     const raw = new TextDecoder().decode(await readLimited(request, 512000));
     if (raw.length > 512000)
         return jsonError('저장할 데이터가 너무 큽니다.', 413);

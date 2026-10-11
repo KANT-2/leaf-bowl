@@ -2,6 +2,7 @@
 const { chromium } = require("./playwright.cjs");
 const assert = require("node:assert/strict");
 const path = require("node:path");
+const { kstDate } = require("../public/customer-preview/time.js");
 const fs = require("node:fs");
 const base = process.env.FRONT5_BASE_URL || "http://localhost:3584";
 const shots = path.join(__dirname, "../docs/screenshots/delivery-timezone");
@@ -54,6 +55,26 @@ fs.mkdirSync(shots, { recursive: true });
       assert.equal(detail.desiredEndAt, params.get("desiredEndAt"));
       assert.equal(detail.desiredDate, "2026-10-13");
       assert.equal(detail.desiredSlot, "10:00–11:00");
+      const mine = await (await context.request.get(base + "/api/v1/orders")).json();
+      assert.equal(mine.items[0].id, created.id);
+      assert.equal(mine.items[0].desiredStartAt, params.get("desiredStartAt"));
+      assert.equal((await context.request.get(base + "/api/admin/catalog")).status(), 401);
+      const login = await context.request.post(base + "/api/v1/auth/login", { data: { loginId: process.env.FRONT5_ADMIN_LOGIN_ID || "quality-admin", password: process.env.FRONT5_ADMIN_PASSWORD || "quality-password" } });
+      assert.equal(login.status(), 200, await login.text());
+      const receivedDay = kstDate(Date.parse(created.createdAt));
+      const adminList = await (await context.request.get(base + `/api/v1/admin/orders?from=${receivedDay}&to=${receivedDay}`)).json();
+      const listed = adminList.items.find(order => order.id === created.id);
+      assert.ok(listed);
+      assert.equal(listed.desiredStartAt, params.get("desiredStartAt"));
+      assert.equal(listed.desiredEndAt, params.get("desiredEndAt"));
+      assert.equal(listed.desiredDate, "2026-10-13");
+      assert.equal(listed.desiredSlot, "10:00–11:00");
+      const adminDetail = await (await context.request.get(base + "/api/v1/admin/orders/" + created.id)).json();
+      assert.equal(adminDetail.desiredStartAt, params.get("desiredStartAt"));
+      assert.equal(adminDetail.phone, "010-1234-5678");
+      assert.match(adminDetail.history[0].createdAt, /Z$/);
+      assert.equal((await context.request.post(base + "/api/v1/auth/logout")).status(), 200);
+      assert.equal((await context.request.get(base + "/api/admin/catalog")).status(), 401);
 
       await page.locator(".checkout-pay-btn").click();
       await page.getByRole("heading", { name: "결제가 완료되었어요", exact: true }).waitFor();
@@ -68,7 +89,7 @@ fs.mkdirSync(shots, { recursive: true });
       await page.getByText("2026.10.13 · 00:00–01:00", { exact: true }).waitFor();
       if (timezoneId === "UTC") await page.screenshot({ path: path.join(shots, "orders-kst.jpg"), type: "jpeg", quality: 80 });
       assert.deepEqual(errors, []);
-      console.log(timezoneId + ": UTC request/storage, KST checkout/history and legacy history passed; no page errors.");
+      console.log(timezoneId + ": UTC request/storage, own/admin lists/details, admin login/logout, KST checkout/history and legacy history passed; no page errors.");
       await context.close();
     }
   } finally { await browser.close(); }

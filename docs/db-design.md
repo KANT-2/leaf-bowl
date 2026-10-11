@@ -344,6 +344,107 @@ erDiagram
 
 **한계**: 시험이 연결 1개라 "진짜 동시에 두 명"은 재현하지 못한다. `version` 조건이 0 건이 되어 덮어쓰기를 막는 논리까지만 확인했고, **읽기·쓰기 잠금(`FOR SHARE`/`FOR UPDATE`)은 실제 PostgreSQL 서버에서 따로 확인해야 한다.**
 
+### 세션 정리와 상한
+
+- 만료된 세션은 해당 토큰으로 다시 접근할 때만 지워지면 계속 쌓이므로, 세션을 발급할 때 1분에 한 번 `purgeExpired(now)` 로 쓸어낸다. DB 에서는 `DELETE FROM sessions WHERE expires_at <= $1` 이고 `idx_sessions_expires` 를 쓴다.
+- 비회원 세션은 동시에 유효한 개수에 상한(10,000)을 둔다. 상한에 이르면 새 세션 발급은 503, 이미 가진 세션은 계속 쓸 수 있다. **개수 확인과 저장은 한 번에(원자적으로) 해야 한다**: 먼저 세고 따로 저장하면 동시 요청이 모두 통과해 상한을 넘는다(상한 3에 동시 20건이 모두 성공하는 것을 재현했다). 저장소 계약의 `createSessionWithinLimit` 이 이를 맡고, DB 에서는 한 문장 `INSERT ... SELECT ... WHERE (SELECT count(*) FROM sessions WHERE kind = 'guest' AND expires_at > $1) < $2` 를 `pg_advisory_xact_lock` 아래에서 실행한다(READ COMMITTED 에서는 잠금 없이는 동시 삽입이 서로를 보지 못한다).
+- 로그인 시도 제한은 **계정이 존재하는지와 무관한** 키(아이디를 1,024칸으로 해시)를 쓴다. 존재 여부로 칸을 나누면 모르는 아이디와 실제 계정의 응답(429/401)이 달라져 계정 존재 여부가 드러난다. 비밀번호 검사의 CPU 총량은 전체 한도(분당 120)로 따로 제한한다.
+- **제한 사항 (알고 선택한 트레이드오프)**
+  - **아이디별 독립 카운터가 아니다.** 아이디는 1,024칸을 공유하고 칸 안에서 카운터를 같이 쓴다. 기본 한도는 칸당 분당 10회다.
+  - **충돌하는 아이디로 관리자 로그인을 1분간 막을 수 있다.** 예: 존재하지 않는 `collision-687` 은 `admin` 과 같은 `account:741` 칸이다. `collision-687` 로 틀린 시도 10회(401) 뒤에는 올바른 `admin` 비밀번호도 429 이고, 60초가 지나면 다시 200 이다(`tests/session-abuse.test.cjs`). 이는 `admin` 을 직접 10회 틀려 잠그는 것과 같은 효과라 공격자의 능력이 늘지는 않지만, `admin` 이라는 아이디를 보내지 않고도 가능하다. 해시가 비밀값 없는 SHA-256 이라 충돌 아이디는 약 1,024회 계산으로 찾을 수 있다. "임의의 아이디 공격이 관리자 로그인을 막지 않는다"는 말은 무작위 아이디(테스트의 `ghost-0`~`ghost-299` 300개 샘플)에서만 관찰된 것이며 일반 보장이 아니다.
+  - **전체 한도(분당 120)는 전체 로그인을 잠글 수 있다.** 누구나 1분에 요청 120개를 보내면 관리자를 포함한 모든 로그인이 그 구간 동안 429 이다. CPU 보호(비밀번호 검사 총량 제한)를 가용성보다 우선한 선택이다. 세션 발급 전체 한도(분당 120)도 같은 방식으로 새 방문자의 발급을 막을 수 있다.
+  - 요청자별 제한은 신뢰할 프록시(`TRUSTED_PROXY_HOPS`) 확인 후에 보완할 수 있다. 메모리 저장소(mock) 기준이라 서버를 다시 시작하면 제한 카운터와 세션이 사라지고, 서버가 여러 대면 공유되지 않는다.
+- 요청 제한기(로그인·세션·주문)는 서버 메모리의 임시 장치다. 서버가 여러 대가 되면 DB 나 Redis 로 옮겨야 한다.
+
+### 저장소 트랜잭션 계약 (제안, 정민님과 합의 필요)
+
+"DB 가 준비되면 `container.ts` 에서 저장소만 바꾸면 된다"는 말은 **route 와 service 의 업무 규칙은 그대로 둔다**는 뜻에서만 맞다. 지금의 저장소 계약(`modules/orders/repository.ts`)은 설계안(`docs/backend-design.md` "주문 API와 트랜잭션 처리")이 요구하는 트랜잭션을 표현하지 못해서, DB 를 붙일 때 **계약 자체를 아래처럼 바꿔야** 한다.
+
+**설계안과 현재 구현의 차이**
+
+| 설계안 | 현재 구현 | 차이 |
+| --- | --- | --- |
+| 기존 키 확인 → 상품 검증·가격 계산 → 주문·항목·이력 저장을 `prisma.$transaction` 한 번에 | `findByRequest`, `getCatalog`, `create` 가 각각 따로 호출된다. `create` 안에서만 주문·항목·접수 이력을 한 번에 저장한다 | 키 확인과 카탈로그 읽기가 저장과 같은 트랜잭션에 묶이지 않는다 |
+| Service 가 연 `tx` 를 모든 Repository 호출에 전달 | `tx` 개념이 계약에 없다 | Repository 가 트랜잭션을 스스로 열면 service 가 앞선 읽기를 포함시킬 수 없다 |
+| 카탈로그 버전 행을 읽기 잠금(`FOR SHARE`), 관리자 저장은 쓰기 잠금(`FOR UPDATE`) | `getCatalog()` 는 파일 저장소를 읽고 잠금이 없다 | 가격 계산 중 관리자가 상품을 바꿔도 막지 못한다 |
+| 상태 변경: 조건부 갱신 + `version + 1` + 이력을 한 트랜잭션에 | `updateStatus` 한 메서드 안에서 처리한다는 주석뿐 | 계약에 "셋이 함께 성공하거나 함께 취소"가 명시되어 있지 않다 |
+
+**실제 PostgreSQL 엔진(PGlite)으로 확인한 동작** (`schema.sql` 의 `orders`, `order_status_history`)
+
+| 시도 | 결과 |
+| --- | --- |
+| 같은 트랜잭션 안에서 `(customer_session_id, request_key)` 중복 INSERT | `23505` 오류. 이 트랜잭션은 **중단 상태**가 되어 이어지는 SELECT 도 `current transaction is aborted` 로 실패한다 |
+| 롤백 후 새 트랜잭션에서 기존 주문 재조회 | 가능 |
+| `SAVEPOINT` 로 INSERT 를 감싸고 오류 시 `ROLLBACK TO SAVEPOINT` | 같은 트랜잭션에서 재조회 가능 |
+| `INSERT ... ON CONFLICT (customer_session_id, request_key) DO NOTHING RETURNING id` | 오류 없이 0행, 같은 트랜잭션에서 재조회 가능 |
+| 상태 `UPDATE` 후 이력 INSERT 가 실패 | 롤백하면 `status`, `version` 이 원래대로 돌아온다 (둘은 한 트랜잭션이어야 한다) |
+
+즉 **P2002 처리는 "트랜잭션을 끝낸 뒤 밖에서 기존 주문을 다시 읽는" 구조여야 한다.** 지금 service 의 `catch (DuplicateRequestError) → findByRequest` 는 이 구조라 그대로 쓸 수 있지만, 그 재조회는 반드시 실패한 트랜잭션 **밖**의 호출이어야 한다.
+
+**제안하는 최소 계약** (코드는 아직 바꾸지 않았다. 합의 후 DB 연결 때 함께 적용)
+
+```ts
+/** 하나의 DB 트랜잭션 안에서만 쓰는 연산. 콜백 밖으로 꺼내 쓰지 않는다 */
+interface OrdersTx {
+  readCatalog(): Promise<Catalog>;                 // 카탈로그 버전 행 FOR SHARE 후 같은 트랜잭션에서 읽기
+  findByRequest(sessionId: string, key: string): Promise<OrderRecord | null>;
+  insertOrder(order: NewOrder): Promise<OrderRecord>;   // 주문 + 항목 + 접수 이력. 키 중복이면 DuplicateRequestError
+  findById(id: string): Promise<OrderRecord | null>;
+  /** id + version + status 조건 갱신, version + 1, 취소 시각·사유, 상태 이력 INSERT 를 모두 이 트랜잭션에서. 조건이 안 맞으면 null */
+  updateStatus(update: StatusUpdate): Promise<OrderRecord | null>;
+}
+
+interface OrdersRepository {
+  /** fn 이 던지면 전체를 롤백하고 그 오류를 다시 던진다. 일시적 충돌(P2034)은 최대 3회 다시 실행한다 */
+  transaction<T>(fn: (tx: OrdersTx) => Promise<T>): Promise<T>;
+  // 트랜잭션이 필요 없는 읽기
+  findByRequest(sessionId: string, key: string): Promise<OrderRecord | null>;
+  findById(id: string): Promise<OrderRecord | null>;
+  list(query: ListQuery): Promise<OrderRecord[]>;
+}
+```
+
+규칙
+
+1. `transaction` 의 콜백은 **다시 실행되어도 안전**해야 한다(P2034 재시도). 콜백 안에서 파일 업로드 같은 외부 호출을 하지 않는다.
+2. 주문 생성은 한 콜백 안에서 `findByRequest → readCatalog → 가격 계산·검증 → insertOrder` 를 한다. `DuplicateRequestError` 는 콜백 밖에서 잡아 `repository.findByRequest` 로 다시 읽고 해시를 비교한다(같으면 기존 주문, 다르면 409).
+3. 상태 변경·취소는 `transaction(tx => tx.updateStatus(...))` 로 한다. 상태·`version`·이력이 한 번에 반영되거나 한 번에 취소된다. 취소가 관리자 변경과 겹쳐 `null` 이면 service 가 최신 상태를 다시 읽어 판단한다(현재 구현 그대로).
+4. 메모리 구현은 같은 계약으로 쓸 수 있다: `transaction` 이 변경을 임시 버퍼에 쓰고 콜백이 성공하면 반영, 실패하면 버린다.
+
+**정민님과 합의할 것**
+
+1. 위 계약의 방향(`transaction` + `OrdersTx`)이 설계안의 의도와 맞는지.
+2. 카탈로그 읽기 잠금을 `OrdersTx.readCatalog()` 로 둘지, `modules/catalog` 가 `tx` 를 받아 읽게 할지 (카탈로그 저장소 통합 담당과 맞춰야 한다).
+3. 격리 수준: 기본(READ COMMITTED) + 조건부 `UPDATE` + 카탈로그 `FOR SHARE` 로 충분한지.
+
+이 절은 **제안**이다. Prisma 저장소 구현이나 `docs/backend-design.md` 의 수정은 포함하지 않는다.
+
+### Prisma 스키마 초안 (`prisma/schema.prisma`)
+
+DB 를 붙이기 전에 설계안(`docs/backend-design.md` "Prisma 구성과 데이터 모델")의 모델을 미리 만들어 둔 **부분 초안**이다.
+
+| 항목 | 내용 |
+| --- | --- |
+| 범위 | `AdminUser`, `Session`, `Order`, `OrderItem`, `OrderStatusHistory`, `Product`(주문 항목이 참조). 옵션 그룹·재료·리뷰·콘텐츠 등 나머지 카탈로그 테이블은 상품 API 통합(#72)·카탈로그 저장소 전환 때 같은 방식으로 추가한다 |
+| 이름 | 테이블·컬럼·인덱스 이름을 `db/schema.sql` 그대로 `@@map`·`@map`·`map:` 으로 맞췄다 (기존 DB 를 `db pull` 로 편입할 때 어긋나지 않게) |
+| 금액 | `BigInt` (JSON 응답에서는 십진 문자열), 옵션 스냅샷은 `Json`(`JSONB`) |
+| 검증 | Prisma 7.10.0 으로 `prisma validate` 통과, `prisma format --check` 통과, 임시 폴더에서 `prisma generate` 로 Client 생성 성공, `prisma migrate diff --from-empty --to-schema --script` 로 생성되는 DDL 을 `db/schema.sql` 과 대조했다. DB 연결은 하지 않았다 |
+| 외래키 | `db/schema.sql` 은 `ON UPDATE` 를 생략(= `NO ACTION`)하는데 Prisma 기본값은 `Cascade` 라서, 5개 관계 모두 `onUpdate: NoAction` 을 명시했다. 생성 DDL 로 `ON DELETE CASCADE/SET NULL` + `ON UPDATE NO ACTION` 이 SQL 과 같음을 확인했다 |
+
+**Prisma 스키마로 표현할 수 없어서 마이그레이션 SQL 에 그대로 보존해야 하는 것**: CHECK 제약(상태 값, `total = subtotal + delivery_fee`, 취소 상태·시각 일치, 수량 1~99, 세션 종류와 관리자 계정 일치), 생성 컬럼과 복합 외래키 `(id, type)`, 부분 유니크 인덱스 `uq_product_dressings_default`, 뷰 `product_availability`·`bowl_match_ingredients`, 트리거 `trg_order_status_transition`. 이것들은 `db/schema.sql` 에 이미 있으므로 baseline 마이그레이션에 포함한다.
+
+**Prisma 가 새로 만든 DDL 과 `db/schema.sql` 의 알려진 차이**
+
+1. `order_items.id`, `order_status_history.id`: SQL 은 `GENERATED ALWAYS AS IDENTITY`, Prisma `autoincrement()` DDL 은 `BIGSERIAL`. **ID 를 생략해 자동 발급받는 INSERT 에서는 같은 역할**이지만 **명시 ID 를 넣는 INSERT 는 다르다.** 실제 PostgreSQL 엔진(PGlite)으로 확인: `ALWAYS` 는 `cannot insert a non-DEFAULT value into column "id"` 로 거부하고(`OVERRIDING SYSTEM VALUE` 를 붙이면 허용), `BIGSERIAL` 은 명시 ID 를 그대로 받는다. 그래서 둘을 서로 바꿔 쓸 수 있는 것으로 보면 안 된다. 앱은 이 두 테이블의 ID 를 직접 지정하지 않는다.
+2. 시각 기본값 `CURRENT_TIMESTAMP`(SQL 은 `now()`, 같은 값).
+3. CHECK 제약·트리거·뷰 등 Prisma 로 표현하지 못하는 규칙은 위 목록처럼 **이 스키마에서는 빠져 있고 동등하지 않다.** baseline 마이그레이션에서 `db/schema.sql` 의 것을 보존해야 한다.
+
+그래서 **새 DB 를 Prisma 마이그레이션으로 처음부터 만들지 않고**, `db/schema.sql` 로 만든 DB 를 `prisma db pull` 로 편입(baseline)한다. 이때 IDENTITY 컬럼이 `autoincrement()` 로 읽히는 것은 Prisma 문서 기준이며 실제 `db pull` 로는 아직 확인하지 않았다(DB 가 없다).
+
+**아직 하지 않은 것**: `package.json` 의존성(`prisma`, `@prisma/client`, `@prisma/adapter-pg`)과 `prisma.config.ts` 추가(설정 파일이라 정민님 담당), 마이그레이션 생성·적용, Client 를 쓰는 저장소 구현, CI 의 Prisma 검증 단계.
+
+**참고**: 개발 서버(Fedora 컨테이너)에서는 Prisma CLI 가 시작 단계에서 세그폴트(종료 코드 139)로 죽어서, 검증은 Windows(Node 24)에서 했다. CI(GitHub Actions)나 배포 서버에 Prisma 검증을 넣을 때는 그 환경에서 CLI 가 도는지 먼저 확인해야 한다.
+
 ### 이번에 넣지 않은 것
 
 - 고객 계정(회원): 설계안은 "고객 세션"만 있다. 프론트의 로그인·마이페이지(#55, mock)와 맞추려면 고객 계정 테이블이 필요하며, 범위는 팀 결정을 기다린다.

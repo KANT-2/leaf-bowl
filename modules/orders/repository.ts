@@ -9,9 +9,12 @@ export class DuplicateRequestError extends Error {
 }
 
 /**
- * 저장소 계약. 지금은 memory-repository.ts 가 구현하고,
- * DB 가 준비되면 같은 계약을 Prisma 로 구현해 container.ts 에서 바꿔 끼운다.
- * create 는 주문·항목·접수 이력을 한 번에(한 트랜잭션처럼) 저장해야 한다.
+ * 저장소 계약. 지금은 memory-repository.ts 가 구현한다.
+ *
+ * 주의: 이 계약은 DB 트랜잭션을 표현하지 못한다. `create`·`updateStatus` 가 각자 원자적으로 저장할 뿐,
+ * 설계안(docs/backend-design.md)이 요구하는 "기존 키 확인 → 카탈로그 검증·가격 계산 → 저장을 한 트랜잭션에"
+ * 는 담을 수 없다. DB 를 붙일 때는 `transaction(fn)` 형태로 계약을 바꿔야 하며, 제안은
+ * docs/db-design.md 의 "저장소 트랜잭션 계약" 에 있다 (정민님과 합의 후 적용).
  */
 export interface OrdersRepository {
   findByRequest(customerSessionId: string, requestKey: string): Promise<OrderRecord | null>;

@@ -1,0 +1,164 @@
+// leaf & bowl Prisma 스키마 초안 (부분)
+//
+// 범위: 주문·인증(AdminUser, Session, Order, OrderItem, OrderStatusHistory)과 주문 항목이 참조하는 Product.
+// 나머지 카탈로그 테이블(옵션 그룹·재료·리뷰·콘텐츠 등)은 상품 API 통합(#72)·카탈로그 저장소 전환 때 같은 방식으로 추가한다.
+//
+// 기준: db/schema.sql (테이블·컬럼·인덱스 이름을 그대로 @@map/@map/map 으로 맞췄다). docs/backend-design.md "Prisma 구성과 데이터 모델".
+//
+// Prisma 스키마로 표현할 수 없는 DB 규칙은 **마이그레이션 SQL 에 그대로 보존**해야 한다 (db/schema.sql 참고):
+//   - CHECK 제약: 상태 값, 금액 합계 `total = subtotal + delivery_fee`, 취소 상태·시각 일치, 수량 1~99, 세션 종류와 관리자 계정 일치 등
+//   - 생성 컬럼과 복합 외래키 `(id, type)` (product_ingredients, product_dressings)
+//   - 부분 유니크 인덱스 `uq_product_dressings_default`, 뷰 `product_availability`·`bowl_match_ingredients`
+//   - 트리거 `trg_order_status_transition` (허용된 주문 상태 순서)
+// 그래서 기존 DB 편입은 `prisma db pull` 로 baseline 을 잡고 SQL 은 migration 에 포함하는 방식을 따른다.
+//
+// 외래키: db/schema.sql 은 ON UPDATE 를 생략(= NO ACTION)하므로 모든 관계에 `onUpdate: NoAction` 을 명시했다 (Prisma 기본값은 Cascade).
+// 알려진 차이: order_items.id·order_status_history.id 는 SQL 이 GENERATED ALWAYS AS IDENTITY, Prisma DDL 은 BIGSERIAL.
+// ID 를 생략해 자동 발급받는 INSERT 에서는 같은 역할이지만 명시 ID INSERT 는 다르다(ALWAYS 는 거부, BIGSERIAL 은 허용). 앱은 이 ID 를 직접 지정하지 않는다.
+// CHECK·트리거·뷰는 이 스키마에 없고 동등하지 않다. 새 DB 를 이 스키마로 만들지 말고 db/schema.sql 로 만든 DB 를 `prisma db pull` 로 편입(baseline)한다.
+//
+// 이 파일은 DB 연결 없이 `prisma validate` 로 문법·관계를 검증했다. 마이그레이션 생성·적용과 Client 사용은 DB 준비 후.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// 관리자 계정. 비밀번호는 해시만 저장한다.
+model AdminUser {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  loginId      String   @unique @map("login_id") @db.VarChar(50)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  disabled     Boolean  @default(false)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  sessions Session[]
+  history  OrderStatusHistory[]
+
+  @@map("admin_users")
+}
+
+/// 방문자(비회원) 또는 관리자 세션. 브라우저 쿠키에는 원본 토큰, DB 에는 토큰의 해시만 저장한다.
+model Session {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tokenHash   String   @unique @map("token_hash") @db.VarChar(64)
+  /// 'admin' | 'guest' (CHECK 는 migration SQL 에 보존)
+  kind        String   @db.VarChar(10)
+  adminUserId String?  @map("admin_user_id") @db.Uuid
+  expiresAt   DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  adminUser AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([expiresAt], map: "idx_sessions_expires")
+  @@map("sessions")
+}
+
+/// 주문. 금액은 원 단위 BigInt, JSON 응답에서는 십진 문자열로 내려간다.
+model Order {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// 주문한 비회원 세션. 세션이 지워져도 주문은 남기므로 외래키를 걸지 않는다
+  customerSessionId String    @map("customer_session_id") @db.Uuid
+  /// 'received' | 'confirmed' | 'preparing' | 'delivering' | 'completed' | 'canceled'
+  status            String    @default("received") @db.VarChar(10)
+  /// 동시 변경 방지용 낙관적 잠금. updateMany 의 where 에 id + version + status 를 넣는다
+  version           Int       @default(1)
+  ordererName       String    @map("orderer_name") @db.VarChar(50)
+  phone             String    @db.VarChar(30)
+  address           String    @db.VarChar(300)
+  addressDetail     String    @default("") @map("address_detail") @db.VarChar(200)
+  /// 배송 예약은 UTC 절대 시각. KST 날짜·슬롯은 응답에서 계산한다
+  desiredStartAt    DateTime  @map("desired_start_at") @db.Timestamptz(6)
+  desiredEndAt      DateTime  @map("desired_end_at") @db.Timestamptz(6)
+  subtotal          BigInt
+  deliveryFee       BigInt    @map("delivery_fee")
+  total             BigInt
+  /// 재전송 식별키(Idempotency-Key)와 요청 내용 해시
+  requestKey        String    @map("request_key") @db.VarChar(80)
+  requestHash       String    @map("request_hash") @db.VarChar(64)
+  cancelReason      String?   @map("cancel_reason") @db.VarChar(200)
+  canceledAt        DateTime? @map("canceled_at") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  items   OrderItem[]
+  history OrderStatusHistory[]
+
+  /// 같은 방문자가 같은 키로 다시 보내도 주문은 한 건 (P2002 → 기존 주문 재조회)
+  @@unique([customerSessionId, requestKey], map: "uq_order_request")
+  /// 관리자 목록: 상태별 최신순 + 마지막으로 본 주문 기준 다음 쪽
+  @@index([status, createdAt(sort: Desc), id(sort: Desc)], map: "idx_orders_list")
+  @@index([customerSessionId, createdAt(sort: Desc)], map: "idx_orders_session")
+  @@map("orders")
+}
+
+/// 주문 항목. 주문 당시의 상품명·옵션·단가를 복사해서 저장한다 (이후 상품이 바뀌거나 지워져도 주문 내역은 그대로).
+model OrderItem {
+  id        BigInt  @id @default(autoincrement())
+  orderId   String  @map("order_id") @db.Uuid
+  /// 참고용. 상품이 지워져도 항목은 남는다
+  productId String? @map("product_id") @db.VarChar(80)
+  name      String  @db.VarChar(80)
+  options   Json    @default("{}") @db.JsonB
+  unitPrice BigInt  @map("unit_price")
+  quantity  Int
+
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([orderId], map: "idx_order_items_order")
+  @@map("order_items")
+}
+
+/// 상태 변경 이력: 누가 언제 무엇에서 무엇으로 바꿨는가.
+model OrderStatusHistory {
+  id          BigInt   @id @default(autoincrement())
+  orderId     String   @map("order_id") @db.Uuid
+  /// 처음 접수할 때는 NULL
+  fromStatus  String?  @map("from_status") @db.VarChar(10)
+  toStatus    String   @map("to_status") @db.VarChar(10)
+  /// 'customer' | 'admin' | 'system'
+  changedBy   String   @map("changed_by") @db.VarChar(10)
+  adminUserId String?  @map("admin_user_id") @db.Uuid
+  reason      String?  @db.VarChar(200)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  order     Order      @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  adminUser AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([orderId, createdAt], map: "idx_order_history_order")
+  @@map("order_status_history")
+}
+
+/// 상품(샐러드·음료·드레싱). 지금은 주문 항목이 참조하는 열만이 아니라 db/schema.sql 의 컬럼을 모두 옮겼다.
+model Product {
+  id          String   @id @db.VarChar(80)
+  /// 고객 주소 번호 (/product/0). 샐러드만
+  customerId  Int?     @unique @map("customer_id")
+  /// 'salad' | 'drink' | 'dressing'
+  type        String   @db.VarChar(10)
+  name        String   @db.VarChar(80)
+  nameEn      String?  @map("name_en") @db.VarChar(100)
+  price       Int
+  description String   @default("") @db.VarChar(600)
+  ingredients String?  @db.VarChar(600)
+  category    String   @db.VarChar(80)
+  /// 'active' | 'soldout' | 'hidden'
+  status      String   @default("active") @db.VarChar(10)
+  badge       String   @default("") @db.VarChar(5)
+  image       String   @default("") @db.VarChar(200)
+  deleted     Boolean  @default(false)
+  sortOrder   Int      @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  orderItems OrderItem[]
+
+  @@unique([id, type], map: "uq_products_id_type")
+  @@index([type, sortOrder], map: "idx_products_type")
+  @@map("products")
+}

@@ -2,8 +2,10 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { dataDirectory } from '@/lib/admin/store';
 import { jsonError, sameOrigin, readLimited, BodyTooLarge } from '@/lib/admin/server';
+import { adminGate } from '@/modules/identity/legacy-admin';
 export async function POST(request: Request) { if (!sameOrigin(request))
-    return jsonError('허용되지 않은 요청입니다.', 403); try {
+    return jsonError('허용되지 않은 요청입니다.', 403); const denied = await adminGate(request); if (denied)
+    return denied; try {
 
     if (Number(request.headers.get('content-length')) > 6 * 1024 * 1024)
         return jsonError('이미지는 5MB 이하로 올려주세요.', 413);
