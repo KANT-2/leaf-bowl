@@ -417,6 +417,23 @@ interface OrdersRepository {
 
 이 절은 **제안**이다. Prisma 저장소 구현이나 `docs/backend-design.md` 의 수정은 포함하지 않는다.
 
+### Prisma 스키마 초안 (`prisma/schema.prisma`)
+
+DB 를 붙이기 전에 설계안(`docs/backend-design.md` "Prisma 구성과 데이터 모델")의 모델을 미리 만들어 둔 **부분 초안**이다.
+
+| 항목 | 내용 |
+| --- | --- |
+| 범위 | `AdminUser`, `Session`, `Order`, `OrderItem`, `OrderStatusHistory`, `Product`(주문 항목이 참조). 옵션 그룹·재료·리뷰·콘텐츠 등 나머지 카탈로그 테이블은 상품 API 통합(#72)·카탈로그 저장소 전환 때 같은 방식으로 추가한다 |
+| 이름 | 테이블·컬럼·인덱스 이름을 `db/schema.sql` 그대로 `@@map`·`@map`·`map:` 으로 맞췄다 (기존 DB 를 `db pull` 로 편입할 때 어긋나지 않게) |
+| 금액 | `BigInt` (JSON 응답에서는 십진 문자열), 옵션 스냅샷은 `Json`(`JSONB`) |
+| 검증 | Prisma 7.10.0 으로 `prisma validate` 통과, `prisma format --check` 통과, 임시 폴더에서 `prisma generate` 로 Client 생성 성공. DB 연결은 하지 않았다 |
+
+**Prisma 스키마로 표현할 수 없어서 마이그레이션 SQL 에 그대로 보존해야 하는 것**: CHECK 제약(상태 값, `total = subtotal + delivery_fee`, 취소 상태·시각 일치, 수량 1~99, 세션 종류와 관리자 계정 일치), 생성 컬럼과 복합 외래키 `(id, type)`, 부분 유니크 인덱스 `uq_product_dressings_default`, 뷰 `product_availability`·`bowl_match_ingredients`, 트리거 `trg_order_status_transition`. 이것들은 `db/schema.sql` 에 이미 있으므로 baseline 마이그레이션에 포함한다.
+
+**아직 하지 않은 것**: `package.json` 의존성(`prisma`, `@prisma/client`, `@prisma/adapter-pg`)과 `prisma.config.ts` 추가(설정 파일이라 정민님 담당), 마이그레이션 생성·적용, Client 를 쓰는 저장소 구현, CI 의 Prisma 검증 단계.
+
+**참고**: 개발 서버(Fedora 컨테이너)에서는 Prisma CLI 가 시작 단계에서 세그폴트(종료 코드 139)로 죽어서, 검증은 Windows(Node 24)에서 했다. CI(GitHub Actions)나 배포 서버에 Prisma 검증을 넣을 때는 그 환경에서 CLI 가 도는지 먼저 확인해야 한다.
+
 ### 이번에 넣지 않은 것
 
 - 고객 계정(회원): 설계안은 "고객 세션"만 있다. 프론트의 로그인·마이페이지(#55, mock)와 맞추려면 고객 계정 테이블이 필요하며, 범위는 팀 결정을 기다린다.
