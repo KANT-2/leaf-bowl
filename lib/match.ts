@@ -1,3 +1,4 @@
+import { normalizeUTC, legacyKSTUTC } from "./time";
 import { readBrowserJSON as read, writeBrowserJSON as write } from "./browser-json";
 import type { Ingredient, Stage } from "./data/ingredients";
 import { createLocalStore, type LocalStore } from "./local-store";
@@ -70,7 +71,7 @@ function loadRecipe(): SavedRecipe | null {
     return null;
   const key = (r as SavedRecipe).dressingKey;
   if (key !== undefined && (typeof key !== "string" || !key || key.length > 80)) return null;
-  return { name: name.slice(0, 30), ingredients, dressing, dressingKey: recipeDressingKey({ dressing, dressingKey: key }), price: Number(price) || 0, savedAt: String(savedAt ?? "") };
+  return { name: name.slice(0, 30), ingredients, dressing, dressingKey: recipeDressingKey({ dressing, dressingKey: key }), price: Number(price) || 0, savedAt: normalizeUTC(savedAt) ?? legacyKSTUTC(savedAt) ?? "" };
 }
 
 const NO_DECISIONS: Decision[] = [];
@@ -96,4 +97,4 @@ function createMemoryStore<T>(empty: T): LocalStore<T> {
 // 재료 고르기 진행 상황은 이번 방문에서만 유지한다 ("내 조합 저장하기"로 남긴 조합과는 다르게,
 // 다른 페이지로 갔다 오거나 새로고침하면 새로 시작한다).
 export const decisionsStore = createMemoryStore<Decision[]>(NO_DECISIONS);
-export const recipeStore = createLocalStore<SavedRecipe | null>(RECIPE_KEY, loadRecipe, (v) => write(RECIPE_KEY, v), null);
+export const recipeStore = createLocalStore<SavedRecipe | null>(RECIPE_KEY, loadRecipe, (v) => write(RECIPE_KEY, v ? { ...v, savedAt: normalizeUTC(v.savedAt) ?? legacyKSTUTC(v.savedAt) ?? "" } : null), null);

@@ -1,3 +1,5 @@
+import { utcTimestampSchema } from "@/lib/utc-timestamp";
+import { kstDate, kstSlotStart } from "@/lib/time";
 import { z } from 'zod';
 import type { Catalog } from './catalog';
 
@@ -7,11 +9,11 @@ export type SalesProductType = typeof salesProductTypes[number];
 export const salesPeriods = ['all', 'today', '7d', '30d'] as const;
 export type SalesPeriod = typeof salesPeriods[number];
 export const salesDataSchema = z.object({
-  updatedAt: z.string().datetime({ offset: true }),
+  updatedAt: utcTimestampSchema,
   orders: z.array(z.object({
     id: z.string().min(1),
     status: z.enum(['pending', 'paid', 'completed', 'cancelled', 'refunded']),
-    paidAt: z.string().datetime({ offset: true }).nullable(),
+    paidAt: utcTimestampSchema.nullable(),
     items: z.array(z.object({
       productId: z.string().min(1),
       productType: z.enum(['salad', 'drink', 'dressing', 'custom']),
@@ -41,9 +43,9 @@ export type SalesReport = {
 // Periods use Korean calendar days, including today, and never include future sales.
 export function salesPeriodStart(period: SalesPeriod, now: Date): number {
   if (period === 'all') return -Infinity;
-  const koreanDay = new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const koreanDay = kstDate(now.getTime());
   const days = period === '7d' ? 7 : period === '30d' ? 30 : 1;
-  return Date.parse(`${koreanDay}T00:00:00+09:00`) - (days - 1) * 86400000;
+  return Date.parse(kstSlotStart(koreanDay, "00:00")!) - (days - 1) * 86400000;
 }
 
 export function buildSalesReport(catalog: Catalog, data: SalesData | null, period: SalesPeriod, now = new Date(), productType: SalesProductType = 'salad'): SalesReport {

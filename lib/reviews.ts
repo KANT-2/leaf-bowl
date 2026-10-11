@@ -1,3 +1,5 @@
+import { kstDate } from "./time";
+
 /** 리뷰 한 개에 올릴 수 있는 사진 수 */
 export const REVIEW_PHOTO_MAX = 3;
 
@@ -91,8 +93,12 @@ export function statsOf(list: Review[]): ReviewStats {
 }
 
 export function dateStr(t: number): string {
-  const d = new Date(t);
-  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+  return kstDate(t).replaceAll("-", ".");
+}
+
+/** Timestamp wins over cached display text, including dates saved by older clients. */
+export function reviewDisplayDate(review: Pick<Review, "t" | "date">): string {
+  return Number.isFinite(new Date(review.t).getTime()) && review.t !== 0 ? dateStr(review.t) : review.date;
 }
 
 export const RATE_LABELS = ["", "아쉬워요", "별로예요", "보통이에요", "좋아요", "최고예요"];

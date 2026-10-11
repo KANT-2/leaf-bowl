@@ -1,4 +1,6 @@
 /** 배송 예약은 UTC ISO 문자열로 전달·저장하고 KST로만 표시한다. */
+import { kstDate } from "./time";
+export { kstDate } from "./time";
 const HOUR = 3_600_000;
 const KST_OFFSET = 9 * HOUR;
 const utcPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
@@ -14,10 +16,6 @@ export function utcISOString(value: string): string | null {
   if (!Number.isFinite(date.getTime())) return null;
   const canonical = value.length === 20 ? value.replace("Z", ".000Z") : value;
   return date.toISOString() === canonical ? canonical : null;
-}
-
-export function kstDate(ms: number): string {
-  return new Date(ms + KST_OFFSET).toISOString().slice(0, 10);
 }
 
 /** KST 달력 날짜와 정시 한 시간 슬롯을 UTC로 바꾼다. 23:00–24:00도 지원한다. */

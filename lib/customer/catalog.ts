@@ -1,9 +1,10 @@
+import { reviewTimestamp } from "@/lib/review-time";
 import type { Snapshot } from "@/lib/admin/catalog";
 import type { Product } from "@/types/product";
 import { NUTRITION, DRESSING_KCAL, DRINK_KCAL } from "@/lib/products";
 import { HERO_SLIDES } from "@/lib/data/hero";
 import type { Ingredient } from "@/lib/data/ingredients";
-import type { Review } from "@/lib/reviews";
+import { reviewDisplayDate, type Review } from "@/lib/reviews";
 import { createCartSelectors } from "./cart-selectors";
 
 const split = (s: string) =>
@@ -88,6 +89,7 @@ export function customerCatalog(snapshot: Snapshot) {
   const reviews: Review[] = (catalog.reviews ?? [])
     .filter((r) => !r.deleted)
     .flatMap((r) => {
+      const t = reviewTimestamp(r) ?? 0;
       const product = salads.find(
         (p) =>
           p.id === r.productId ||
@@ -103,9 +105,9 @@ export function customerCatalog(snapshot: Snapshot) {
               title: r.title,
               text: r.body,
               images: r.images,
-              date: r.date,
+              date: reviewDisplayDate({ t, date: r.date }),
               via: r.via ?? "delivery",
-              t: Date.parse(r.createdAt ?? r.date.replaceAll(".", "-")) || 0,
+              t,
               sample: r.sample ?? r.id.startsWith("review-example"),
             },
           ]

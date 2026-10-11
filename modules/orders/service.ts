@@ -1,3 +1,4 @@
+import { kstDate } from "@/lib/time";
 import type { Catalog } from "@/lib/admin/catalog";
 import { decodeCursor, encodeCursor } from "../shared/cursor";
 import { AppError } from "../shared/errors";
@@ -21,7 +22,7 @@ const CHANGED_BY_OTHER = "다른 관리자가 먼저 변경했습니다. 새로 
 
 /** 한국 시간 기준 오늘 (YYYY-MM-DD) */
 function todayInSeoul(now: Date): string {
-  return new Date(now.getTime() + 9 * 3600_000).toISOString().slice(0, 10);
+  return kstDate(now.getTime());
 }
 
 export function createOrdersService({ repository, getCatalog, now = () => new Date() }: OrdersServiceDeps) {

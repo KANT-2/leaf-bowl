@@ -11,7 +11,7 @@ export const exampleReviews = [
     "author": "김**",
     "date": "2026.10.05",
     "deleted": false,
-    "createdAt": "2026-10-05T12:34:00+09:00"
+    "createdAt": "2026-10-05T03:34:00.000Z"
   },
   {
     "id": "review-example-1",
@@ -22,7 +22,7 @@ export const exampleReviews = [
     "author": "이**",
     "date": "2026.10.04",
     "deleted": false,
-    "createdAt": "2026-10-04T18:20:00+09:00"
+    "createdAt": "2026-10-04T09:20:00.000Z"
   },
   {
     "id": "review-example-2",
@@ -33,7 +33,7 @@ export const exampleReviews = [
     "author": "박**",
     "date": "2026.10.02",
     "deleted": false,
-    "createdAt": "2026-10-02T13:05:00+09:00"
+    "createdAt": "2026-10-02T04:05:00.000Z"
   },
   {
     "id": "review-example-3",
@@ -46,7 +46,7 @@ export const exampleReviews = [
     ],
     "author": "최**",
     "date": "2026.10.08",
-    "createdAt": "2026-10-08T12:45:00+09:00",
+    "createdAt": "2026-10-08T03:45:00.000Z",
     "deleted": false
   },
   {
@@ -60,7 +60,7 @@ export const exampleReviews = [
     ],
     "author": "정**",
     "date": "2026.10.08",
-    "createdAt": "2026-10-08T13:20:00+09:00",
+    "createdAt": "2026-10-08T04:20:00.000Z",
     "images": [
       "/admin-assets/reviews/chicken-avocado-review.png",
       "/admin-assets/reviews/chicken-avocado-detail.png",
