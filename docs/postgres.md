@@ -19,6 +19,12 @@ npm run dev
 
 `db:seed`는 카탈로그가 없을 때만 현재 앱의 초기값을 저장한다. 관리자 계정은 `ADMIN_LOGIN_ID`·`ADMIN_PASSWORD`를 모두 설정한 경우에만 만들고 기존 계정의 비밀번호는 덮어쓰지 않는다. 비밀번호는 scrypt 해시, 쿠키 토큰은 SHA-256 해시로만 DB에 저장한다. 기본 관리자 비밀번호는 없다. 기존 계정의 비밀번호를 바꾸려면 별도의 관리자 관리 작업이 필요하다.
 
+현재 개발 MCP 컨테이너에서는 기본 Node 22.23.1로 Prisma CLI가 종료 코드 139를 반환했다. 같은 컨테이너의 Node 24.17.0에서는 generate·validate가 정상 동작하므로 leaf-bowl 개발 서버만 별도 Node 24 도구 경로를 사용한다. 해당 컨테이너의 터미널에서 Prisma 명령을 실행할 때도 먼저 다음 경로를 설정한다. 다른 프로젝트의 기본 Node 설정은 바꾸지 않는다. GitHub Actions의 Ubuntu·Node 22 검증은 통과했다.
+
+```sh
+export PATH=/workspace/.dev-mcp-home/leaf-bowl-toolchain/bin:$PATH
+```
+
 ## 기존 JSON을 가져오는 경우
 
 기존 앱의 저장을 잠시 멈추고 카탈로그·이미지 디렉터리를 보관한다. 새 DB에서 **seed보다 먼저** 실행한다.
