@@ -36,6 +36,8 @@ jobs:
         run: npm ci
       - name: Lint
         run: npm run lint
+      - name: Domain and API regression tests
+        run: npm test
       - name: Verify deployment policy and recovery
         run: python3 -m unittest discover -s ops -p 'test_*.py' -v
       - name: Build
