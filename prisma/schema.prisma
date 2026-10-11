@@ -13,8 +13,9 @@
 // 그래서 기존 DB 편입은 `prisma db pull` 로 baseline 을 잡고 SQL 은 migration 에 포함하는 방식을 따른다.
 //
 // 외래키: db/schema.sql 은 ON UPDATE 를 생략(= NO ACTION)하므로 모든 관계에 `onUpdate: NoAction` 을 명시했다 (Prisma 기본값은 Cascade).
-// 알려진 차이(동작은 같음): order_items.id·order_status_history.id 는 SQL 이 IDENTITY 인데 Prisma DDL 은 BIGSERIAL. 새 DB 를 이 스키마로 만들지 말고
-// db/schema.sql 로 만든 DB 를 `prisma db pull` 로 편입(baseline)한다.
+// 알려진 차이: order_items.id·order_status_history.id 는 SQL 이 GENERATED ALWAYS AS IDENTITY, Prisma DDL 은 BIGSERIAL.
+// ID 를 생략해 자동 발급받는 INSERT 에서는 같은 역할이지만 명시 ID INSERT 는 다르다(ALWAYS 는 거부, BIGSERIAL 은 허용). 앱은 이 ID 를 직접 지정하지 않는다.
+// CHECK·트리거·뷰는 이 스키마에 없고 동등하지 않다. 새 DB 를 이 스키마로 만들지 말고 db/schema.sql 로 만든 DB 를 `prisma db pull` 로 편입(baseline)한다.
 //
 // 이 파일은 DB 연결 없이 `prisma validate` 로 문법·관계를 검증했다. 마이그레이션 생성·적용과 Client 사용은 DB 준비 후.
 

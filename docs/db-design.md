@@ -431,7 +431,13 @@ DB 를 붙이기 전에 설계안(`docs/backend-design.md` "Prisma 구성과 데
 
 **Prisma 스키마로 표현할 수 없어서 마이그레이션 SQL 에 그대로 보존해야 하는 것**: CHECK 제약(상태 값, `total = subtotal + delivery_fee`, 취소 상태·시각 일치, 수량 1~99, 세션 종류와 관리자 계정 일치), 생성 컬럼과 복합 외래키 `(id, type)`, 부분 유니크 인덱스 `uq_product_dressings_default`, 뷰 `product_availability`·`bowl_match_ingredients`, 트리거 `trg_order_status_transition`. 이것들은 `db/schema.sql` 에 이미 있으므로 baseline 마이그레이션에 포함한다.
 
-**Prisma 가 새로 만든 DDL 과 `db/schema.sql` 의 알려진 차이(동작은 같다)**: ① `order_items.id`, `order_status_history.id` 는 SQL 이 `GENERATED ALWAYS AS IDENTITY` 인데 Prisma `autoincrement()` DDL 은 `BIGSERIAL` ② 시각 기본값 `CURRENT_TIMESTAMP`(SQL 은 `now()`, 같은 값) ③ CHECK 등은 위 목록. 그래서 **새 DB 를 Prisma 마이그레이션으로 처음부터 만들지 않고**, `db/schema.sql` 로 만든 DB 를 `prisma db pull` 로 편입(baseline)한다(이 경우 IDENTITY 는 `autoincrement()` 로 올바르게 읽힌다).
+**Prisma 가 새로 만든 DDL 과 `db/schema.sql` 의 알려진 차이**
+
+1. `order_items.id`, `order_status_history.id`: SQL 은 `GENERATED ALWAYS AS IDENTITY`, Prisma `autoincrement()` DDL 은 `BIGSERIAL`. **ID 를 생략해 자동 발급받는 INSERT 에서는 같은 역할**이지만 **명시 ID 를 넣는 INSERT 는 다르다.** 실제 PostgreSQL 엔진(PGlite)으로 확인: `ALWAYS` 는 `cannot insert a non-DEFAULT value into column "id"` 로 거부하고(`OVERRIDING SYSTEM VALUE` 를 붙이면 허용), `BIGSERIAL` 은 명시 ID 를 그대로 받는다. 그래서 둘을 서로 바꿔 쓸 수 있는 것으로 보면 안 된다. 앱은 이 두 테이블의 ID 를 직접 지정하지 않는다.
+2. 시각 기본값 `CURRENT_TIMESTAMP`(SQL 은 `now()`, 같은 값).
+3. CHECK 제약·트리거·뷰 등 Prisma 로 표현하지 못하는 규칙은 위 목록처럼 **이 스키마에서는 빠져 있고 동등하지 않다.** baseline 마이그레이션에서 `db/schema.sql` 의 것을 보존해야 한다.
+
+그래서 **새 DB 를 Prisma 마이그레이션으로 처음부터 만들지 않고**, `db/schema.sql` 로 만든 DB 를 `prisma db pull` 로 편입(baseline)한다. 이때 IDENTITY 컬럼이 `autoincrement()` 로 읽히는 것은 Prisma 문서 기준이며 실제 `db pull` 로는 아직 확인하지 않았다(DB 가 없다).
 
 **아직 하지 않은 것**: `package.json` 의존성(`prisma`, `@prisma/client`, `@prisma/adapter-pg`)과 `prisma.config.ts` 추가(설정 파일이라 정민님 담당), 마이그레이션 생성·적용, Client 를 쓰는 저장소 구현, CI 의 Prisma 검증 단계.
 
