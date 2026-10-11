@@ -5,8 +5,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useReviews } from "./ReviewsProvider";
 import { useToast } from "./ToastProvider";
 import {useCustomerCatalog} from "./CustomerCatalogProvider";
+import { createReviewSubmission } from "@/lib/review-submission";
 import { shrinkImage } from "@/lib/image";
-import { RATE_LABELS, REVIEW_PHOTO_MAX, dateStr, type Review } from "@/lib/reviews";
+import { RATE_LABELS, REVIEW_PHOTO_MAX, type Review } from "@/lib/reviews";
 
 const len = (s: string) => [...s].length;
 
@@ -69,6 +70,8 @@ function WriteDialog({ fixedPid, onAdded, onClosed }: DialogProps) {
   const { addReview } = useReviews();
   const {visibleProducts: PRODUCTS, getProduct}=useCustomerCatalog();
   const [saving,setSaving]=useState(false);
+  const submission = useRef<ReturnType<typeof createReviewSubmission> | null>(null);
+  const pending = useRef(false);
   const [photos, setPhotos] = useState<string[]>([]);
   const [reading, setReading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -132,7 +135,7 @@ function WriteDialog({ fixedPid, onAdded, onClosed }: DialogProps) {
 
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if(saving)return;
+    if(pending.current)return;
     const tTitle = title.trim();
     const tText = text.trim();
     const tNick = nick.trim();
@@ -156,20 +159,13 @@ function WriteDialog({ fixedPid, onAdded, onClosed }: DialogProps) {
       textRef.current?.focus();
       return;
     }
-    const now = Date.now();
-    const review: Review = {
-      id: "u" + now,
+    submission.current ??= createReviewSubmission();
+    const review = submission.current({
       pid,
       author: tNick ? [...tNick][0] + "**" : "익명",
-      stars,
-      title: tTitle,
-      text: tText,
-      date: dateStr(now),
-      via: "delivery",
-      t: now,
-      sample: false,
-      mine: true,
-    };
+      stars, title: tTitle, text: tText, via: "delivery",
+    }, photos);
+    pending.current = true;
     setSaving(true);
     try {
       await addReview(review, photos);
@@ -177,7 +173,7 @@ function WriteDialog({ fixedPid, onAdded, onClosed }: DialogProps) {
       close();
       onAdded(review);
     } catch {setMsg("리뷰를 저장하지 못했습니다. 다시 시도해주세요.");}
-    finally {setSaving(false);}
+    finally {pending.current = false; setSaving(false);}
   };
 
   const painted = hover || stars;

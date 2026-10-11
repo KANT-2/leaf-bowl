@@ -335,3 +335,27 @@ test("관리자 취소는 사유·시각·변경자를 기록하고, 음료 단�
   assert.equal(drinks.status, 201); // 4000원 x 5 = 20000, 배달비 3000
   assert.equal((await json(drinks)).total, "23000");
 });
+
+
+test("관리자 화면 어댑터로 실제 로그인·로그아웃 API 계약을 검증한다", async () => {
+  await setup();
+  const { submitAdminAuth } = require("../lib/admin/auth-client.ts");
+  const originalFetch = global.fetch;
+  const originalWindow = global.window;
+  global.window = { setTimeout, clearTimeout };
+  global.fetch = async (url, options) => {
+    const handler = url.endsWith("login") ? routes.login : routes.logout;
+    return handler.POST(new Request(BASE + url, options));
+  };
+  try {
+    await submitAdminAuth("login", { loginId: "admin", password: "test-password" });
+    await assert.rejects(submitAdminAuth("login", { loginId: "admin", password: "wrong" }), /아이디 또는 비밀번호/);
+    await submitAdminAuth("logout");
+    global.fetch = async () => { throw new TypeError("offline"); };
+    await assert.rejects(submitAdminAuth("login", { loginId: "admin", password: "test-password" }), /서버에 연결할 수 없습니다/);
+  } finally {
+    global.fetch = originalFetch;
+    if (originalWindow === undefined) delete global.window;
+    else global.window = originalWindow;
+  }
+});

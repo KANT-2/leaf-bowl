@@ -236,3 +236,28 @@ test("identity: 토큰 해시(64자)와 비밀번호 해시 검증", async () =>
   assert.equal(await idc.verifyPassword("wrong", h), false);
   assert.equal(await idc.verifyPassword("x", "plain"), false);
 });
+
+
+test("pricing: 모든 연결 그룹의 필수·다중 선택과 고객 화면 금액을 검증한다", () => {
+  const c = catalog();
+  const drinkGroup = c.groups.find((g) => g.source === "drinks");
+  drinkGroup.required = true;
+  const item = (extra = {}) => schema.orderItemSchema.parse({ productId: 0, dressingKey: dressingKey(c, "참깨"), quantity: 2, ...extra });
+  throws400(() => priceOrder(c, [item()]), /음료.*선택/);
+  const group = { id: "extra", name: "추가 토핑", source: "custom", required: true, multiple: false, choices: [{ id: "nuts", name: "견과", price: 800 }], deleted: false };
+  c.groups.push(group);
+  c.products.find((p) => p.customerId === 0).optionIds.push(group.id);
+  throws400(() => priceOrder(c, [item({ drinkKeys: [drinkKey(c, "오렌지 주스")] })]), /추가 토핑.*선택/);
+  const selections = { [c.groups.find((g) => g.source === "dressings").id]: [dressingKey(c, "참깨")], [drinkGroup.id]: [drinkKey(c, "오렌지 주스")], extra: ["nuts"] };
+  const input = schema.orderItemSchema.parse({ productId: 0, optionSelections: selections, quantity: 2 });
+  const priced = priceOrder(c, [input]);
+  const { customerCatalog } = require("../lib/customer/catalog.ts");
+  const client = customerCatalog({ catalog: c, revision: 1, updatedAt: "" });
+  assert.equal(Number(priced.lines[0].unitPrice), client.itemUnitPrice({ id: 0, dressing: -1, drinks: [], optionSelections: selections, qty: 2 }));
+  assert.equal(priced.lines[0].options.custom[0].name, "견과");
+  throws400(() => priceOrder(c, [{ ...input, optionSelections: { ...selections, extra: ["nuts", "nuts"] } }]), /중복/);
+  throws400(() => priceOrder(c, [{ ...input, optionSelections: { ...selections, unlinked: ["nuts"] } }]), /연결되지/);
+  assert.throws(() => schema.orderItemSchema.parse({ ...input, dressingKey: "dressing-0" }));
+  c.products.find((p) => p.id === selections[drinkGroup.id][0]).status = "soldout";
+  throws400(() => priceOrder(c, [input]), /품절/);
+});

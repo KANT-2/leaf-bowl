@@ -1,9 +1,11 @@
+import { readBrowserJSON as read, writeBrowserJSON as write } from "./browser-json";
 import type { Ingredient, Stage } from "./data/ingredients";
 import { createLocalStore, type LocalStore } from "./local-store";
-import { DRESSINGS } from "./products";
+import { dressingKey as recipeDressingKey } from "./cart-identifiers";
 
 /** 재료를 하나도 더하지 않은 기본 볼 가격 */
-export const BASE_BOWL_PRICE = 6500;
+import { BASE_BOWL_PRICE } from "./pricing-policy";
+export { BASE_BOWL_PRICE } from "./pricing-policy";
 
 export const STAGES: Stage[] = ["GREENS", "PROTEIN", "VEGGIES", "TOPPINGS"];
 
@@ -22,6 +24,7 @@ export interface SavedRecipe {
   /** 재료 id 목록 */
   ingredients: string[];
   dressing: number;
+  dressingKey?: string;
   price: number;
   savedAt: string;
 }
@@ -51,21 +54,7 @@ export function matchProduct(mainIngredientId: string): number {
 
 const RECIPE_KEY = "bm-recipe";
 
-function read(key: string): unknown {
-  try {
-    return JSON.parse(localStorage.getItem(key) || "null");
-  } catch {
-    return null;
-  }
-}
 
-function write(key: string, value: unknown) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // 저장할 수 없으면 이번 화면에서만 유지한다.
-  }
-}
 
 function loadRecipe(): SavedRecipe | null {
   const r = read(RECIPE_KEY);
@@ -76,10 +65,12 @@ function loadRecipe(): SavedRecipe | null {
     !Array.isArray(ingredients) ||
     !ingredients.every((id) => typeof id === "string") ||
     typeof dressing !== "number" ||
-    !DRESSINGS[dressing]
+(dressing < -1 || !Number.isInteger(dressing))
   )
     return null;
-  return { name: name.slice(0, 30), ingredients, dressing, price: Number(price) || 0, savedAt: String(savedAt ?? "") };
+  const key = (r as SavedRecipe).dressingKey;
+  if (key !== undefined && (typeof key !== "string" || !key || key.length > 80)) return null;
+  return { name: name.slice(0, 30), ingredients, dressing, dressingKey: recipeDressingKey({ dressing, dressingKey: key }), price: Number(price) || 0, savedAt: String(savedAt ?? "") };
 }
 
 const NO_DECISIONS: Decision[] = [];

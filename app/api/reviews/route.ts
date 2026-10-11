@@ -57,24 +57,28 @@ export async function POST(request: Request) {
     // 사진은 관리자 이미지와 같은 폴더에 저장하고, 리뷰에는 주소만 남긴다.
     const directory = path.join(dataDirectory(), "images");
     const saved: string[] = [];
+    let referenced = new Set<string>();
     try {
       if (decoded.length) await mkdir(directory, { recursive: true });
       for (const d of decoded) {
         const [bytes, ext] = d!;
         const key = `review-${crypto.randomUUID()}.${ext}`;
-        await writeFile(path.join(directory, key), bytes);
         saved.push(key);
+        await writeFile(path.join(directory, key), bytes);
       }
       const snapshot = await appendCustomerReview({
         ...review,
         images: saved.map((key) => "/api/admin/images/" + key),
       });
+      // 중복·삭제된 ID는 저장소가 성공 응답으로 무시한다. 그 요청의 새 사진은 참조되지 않는다.
+      referenced = new Set((snapshot.catalog.reviews ?? []).flatMap((r) => r.images ?? []));
+      await Promise.all(saved.filter((key) => !referenced.has("/api/admin/images/" + key)).map((key) => rm(path.join(directory, key), { force: true })));
       return Response.json(publicSnapshot(snapshot), {
         headers: { "Cache-Control": "no-store" },
       });
     } catch (e) {
       // 리뷰 저장에 실패하면 먼저 써 둔 사진 파일도 지운다.
-      await Promise.all(saved.map((key) => rm(path.join(directory, key), { force: true })));
+      await Promise.all(saved.filter((key) => !referenced.has("/api/admin/images/" + key)).map((key) => rm(path.join(directory, key), { force: true })));
       throw e;
     }
   } catch (e) {

@@ -1,3 +1,4 @@
+import { readBrowserJSON as readJSON, writeBrowserJSON as writeJSON } from "./browser-json";
 /**
  * 로그인·마이페이지 프론트엔드용 mock 사용자 저장소.
  * 실제 인증·DB 연동 전까지 이 브라우저의 localStorage에만 저장한다. 로그아웃해도
@@ -47,21 +48,7 @@ export interface UserProfile {
 
 const USER_KEY = "bb-user";
 
-function readJSON(key: string): unknown {
-  try {
-    return JSON.parse(localStorage.getItem(key) || "null");
-  } catch {
-    return null;
-  }
-}
 
-function writeJSON(key: string, value: unknown) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // 저장할 수 없으면 이번 화면에서만 유지한다.
-  }
-}
 
 const isStringList = (v: unknown): v is string[] =>
   Array.isArray(v) && v.every((x) => typeof x === "string");

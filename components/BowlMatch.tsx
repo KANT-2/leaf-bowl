@@ -78,6 +78,7 @@ function BowlMatchBody({ ingredients }: { ingredients: Ingredient[] }) {
   const price = bowlPrice(selected);
   const savedRecipe =
     recipe &&
+    DRESSINGS.some((d) => d.id === recipe.dressingKey && d.available) &&
     recipe.ingredients.every((id) => ingredients.some((i) => i.id === id))
       ? recipe
       : null;
@@ -108,7 +109,10 @@ function BowlMatchBody({ ingredients }: { ingredients: Ingredient[] }) {
 
   const [resultOpen, setResultOpen] = useState(false);
   const [name, setName] = useState("");
-  const [dressing, setDressing] = useState(Math.max(0, DRESSINGS.findIndex((d) => d.available)));
+  const [dressingId, setDressing] = useState(
+    DRESSINGS.find((d) => d.available)?.id ?? "",
+  );
+  const dressing = DRESSINGS.findIndex((d) => d.id === dressingId);
   const [savedNote, setSavedNote] = useState("");
   const makeBtn = useRef<HTMLButtonElement>(null);
 
@@ -152,7 +156,7 @@ function BowlMatchBody({ ingredients }: { ingredients: Ingredient[] }) {
 
   /* ---- 결과 창 ---- */
   const showResult = (
-    preset?: { name: string; dressing?: number },
+    preset?: { name: string; dressingKey?: string },
     list = selected,
   ) => {
     if (busyRef.current) return;
@@ -162,7 +166,7 @@ function BowlMatchBody({ ingredients }: { ingredients: Ingredient[] }) {
     }
     setName(preset?.name ?? `나의 ${mainIngredient(list).name} 볼`);
     setDressing(
-      preset?.dressing ?? Math.max(0, DRESSINGS.findIndex((d) => d.available)),
+      preset?.dressingKey ?? DRESSINGS.find((d) => d.available)?.id ?? "",
     );
     setSavedNote("");
     setResultOpen(true);
@@ -177,7 +181,7 @@ function BowlMatchBody({ ingredients }: { ingredients: Ingredient[] }) {
     }));
     setDecisions(list);
     showResult(
-      { name: savedRecipe.name, dressing: savedRecipe.dressing },
+      { name: savedRecipe.name, dressingKey: savedRecipe.dressingKey },
       list.filter((d) => d.liked).map((d) => ingredients[d.index]),
     );
     toast("저장한 조합을 불러왔어요");
@@ -191,6 +195,7 @@ function BowlMatchBody({ ingredients }: { ingredients: Ingredient[] }) {
       name: n,
       ingredients: ids,
       dressing,
+      dressingKey: dressingId,
       price,
       savedAt: new Date().toISOString(),
     });
@@ -209,6 +214,7 @@ function BowlMatchBody({ ingredients }: { ingredients: Ingredient[] }) {
       ingredients: selected.map((i) => i.name),
       allergens: unique(selected.flatMap((i) => i.allergens)),
       dressing,
+      dressingKey: dressingId,
       price,
       photo: similar.id,
     });
@@ -503,7 +509,7 @@ function BowlMatchBody({ ingredients }: { ingredients: Ingredient[] }) {
         resultOpen={resultOpen}
         selected={selected}
         name={name}
-        dressing={dressing}
+        dressing={dressingId}
         dressings={DRESSINGS}
         similar={similar}
         photo={photoSrc(similar.id)}

@@ -2,14 +2,13 @@ import type { Catalog, OptionGroup, Product } from "@/lib/admin/catalog";
 import { AppError } from "../shared/errors";
 import type { OrderItemInput } from "./schema";
 
-// 체험용 예시 배달 정책. lib/products.ts 의 값과 같다 (화면 표시와 서버 계산이 어긋나지 않게 맞춘다).
-// tsconfig target 이 ES2017 이라 BigInt 리터럴(3000n) 대신 BigInt() 를 쓴다.
-export const DELIVERY_FEE = BigInt(3000);
-export const MIN_DELIVERY_ORDER = BigInt(15000);
-export const FREE_DELIVERY_FROM = BigInt(30000);
+import * as policy from "@/lib/pricing-policy";
 
-/** 내 취향 볼의 기본 가격(재료를 하나도 더하지 않은 볼). 화면의 lib/match.ts BASE_BOWL_PRICE 와 같은 값이다 */
-export const BASE_BOWL_PRICE = BigInt(6500);
+// API 금액은 정수 BigInt, 화면 정책은 원 단위 number로 표현한다.
+export const DELIVERY_FEE = BigInt(policy.DELIVERY_FEE);
+export const MIN_DELIVERY_ORDER = BigInt(policy.MIN_DELIVERY_ORDER);
+export const FREE_DELIVERY_FROM = BigInt(policy.FREE_DELIVERY_FROM);
+export const BASE_BOWL_PRICE = BigInt(policy.BASE_BOWL_PRICE);
 
 export function deliveryFee(subtotal: bigint): bigint {
   return subtotal >= FREE_DELIVERY_FROM ? BigInt(0) : DELIVERY_FEE;
@@ -27,7 +26,7 @@ export interface PricedLine {
   /** 주문 당시 이름 (스냅샷) */
   name: string;
   /** 주문 당시 선택 내역 (스냅샷) */
-  options: { dressing?: PricedOption; drinks: PricedOption[]; ingredients: PricedOption[] };
+  options: { dressing?: PricedOption; drinks: PricedOption[]; ingredients: PricedOption[]; custom?: PricedOption[] };
   /** 옵션을 포함한 1개 가격 */
   unitPrice: bigint;
   quantity: number;
@@ -42,9 +41,10 @@ export interface PricedOrder {
 
 const sellable = (p: Product) => !p.deleted && p.status === "active";
 
-function findDressing(catalog: Catalog, group: OptionGroup, key: string) {
-  if (group.source === "dressings") {
-    const p = catalog.products.find((x) => x.type === "dressing" && x.id === key && !x.deleted && x.status !== "hidden");
+function findChoice(catalog: Catalog, group: OptionGroup, key: string) {
+  if (group.source !== "custom") {
+    const type = group.source === "dressings" ? "dressing" : "drink";
+    const p = catalog.products.find((x) => x.type === type && x.id === key && !x.deleted && x.status !== "hidden");
     return p && { key: p.id, name: p.name, price: p.price, available: sellable(p) };
   }
   const c = group.choices.find((x) => x.id === key);
@@ -86,39 +86,41 @@ function priceMenu(catalog: Catalog, item: OrderItemInput, customerId: number): 
 
   const linkedGroups = catalog.groups.filter((g) => !g.deleted && product.optionIds.includes(g.id));
 
-  // 드레싱: 필수 그룹이면 반드시 하나. 선택지는 직접 만든 항목(custom)이거나 드레싱 상품(dressings)이다
   const dressingGroup = linkedGroups.find((g) => g.id === "dressing" || g.source === "dressings");
-  let dressing: PricedOption | undefined;
-  if (item.dressingKey !== undefined) {
-    const choice = dressingGroup && findDressing(catalog, dressingGroup, item.dressingKey);
-    if (!choice) throw new AppError(400, "선택할 수 없는 드레싱입니다.");
-    if (!choice.available) throw new AppError(400, `품절된 드레싱입니다: ${choice.name}`);
-    dressing = { key: choice.key, name: choice.name, price: choice.price };
-  } else if (dressingGroup?.required) {
-    throw new AppError(400, "드레싱을 선택해주세요.");
-  }
-
-  // 음료: 이 메뉴에 음료 그룹이 연결되어 있어야 하고, 판매 중인 음료여야 한다
-  if (duplicates(item.drinkKeys)) throw new AppError(400, "같은 음료를 중복해서 선택할 수 없습니다.");
   const drinksGroup = linkedGroups.find((g) => g.source === "drinks");
-  const drinks = item.drinkKeys.map((k): PricedOption => {
-    const drink = catalog.products.find((p) => p.type === "drink" && p.id === k && !p.deleted);
-    if (!drinksGroup || !drink) throw new AppError(400, "선택할 수 없는 음료입니다.");
-    if (!sellable(drink)) throw new AppError(400, `품절된 음료가 있습니다: ${drink.name}`);
-    return { key: drink.id, name: drink.name, price: drink.price };
-  });
-  if (drinks.length > 1 && !drinksGroup?.multiple) {
-    throw new AppError(400, "음료는 하나만 선택할 수 있습니다.");
+  if (item.optionSelections === undefined) {
+    if (item.dressingKey !== undefined && !dressingGroup) throw new AppError(400, "선택할 수 없는 드레싱입니다.");
+    if (item.drinkKeys.length && !drinksGroup) throw new AppError(400, "선택할 수 없는 음료입니다.");
   }
-
-  const unitPrice =
-    BigInt(product.price) +
-    BigInt(dressing?.price ?? 0) +
-    drinks.reduce((n, d) => n + BigInt(d.price), BigInt(0));
+  const selections = item.optionSelections ?? Object.fromEntries(linkedGroups.map((group) => [
+    group.id,
+    group === dressingGroup ? (item.dressingKey === undefined ? [] : [item.dressingKey]) : group === drinksGroup ? item.drinkKeys : [],
+  ]));
+  if (Object.keys(selections).some((id) => !linkedGroups.some((g) => g.id === id))) {
+    throw new AppError(400, "메뉴에 연결되지 않은 옵션입니다.");
+  }
+  const priced = linkedGroups.map((group) => {
+    const keys = selections[group.id] ?? [];
+    const label = group === dressingGroup ? "드레싱" : group === drinksGroup ? "음료" : group.name;
+    if (group.required && !keys.length) throw new AppError(400, `${label}을 선택해주세요.`);
+    if (duplicates(keys)) throw new AppError(400, `같은 ${label}를 중복해서 선택할 수 없습니다.`);
+    if (!group.multiple && keys.length > 1) throw new AppError(400, `${label}는 하나만 선택할 수 있습니다.`);
+    const choices = keys.map((key): PricedOption => {
+      const choice = findChoice(catalog, group, key);
+      if (!choice) throw new AppError(400, `선택할 수 없는 ${label}입니다.`);
+      if (!choice.available) throw new AppError(400, `품절된 ${label}입니다: ${choice.name}`);
+      return { key: choice.key, name: choice.name, price: choice.price };
+    });
+    return { group, choices };
+  });
+  const dressingChoices = priced.find((p) => p.group === dressingGroup)?.choices ?? [];
+  const drinks = priced.filter((p) => p.group.source === "drinks").flatMap((p) => p.choices);
+  const custom = [...dressingChoices.slice(1), ...priced.filter((p) => p.group !== dressingGroup && p.group.source !== "drinks").flatMap((p) => p.choices)];
+  const unitPrice = BigInt(product.price) + priced.flatMap((p) => p.choices).reduce((sum, choice) => sum + BigInt(choice.price), BigInt(0));
   return {
     productId: product.id,
     name: product.name,
-    options: { dressing, drinks, ingredients: [] },
+    options: { dressing: dressingChoices[0], drinks, ingredients: [], ...(custom.length ? { custom } : {}) },
     unitPrice,
     quantity: item.quantity,
   };

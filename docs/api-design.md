@@ -154,6 +154,7 @@
   | 종류 | 모양 | 한 개 가격 |
   | --- | --- | --- |
   | 메뉴 | `{ productId: Number, dressingKey?: String, drinkKeys?: String[], quantity: Number }` | 메뉴 가격 + 드레싱 + 음료 |
+  | 관리자 정의 옵션 메뉴 | `{ productId: Number, optionSelections: { [groupId]: String[] }, quantity: Number }` (기존 드레싱·음료 필드와 혼용 불가) | 메뉴 가격 + 연결된 모든 선택 옵션, 필수·단일/다중·판매 상태 검증 |
   | 내 취향 볼 | `{ ingredientKeys: String[], dressingKey?: String, quantity: Number }` (음료 불가) | 기본 볼 6,500원 + 고른 재료 + 드레싱 (화면의 `bowlPrice` 와 같다) |
   | 음료 단품 | `{ drinkKeys: [String], quantity: Number }` (음료 1개, 드레싱 불가) | 음료 가격 |
 

@@ -11,7 +11,7 @@ interface Props {
   resultOpen: boolean;
   selected: Ingredient[];
   name: string;
-  dressing: number;
+  dressing: string;
   dressings: CustomerCatalog["DRESSINGS"];
   similar: Product;
   photo: string;
@@ -19,7 +19,7 @@ interface Props {
   savedNote: string;
   resultAllergens: string[];
   onName: (value: string) => void;
-  onDressing: (value: number) => void;
+  onDressing: (value: string) => void;
   onClosed: () => void;
   onSave: () => void;
   onAdd: () => void;
@@ -101,11 +101,11 @@ export default function BowlResultDialog({
             <span>마지막으로, 드레싱</span>
             <select
               value={dressing}
-              onChange={(e) => onDressing(Number(e.target.value))}
+              onChange={(e) => onDressing(e.target.value)}
             >
-              {dressings.map((d, index) =>
+              {dressings.map((d) =>
                 d.name ? (
-                  <option key={d.id} value={index} disabled={!d.available}>
+                  <option key={d.id} value={d.id} disabled={!d.available}>
                     {d.name}
                     {d.allergens.length ? ` (${d.allergens.join(", ")})` : ""}
                     {d.available ? "" : " · 품절"}

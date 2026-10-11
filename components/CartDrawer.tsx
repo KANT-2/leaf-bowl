@@ -9,9 +9,11 @@ import { useAuth } from "./AuthProvider";
 import { useCart } from "./CartProvider";
 import FoodImage from "./FoodImage";
 import { useToast } from "./ToastProvider";
+import { dateValue, timeOptions, isAtLeast30MinAhead } from "@/lib/delivery-slots";
 import type { DeliveryHours } from "@/lib/data/delivery";
 import { isCustom, isDrink, itemKey, withChoice } from "@/lib/cart";
 import { optionChoices, type CustomerCatalog } from "@/lib/customer/catalog";
+import { dressingKey, drinkKey } from "@/lib/cart-identifiers";
 import type { CartItem } from "@/lib/storage";
 import {
   FREE_DELIVERY_FROM,
@@ -22,40 +24,6 @@ import {
 
 const FOCUSABLE =
   "a[href],button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled)";
-
-const pad = (n: number) => String(n).padStart(2, "0");
-
-function dateValue(base: number, day: number): string {
-  const d = new Date(base);
-  d.setDate(d.getDate() + day);
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-interface TimeOption {
-  value: string;
-  label: string;
-}
-
-/** 배달 운영 시간 안의 한 시간 단위 중 지금부터 30분 이후에 시작하는 시간대만. */
-/** 지금부터 최소 30분 뒤인지 (지난 시간대로 주문하는 것을 막는다) */
-function isAtLeast30MinAhead(day: string, time: string): boolean {
-  return new Date(`${day}T${time}`).getTime() > Date.now() + 30 * 60000;
-}
-
-function timeOptions(
-  day: string,
-  now: number,
-  { open, close }: DeliveryHours,
-): TimeOption[] {
-  const list: TimeOption[] = [];
-  for (let h = open; h < close; h++) {
-    const start = `${pad(h)}:00`;
-    const end = `${pad(h + 1)}:00`;
-    if (new Date(`${day}T${start}`).getTime() > now + 30 * 60000)
-      list.push({ value: start, label: `${start}–${end}` });
-  }
-  return list;
-}
 
 export default function CartDrawer({ hours }: { hours: DeliveryHours }) {
   const { isOpen, openedAt, close } = useCart();
@@ -165,14 +133,14 @@ function choiceSlot(i: CartItem, cat: CustomerCatalog): ChoiceSlot | null {
       choices,
     };
   }
-  if (i.dressing < 0) return null;
+  if (!dressingKey(i)) return null;
   return {
     groupId: null,
     label: "드레싱",
-    value: String(i.dressing),
-    choices: cat.DRESSINGS.flatMap((d, k) =>
+    value: dressingKey(i)!,
+    choices: cat.DRESSINGS.flatMap((d) =>
       d.name
-        ? [{ value: String(k), name: d.name, available: d.available }]
+        ? [{ value: d.id, name: d.name, available: d.available }]
         : [],
     ),
   };
@@ -357,7 +325,7 @@ function CartBody({ openedAt, hours, closeBtn }: BodyProps) {
           {items.map((i, n) => (
             <div className="cart-item" key={itemKey(i)}>
               {isDrink(i) ? (
-                <DrinkThumb src={DRINKS[i.drink]?.image} />
+                <DrinkThumb src={DRINKS.find((d) => d.id === drinkKey(i))?.image} />
               ) : (
                 <FoodImage id={isCustom(i) ? i.photo : i.id} sizes="64px" />
               )}
@@ -480,7 +448,7 @@ function CartBody({ openedAt, hours, closeBtn }: BodyProps) {
               {DRINKS.map((d, n) => {
                 if (!d.name) return null;
                 const inCart =
-                  items.find((i) => isDrink(i) && i.drink === n)?.qty ?? 0;
+                  items.find((i) => isDrink(i) && drinkKey(i) === d.id)?.qty ?? 0;
                 return (
                   <button
                     key={d.id}

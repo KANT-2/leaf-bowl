@@ -311,3 +311,53 @@ test('purged review retries cannot restore content and deletion IDs remain inter
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
+
+
+test("review retries keep an ID and duplicated/deleted requests leave no orphan photos", async () => {
+  const { createReviewSubmission } = require("../lib/review-submission.ts");
+  const submit = createReviewSubmission();
+  const draft = { pid: 0, author: "익명", stars: 5, title: "맛있어요", text: "아주 신선하고 맛있어요.", via: "delivery" };
+  const photo = "data:image/png;base64," + Buffer.from([137,80,78,71,13,10,26,10,1]).toString("base64");
+  const first = submit(draft, [photo]);
+  assert.equal(submit(draft, [photo]).id, first.id);
+  assert.notEqual(submit({ ...draft, text: "수정한 새로운 리뷰 내용입니다." }, [photo]).id, first.id);
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "review-retry-"));
+  const oldDirectory = process.env.ADMIN_DATA_DIR;
+  process.env.ADMIN_DATA_DIR = directory;
+  try {
+    const { POST } = require("../app/api/reviews/route.ts");
+    const { readCatalog, writeCatalog } = require("../lib/admin/store.ts");
+    const request = () => new Request("http://localhost/api/reviews", { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost" }, body: JSON.stringify({ ...first, photos: [photo] }) });
+    const results = await Promise.all([POST(request()), POST(request())]);
+    assert.deepEqual(results.map((r) => r.status), [200, 200]);
+    let state = await readCatalog();
+    assert.equal(state.catalog.reviews.filter((r) => r.id === first.id).length, 1);
+    assert.equal(fs.readdirSync(path.join(directory, "images")).length, 1);
+    const existingImages = fs.readdirSync(path.join(directory, "images"));
+    state.catalog.reviews = state.catalog.reviews.filter((r) => r.id !== first.id);
+    await writeCatalog(state.catalog, state.revision);
+    assert.equal((await POST(request())).status, 200);
+    assert.deepEqual(fs.readdirSync(path.join(directory, "images")), existingImages);
+  } finally {
+    if (oldDirectory === undefined) delete process.env.ADMIN_DATA_DIR;
+    else process.env.ADMIN_DATA_DIR = oldDirectory;
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("local review migration retries failures, acknowledges success and cancels pending work", async () => {
+  const { startReviewMigration } = require("../lib/review-migration.ts");
+  const migrated = new Set();
+  let sends = 0;
+  let refreshes = 0;
+  const cancel = startReviewMigration([{ id: "local" }], migrated, async () => ++sends > 1, () => refreshes++);
+  await new Promise((resolve) => setTimeout(resolve, 1200));
+  cancel();
+  assert.equal(sends, 2);
+  assert.ok(migrated.has("local"));
+  assert.equal(refreshes, 1);
+  const cancelFailure = startReviewMigration([{ id: "offline" }], migrated, async () => { throw Error("offline"); }, () => assert.fail("failed migration refreshed"));
+  await new Promise((resolve) => setImmediate(resolve));
+  cancelFailure();
+  assert.ok(!migrated.has("offline"));
+});
