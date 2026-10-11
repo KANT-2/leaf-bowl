@@ -179,12 +179,29 @@ async function loginSetup(limits) {
 }
 const login = (loginId, password, headers) => loginRoute.POST(req("/api/v1/auth/login", { body: { loginId, password }, headers }));
 
-test("로그인 제한: 임의의 아이디를 아무리 보내도 키가 늘지 않고, 실제 관리자 로그인은 막히지 않는다", async () => {
+test("로그인 제한: 'ghost-0'~'ghost-299' 300개 샘플에서는 키가 상한 안이고 실제 관리자 로그인이 막히지 않았다 (일반 보장이 아님)", async () => {
+  // 한정된 샘플 검증이다. 아이디는 1,024칸을 공유하므로, admin 과 같은 칸에 걸리는 아이디를 고르면
+  // 관리자 로그인이 막힐 수 있다 (아래 'collision-687' 테스트). 이 샘플은 그 칸을 우연히 피한 것뿐이다.
   const limits = createLimits({ account: 5, clientLogin: 1000, globalLogin: 1000 });
   await loginSetup(limits);
   for (let i = 0; i < 300; i++) await login("ghost-" + i, "x", { "x-forwarded-for": "7.7.7." + i });
   assert.ok(limits.account.size() <= LOGIN_BUCKETS, "키 " + limits.account.size() + "개 (상한 " + LOGIN_BUCKETS + ")");
-  assert.equal((await login("admin", "pw")).status, 200); // 임의 아이디 공격이 실제 관리자 로그인을 막지 않는다
+  const sampleBuckets = new Set(Array.from({ length: 300 }, (_, i) => loginRateKey("ghost-" + i)));
+  assert.ok(!sampleBuckets.has(loginRateKey("admin")), "샘플이 admin 과 같은 칸을 쓰면 이 단언의 전제가 깨진다");
+  assert.equal((await login("admin", "pw")).status, 200); // 이 300개 샘플은 admin 의 칸을 쓰지 않았으므로 막히지 않았다
+});
+
+test("로그인 제한: 존재하지 않는 'collision-687' 이 admin 과 같은 칸(account:741)을 쓰면 기본 한도 10 뒤 관리자 로그인이 429, 60초 뒤 200", async () => {
+  // 결정적 충돌: 아이디는 1,024칸을 공유하고 칸 안에서는 카운터를 같이 쓴다 (아이디별 독립 카운터가 아니다).
+  assert.equal(loginRateKey("collision-687"), loginRateKey("admin"));
+  assert.equal(loginRateKey("admin"), "account:741");
+  let t = 0;
+  const limits = createLimits({ clientLogin: 1000, globalLogin: 1000 }, () => t); // account 기본 한도 10/분
+  await loginSetup(limits);
+  for (let i = 0; i < 10; i++) assert.equal((await login("collision-687", "wrong")).status, 401);
+  assert.equal((await login("admin", "pw")).status, 429); // 올바른 비밀번호여도 같은 칸이 소진되어 막힌다 (직접 admin 을 10회 공격한 것과 같은 효과)
+  t += 60_000;
+  assert.equal((await login("admin", "pw")).status, 200); // 한 구간(60초)이 지나 풀린다
 });
 
 test("로그인 제한: 응답이 계정 존재 여부를 드러내지 않는다 (모르는 아이디와 실제 계정이 같은 응답)", async () => {
