@@ -12,6 +12,7 @@ import { checkoutIssue } from "@/lib/checkout-validation";
 import { customerCatalog } from "@/lib/customer/catalog";
 import type { Snapshot } from "@/lib/admin/catalog";
 import { recordOrder } from "@/lib/orders";
+import { deliveryWindowKST, deliveryWindowUTC } from "@/lib/delivery-time";
 import { deliveryFee, money } from "@/lib/products";
 import { CardIcon, KakaoPayMark, TossMark } from "./icons/BrandMarks";
 
@@ -41,8 +42,12 @@ export default function CheckoutView({ hours }: { hours: DeliveryHours }) {
   const { itemName, itemOptions, itemUnitPrice } = catalog;
 
   const address = params.get("address") ?? "";
-  const day = params.get("day") ?? "";
-  const timeLabel = params.get("time") ?? "";
+  const hasUTC = params.has("desiredStartAt") || params.has("desiredEndAt");
+  const windowDisplay = hasUTC
+    ? deliveryWindowKST(params.get("desiredStartAt") ?? "", params.get("desiredEndAt") ?? "")
+    : { day: params.get("day") ?? "", timeLabel: params.get("time") ?? "" };
+  const day = windowDisplay?.day ?? "";
+  const timeLabel = windowDisplay?.timeLabel ?? "";
 
   const [method, setMethod] = useState<PayMethod>("toss");
   const [cardNumber, setCardNumber] = useState("");
@@ -85,8 +90,10 @@ export default function CheckoutView({ hours }: { hours: DeliveryHours }) {
         setError("메뉴 금액이 변경되었어요. 장바구니에서 금액을 확인해주세요.");
         return;
       }
+      const window = deliveryWindowUTC(day, timeLabel);
+      if (!window) throw Error("받을 시간대를 다시 선택해주세요.");
       recordOrder({
-        day, timeLabel, address, total: latestTotal,
+        ...window, address, total: latestTotal,
         items: items.map((item) => ({ name: latest.itemName(item), options: latest.itemOptions(item), qty: item.qty, unitPrice: latest.itemUnitPrice(item) })),
       });
       setDoneTotal(latestTotal);

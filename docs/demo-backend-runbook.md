@@ -117,3 +117,7 @@ rm -rf $JAR
 - [ ] 서버를 방금 재시작해 이전 주문이 비어 있는가(원하면)
 - [ ] 받을 날짜는 내일, 시간대는 영업시간(10:00–21:00) 안의 한 시간 단위인가
 - [ ] `node --test tests/*.test.cjs` 가 통과하는가
+
+## UTC 저장·KST 표시 호환
+
+배송 요청은 `desiredStartAt`·`desiredEndAt`의 UTC ISO Z를 사용한다. 위 시연의 기존 `desiredDate`·`desiredSlot` 쌍도 호환 입력으로 받아 KST로 해석하고 UTC로 정규화한다. 고객·관리자 목록/상세는 UTC 시작·종료와 그로부터 계산한 KST 호환 날짜/슬롯을 함께 반환한다. Prisma 초안은 SQL과 같은 `desired_start_at`·`desired_end_at` TIMESTAMPTZ를 사용한다. DB 연결·마이그레이션 적용은 별도 단계다.

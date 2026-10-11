@@ -1,6 +1,6 @@
 import { dressingKey, drinkKey, drinkKeys } from "./cart-identifiers";
 import { readBrowserJSON as readJSON, writeBrowserJSON as writeJSON } from "./browser-json";
-import type { Review } from "./reviews";
+import { reviewDisplayDate, type Review } from "./reviews";
 
 export const CART_KEY = "bb-cart";
 export const REVIEW_KEY = "bb-user-reviews";
@@ -203,7 +203,7 @@ export function loadUserReviews(): Review[] {
         text: r.text,
         via: r.via,
         t: r.t,
-        date: typeof r.date === "string" ? r.date : "",
+        date: reviewDisplayDate({ t: r.t, date: typeof r.date === "string" ? r.date : "" }),
         sample: false,
         mine: true,
       }))
@@ -220,7 +220,7 @@ export function saveUserReviews(list: Review[]) {
       stars,
       title,
       text,
-      date,
+      date: reviewDisplayDate({ t, date }),
       via,
       t,
     })),

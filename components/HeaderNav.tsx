@@ -3,14 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MATCH_URL } from "@/lib/products";
-import { useAuth } from "./AuthProvider";
 
 const REVIEWS_PATH = /^\/(reviews|product\/\d+\/reviews)\/?$/;
 
 export default function HeaderNav() {
   const path = usePathname();
   const onReviews = REVIEWS_PATH.test(path);
-  const { isLoggedIn } = useAuth();
   return (
     <nav aria-label="주요 메뉴">
       <Link href="/menu" aria-current={path === "/menu" ? "page" : undefined}>
@@ -25,12 +23,6 @@ export default function HeaderNav() {
       </Link>
       <Link href={MATCH_URL} className="match-link" aria-current={path === MATCH_URL ? "page" : undefined}>
         내 취향 찾기
-      </Link>
-      <Link
-        href={isLoggedIn ? "/mypage" : "/login"}
-        aria-current={path === "/mypage" || path === "/login" ? "page" : undefined}
-      >
-        {isLoggedIn ? "마이페이지" : "로그인"}
       </Link>
     </nav>
   );

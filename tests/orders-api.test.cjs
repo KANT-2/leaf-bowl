@@ -79,6 +79,39 @@ function orderBody(catalog, overrides = {}) {
 const place = (cookie, key, body) =>
   routes.orders.POST(req("/api/v1/orders", { method: "POST", cookie, body, headers: { "idempotency-key": key } }));
 
+test("배송 UTC 입력·저장·응답과 기존 KST 입력의 동등한 재전송", async () => {
+  const catalog = await setup();
+  const cookie = await guest();
+  const legacy = orderBody(catalog);
+  const utc = { ...legacy, desiredDate: undefined, desiredSlot: undefined,
+    desiredStartAt: "2026-10-13T03:00:00.000Z", desiredEndAt: "2026-10-13T04:00:00.000Z" };
+  const response = await place(cookie, "utc-order-0001", utc);
+  assert.equal(response.status, 201);
+  const created = await json(response);
+  const detail = await json(await routes.order.GET(req(`/api/v1/orders/${created.id}`, { cookie }), ctx(created.id)));
+  assert.equal(detail.desiredStartAt, utc.desiredStartAt);
+  assert.equal(detail.desiredEndAt, utc.desiredEndAt);
+  assert.equal(detail.desiredDate, "2026-10-13");
+  assert.equal(detail.desiredSlot, "12:00–13:00");
+  const stored = (await services().orders.listOrders({ limit: 20 })).items[0];
+  assert.equal(stored.desiredStartAt.toISOString(), utc.desiredStartAt);
+  assert.equal(stored.desiredDate, undefined);
+  assert.equal(stored.desiredSlot, undefined);
+  const admin = await adminCookie();
+  const own = await json(await routes.orders.GET(req("/api/v1/orders", { cookie })));
+  const adminList = await json(await routes.adminOrders.GET(req("/api/v1/admin/orders", { cookie: admin })));
+  const adminDetail = await json(await require("../app/api/v1/admin/orders/[id]/route.ts").GET(req(`/api/v1/admin/orders/${created.id}`, { cookie: admin }), ctx(created.id)));
+  for (const view of [own.items[0], adminList.items[0], adminDetail]) {
+    assert.equal(view.desiredStartAt, utc.desiredStartAt);
+    assert.equal(view.desiredEndAt, utc.desiredEndAt);
+    assert.equal(view.desiredDate, "2026-10-13");
+    assert.equal(view.desiredSlot, "12:00–13:00");
+  }
+  assert.ok(!("phone" in own.items[0]));
+  assert.equal((await place(cookie, "utc-order-0001", legacy)).status, 200);
+  assert.equal((await place(cookie, "utc-order-0002", { ...utc, desiredStartAt: "2026-10-13T12:00:00+09:00" })).status, 400);
+});
+
 test("고객 흐름: 세션 → 주문 → 재전송 → 조회 → 취소", async () => {
   const catalog = await setup();
   const res = await routes.session.POST(req("/api/v1/session", { method: "POST" }));

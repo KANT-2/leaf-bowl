@@ -71,8 +71,9 @@ model Order {
   phone             String    @db.VarChar(30)
   address           String    @db.VarChar(300)
   addressDetail     String    @default("") @map("address_detail") @db.VarChar(200)
-  desiredDate       DateTime  @map("desired_date") @db.Date
-  desiredSlot       String    @map("desired_slot") @db.VarChar(30)
+  /// 배송 예약은 UTC 절대 시각. KST 날짜·슬롯은 응답에서 계산한다
+  desiredStartAt    DateTime  @map("desired_start_at") @db.Timestamptz(6)
+  desiredEndAt      DateTime  @map("desired_end_at") @db.Timestamptz(6)
   subtotal          BigInt
   deliveryFee       BigInt    @map("delivery_fee")
   total             BigInt

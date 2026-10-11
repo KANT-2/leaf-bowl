@@ -1,4 +1,5 @@
 import type { OrderRecord } from "./types";
+import { deliveryWindowKST } from "@/lib/delivery-time";
 
 /** 응답에는 필요한 필드만 고른다 (docs/api-design.md §3). 금액은 BigInt 라 toJson 이 문자열로 바꾼다. */
 function optionsLabel(options: OrderRecord["items"][number]["options"]): string {
@@ -19,14 +20,18 @@ export function createdView(o: OrderRecord) {
 }
 
 export function detailView(o: OrderRecord) {
+  const delivery = deliveryWindowKST(o.desiredStartAt.toISOString(), o.desiredEndAt.toISOString())!;
   return {
     id: o.id,
     status: o.status,
     ordererName: o.ordererName,
     address: o.address,
     addressDetail: o.addressDetail,
-    desiredDate: o.desiredDate,
-    desiredSlot: o.desiredSlot,
+    desiredStartAt: o.desiredStartAt.toISOString(),
+    desiredEndAt: o.desiredEndAt.toISOString(),
+    // 기존 클라이언트 호환용 표시 필드. 저장소에는 UTC 시각만 보관한다.
+    desiredDate: delivery.day,
+    desiredSlot: delivery.timeLabel,
     items: o.items.map((i) => ({
       name: i.name,
       options: optionsLabel(i.options),
@@ -49,13 +54,16 @@ export function statusView(o: OrderRecord) {
 }
 
 export function adminListItemView(o: OrderRecord) {
+  const delivery = deliveryWindowKST(o.desiredStartAt.toISOString(), o.desiredEndAt.toISOString())!;
   return {
     id: o.id,
     status: o.status,
     version: o.version,
     ordererName: o.ordererName,
-    desiredDate: o.desiredDate,
-    desiredSlot: o.desiredSlot,
+    desiredStartAt: o.desiredStartAt.toISOString(),
+    desiredEndAt: o.desiredEndAt.toISOString(),
+    desiredDate: delivery.day,
+    desiredSlot: delivery.timeLabel,
     total: o.total,
     createdAt: o.createdAt.toISOString(),
   };

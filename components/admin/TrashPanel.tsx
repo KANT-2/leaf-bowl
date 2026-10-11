@@ -1,6 +1,7 @@
 "use client";
 import { Button } from "@/components/admin/button";
 import { type Catalog } from "@/lib/admin/catalog";
+import { statusNames } from "@/lib/admin/editor-helpers";
 import { RotateCcw, Trash2 } from "lucide-react";
 export default function TrashPanel({
   catalog,
@@ -46,13 +47,17 @@ export default function TrashPanel({
                     if (i.kind === "product") {
                       const p = next.products.find((p) => p.id === i.id)!;
                       p.deleted = false;
-                      p.status = "hidden";
                       p.optionIds = p.optionIds.filter((id) =>
                         next.groups.some((g) => g.id === id && !g.deleted),
                       );
                     } else
                       next.groups.find((g) => g.id === i.id)!.deleted = false;
-                    await save(next);
+                    await save(
+                      next,
+                      i.kind === "product"
+                        ? `“${i.name}”을 ${statusNames[next.products.find((p) => p.id === i.id)!.status]} 상태로 복원했습니다.`
+                        : "옵션 그룹을 복원했습니다.",
+                    );
                   })
                 }
               >

@@ -1,3 +1,5 @@
+import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -20,6 +22,17 @@ class DeploymentTests(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.deployer = Deployer(Path(self.directory.name), "main", 3100)
+
+    @patch.dict("os.environ", {"TZ": "America/Los_Angeles"})
+    def test_server_environment_and_operational_timestamps_are_utc(self):
+        deployer = Deployer(Path(self.directory.name), "main", 3100)
+        self.assertEqual(deployer.env["TZ"], "UTC")
+        deployer.write_state({"sha": SHA})
+        stored = json.loads(deployer.state_file.read_text())
+        self.assertRegex(stored["updated_at"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+        with patch("builtins.print") as output:
+            deployer.log("ready")
+        self.assertTrue(re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z ", output.call_args.args[0]))
 
     def test_only_successful_exact_branch_push_ci_can_deploy(self):
         self.assertIsNotNone(successful_ci([ci_run()], "main", SHA))

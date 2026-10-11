@@ -1,3 +1,5 @@
+import { kstDate } from "@/lib/time";
+import { normalizeReviewTime } from "@/lib/review-time";
 import { readFile, writeFile, rename } from "node:fs/promises";
 import path from "node:path";
 import { withFileLock } from "./file-lock";
@@ -19,17 +21,17 @@ async function readState(): Promise<StoredSnapshot> {
     const snapshot: StoredSnapshot = JSON.parse(
       await readFile(path.join(dataDirectory(), "catalog.json"), "utf8"),
     );
-    if (snapshot.schemaVersion !== 3) {
+    if (snapshot.schemaVersion !== 4) {
       try {
         await writeFile(
-          path.join(dataDirectory(), "catalog.v1.backup.json"),
+          path.join(dataDirectory(), `catalog.v${snapshot.schemaVersion ?? 1}.backup.json`),
           JSON.stringify(snapshot),
           { flag: "wx" },
         );
       } catch (e) {
         if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
       }
-      snapshot.catalog = migrateCatalog(snapshot.catalog, true);
+      snapshot.catalog = migrateCatalog(snapshot.catalog, snapshot.schemaVersion !== 3);
       const deletedIds = new Set(snapshot.deletedReviewIds ?? []);
       snapshot.catalog.reviews = snapshot.catalog.reviews?.filter(review => !deletedIds.has(review.id));
       snapshot.revision++;
@@ -51,7 +53,8 @@ async function readState(): Promise<StoredSnapshot> {
 async function writeState(snapshot: StoredSnapshot) {
   const target = path.join(dataDirectory(), "catalog.json"),
     temp = target + "." + crypto.randomUUID() + ".tmp";
-  await writeFile(temp, JSON.stringify({ ...snapshot, schemaVersion: 3 }));
+  snapshot.catalog = { ...snapshot.catalog, reviews: snapshot.catalog.reviews?.map(normalizeReviewTime) };
+  await writeFile(temp, JSON.stringify({ ...snapshot, schemaVersion: 4 }));
   await rename(temp, target);
 }
 export async function readCatalog(): Promise<Snapshot> {
@@ -131,7 +134,7 @@ export async function appendCustomerReview(input: {
       via: input.via,
       menu: product.name,
       ...(input.images?.length ? { images: input.images } : {}),
-      date: createdAt.slice(0, 10).replaceAll("-", "."),
+      date: kstDate(Date.parse(createdAt)).replaceAll("-", "."),
       createdAt,
       deleted: false,
     };
