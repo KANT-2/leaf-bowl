@@ -362,3 +362,73 @@ test("관리자 화면 어댑터로 실제 로그인·로그아웃 API 계약을
     else global.window = originalWindow;
   }
 });
+
+const adminRoutes = { detail: require("../app/api/v1/admin/orders/[id]/route.ts") };
+
+test("관리자 주문 상세와 접수일 범위 조회 (BE-05)", async () => {
+  const catalog = await setup();
+  const g = await guest();
+  const admin = await adminCookie();
+  const created = await json(await place(g, "order-detail-0001", orderBody(catalog)));
+  const id = created.id;
+  const detailReq = (cookie, target = id) => adminRoutes.detail.GET(req(`/api/v1/admin/orders/${target}`, { cookie }), ctx(target));
+
+  assert.equal((await detailReq(undefined)).status, 401);
+  assert.equal((await detailReq(g)).status, 401); // 비회원 쿠키로는 볼 수 없다
+  assert.equal((await detailReq(admin, "not-a-uuid")).status, 404);
+  assert.equal((await detailReq(admin, "7c1d9f64-2b0a-4a56-9f0e-3c1a8e5b2d10")).status, 404);
+
+  await routes.adminStatus.PATCH(req(`/api/v1/admin/orders/${id}/status`, { method: "PATCH", cookie: admin, body: { status: "confirmed", version: 1 } }), ctx(id));
+  const res = await detailReq(admin);
+  assert.equal(res.status, 200);
+  const d = await json(res);
+  assert.equal(d.phone, "010-1234-5678"); // 연락처는 관리자 상세에만
+  assert.equal(d.version, 2);
+  assert.equal(d.items[0].options, "발사믹 · 오렌지 주스");
+  assert.deepEqual(d.history.map((h) => [h.fromStatus, h.toStatus, h.changedBy]), [[null, "received", "customer"], ["received", "confirmed", "admin"]]);
+  assert.ok(!("customerSessionId" in d) && !("requestHash" in d) && !("requestKey" in d));
+  assert.equal(typeof d.total, "string");
+  assert.equal(d.cancelReason, null);
+
+  // 기간 조회: 한국 시간 날짜, 양 끝 포함. 목록 항목에는 받을 날짜·시간대가 들어간다
+  const list = (qs) => routes.adminOrders.GET(req(`/api/v1/admin/orders${qs}`, { cookie: admin }));
+  const day = "2026-10-10"; // 테스트 시계: 한국 시간 2026-10-10 12:00 부터 1초씩
+  const hit = await json(await list(`?from=${day}&to=${day}`));
+  assert.equal(hit.items.length, 1);
+  assert.equal(hit.items[0].desiredDate, "2026-10-13");
+  assert.equal(hit.items[0].desiredSlot, "12:00–13:00");
+  assert.equal((await json(await list("?from=2000-01-01&to=2000-01-31"))).items.length, 0);
+  assert.equal((await json(await list("?from=2026-10-11"))).items.length, 0); // 다음 날부터는 없음
+  assert.equal((await json(await list("?to=2026-10-09"))).items.length, 0); // 전날까지는 없음
+  assert.equal((await json(await list("?to=2026-10-10"))).items.length, 1); // to 날짜는 그날 끝까지 포함
+  assert.equal((await json(await list(`?from=${day}`))).items.length, 1);
+  assert.equal((await list("?from=2026-10-12&to=2026-10-01")).status, 400); // 시작이 끝보다 늦음
+  assert.equal((await list("?from=2026-13-40")).status, 400);
+  assert.equal((await json(await list(`?status=confirmed&from=${day}`))).items.length, 1);
+  assert.equal((await json(await list(`?status=received&from=${day}`))).items.length, 0);
+});
+
+test("내 주문 목록 (마이페이지용): 본인 세션의 주문만 최신순, 쪽 나눔", async () => {
+  const catalog = await setup();
+  const a = await guest();
+  const b = await guest();
+  const ids = [];
+  for (let i = 0; i < 3; i++) ids.push((await json(await place(a, `own-list-000${i}`, orderBody(catalog)))).id);
+  await place(b, "own-list-other-0", orderBody(catalog));
+
+  const mine = (cookie, qs = "") => routes.orders.GET(req(`/api/v1/orders${qs}`, { cookie }));
+  assert.equal((await mine(undefined)).status, 401);
+  const page1 = await json(await mine(a, "?limit=2"));
+  assert.deepEqual(page1.items.map((o) => o.id), [ids[2], ids[1]]);
+  assert.ok(page1.nextCursor);
+  const page2 = await json(await mine(a, `?limit=2&cursor=${page1.nextCursor}`));
+  assert.deepEqual(page2.items.map((o) => o.id), [ids[0]]);
+  assert.equal(page2.nextCursor, null);
+  // 다른 방문자의 주문은 섞이지 않고, 연락처는 내려가지 않는다
+  assert.equal((await json(await mine(b))).items.length, 1);
+  const first = page1.items[0];
+  assert.equal(first.items[0].options, "발사믹 · 오렌지 주스");
+  assert.ok(!("phone" in first) && !("customerSessionId" in first));
+  assert.equal((await mine(a, "?limit=0")).status, 400);
+  assert.equal((await mine(a, "?cursor=broken")).status, 400);
+});

@@ -45,8 +45,8 @@
 | 쿠키 | JavaScript 가 읽을 수 없고(`HttpOnly`) 운영 HTTPS 에서만 전달된다. 관리자·고객 쿠키를 구분한다 |
 | 쓰기 요청 | 같은 사이트에서 온 요청만 허용한다 (CSRF 방어), 로그인·주문·리뷰는 요청 횟수를 제한한다 |
 
-> ⚠️ **지금 `main` 의 관리자 API(`/api/admin/catalog`, `/api/admin/images`)에는 인증이 없다.** 다른 사이트에서 온 쓰기 요청(`Sec-Fetch-Site: cross-site`)만 403 으로 막고, 같은 사이트에서는 누구나 호출할 수 있다.
-> 위 로그인·세션이 연결되기 전에는 운영에 공개하지 않는다.
+> **기존 관리자 API 의 권한 검사**: `GET`·`PUT /api/admin/catalog`, `POST /api/admin/images`, `GET /api/admin/sales` 는 관리자 세션이 없으면 `401` 이다. 오류 모양은 기존 API 와 같은 `{ "error": "로그인이 필요합니다." }` 를 유지한다(화면의 오류 표시가 깨지지 않게). `/admin/preview` 는 로그인 화면으로 이동하고, `/admin` 은 로그인 쿠키가 없으면 로그인 화면으로 이동한다(보조 장치이며 실제 검사는 API 가 한다).
+> 고객 화면이 쓰는 `GET /api/catalog` 와 업로드 이미지 조회(`GET /api/admin/images/{key}`)는 공개다. `PATCH /api/admin/products/{id}` 는 상품 API 통합(#72)에서 교체한 뒤 같은 검사를 붙인다.
 
 ### 공통 에러 포맷
 
@@ -142,10 +142,13 @@
 | POST | `/api/v1/session` | (없음) | `201` `{ "expiresAt": "2026-11-09T05:00:00.000Z" }` (세션 토큰은 쿠키로만 내려가고 본문에는 없다. 이미 유효한 세션 쿠키가 있으면 새로 만들지 않고 같은 형식으로 `200`) | 신규 (설계안) |
 | POST | `/api/v1/auth/login` | `{ loginId: String, password: String }` (본문) | `{ "ok": true }` (관리자 세션 쿠키 발급) | 신규 (설계안) |
 | POST | `/api/v1/auth/logout` | (없음) | `{ "ok": true }` | 신규 (설계안) |
+| GET | `/api/v1/auth/session` | (없음) | `{ "authenticated": true, "expiresAt": "2026-10-10T18:47:44.000Z" }` (관리자 로그인 상태 확인. 로그인하지 않았거나 만료되면 `401`) | 신규 |
 | POST | `/api/v1/orders` | `{ Idempotency-Key: String }` (헤더), `{ items: Object[], ordererName: String, phone: String, address: String, addressDetail?: String, desiredDate: String, desiredSlot: String }` (본문) | `201` `{ "id": "7c1d9f64-2b0a-4a56-9f0e-3c1a8e5b2d10", "status": "received", "subtotal": "21800", "deliveryFee": "3000", "total": "24800", "createdAt": "2026-10-09T05:30:00.000Z" }` (같은 키·같은 내용의 재전송은 기존 주문과 함께 `200`) | 신규 (설계안) |
+| GET | `/api/v1/orders` | `{ limit?: Number, cursor?: String }` (쿼리, `limit` 기본 20 · 최대 50) | `{ "items": [{ "id": "7c1d9f64-2b0a-4a56-9f0e-3c1a8e5b2d10", "status": "received", "ordererName": "홍길동", "address": "서울 중구 세종대로 110", "addressDetail": "5층", "desiredDate": "2026-10-13", "desiredSlot": "12:00–13:00", "items": [{ "name": "레몬 치킨 아보카도", "options": "레몬 올리브 · 오렌지 주스", "unitPrice": "14900", "quantity": 1 }], "subtotal": "21800", "deliveryFee": "3000", "total": "24800", "createdAt": "2026-10-09T05:30:00.000Z" }], "nextCursor": null }` (이 방문자 세션으로 접수한 주문만 최신순. 항목은 상세 조회와 같은 모양. 세션이 없으면 `401`) | 신규 |
 | GET | `/api/v1/orders/{id}` | `{ id: String }` (경로) | `{ "id": "7c1d9f64-2b0a-4a56-9f0e-3c1a8e5b2d10", "status": "received", "ordererName": "홍길동", "address": "서울 중구 세종대로 110", "addressDetail": "5층", "desiredDate": "2026-10-13", "desiredSlot": "12:00–13:00", "items": [{ "name": "레몬 치킨 아보카도", "options": "레몬 올리브 · 오렌지 주스", "unitPrice": "14900", "quantity": 1 }], "subtotal": "21800", "deliveryFee": "3000", "total": "24800", "createdAt": "2026-10-09T05:30:00.000Z" }` (본인 주문만, 그 외는 404) | 신규 (설계안) |
 | POST | `/api/v1/orders/{id}/cancel` | `{ id: String }` (경로), `{ reason?: String }` (본문) | `{ "id": "7c1d9f64-2b0a-4a56-9f0e-3c1a8e5b2d10", "status": "canceled", "canceledAt": "2026-10-09T05:40:00.000Z" }` (이미 취소된 주문의 재요청은 현재 결과를 그대로 반환) | 신규 (설계안) |
-| GET | `/api/v1/admin/orders` | `{ status?: String, limit?: Number, cursor?: String }` (쿼리) | `{ "items": [{ "id": "7c1d9f64-2b0a-4a56-9f0e-3c1a8e5b2d10", "status": "received", "version": 1, "ordererName": "홍길동", "total": "24800", "createdAt": "2026-10-09T05:30:00.000Z" }], "nextCursor": "eyJjIjoiMjAyNi0xMC0wOVQwNTozMDowMC4wMDBaIiwiaSI6IjdjMWQ5ZjY0In0" }` | 신규 (설계안) |
+| GET | `/api/v1/admin/orders` | `{ status?: String, from?: String, to?: String, limit?: Number, cursor?: String }` (쿼리. `from`·`to` 는 접수일 `YYYY-MM-DD`, 한국 시간 기준 양 끝 포함) | `{ "items": [{ "id": "7c1d9f64-2b0a-4a56-9f0e-3c1a8e5b2d10", "status": "received", "version": 1, "ordererName": "홍길동", "desiredDate": "2026-10-13", "desiredSlot": "12:00–13:00", "total": "24800", "createdAt": "2026-10-09T05:30:00.000Z" }], "nextCursor": "eyJjIjoiMjAyNi0xMC0wOVQwNTozMDowMC4wMDBaIiwiaSI6IjdjMWQ5ZjY0In0" }` | 신규 (설계안) |
+| GET | `/api/v1/admin/orders/{id}` | `{ id: String }` (경로) | `{ "id": "7c1d9f64-2b0a-4a56-9f0e-3c1a8e5b2d10", "status": "confirmed", "version": 2, "ordererName": "홍길동", "phone": "010-1234-5678", "address": "서울 중구 세종대로 110", "addressDetail": "5층", "desiredDate": "2026-10-13", "desiredSlot": "12:00–13:00", "items": [{ "name": "레몬 치킨 아보카도", "options": "레몬 올리브 · 오렌지 주스", "unitPrice": "14900", "quantity": 1 }], "subtotal": "21800", "deliveryFee": "3000", "total": "24800", "createdAt": "2026-10-09T05:30:00.000Z", "cancelReason": null, "canceledAt": null, "history": [{ "fromStatus": null, "toStatus": "received", "changedBy": "customer", "reason": null, "createdAt": "2026-10-09T05:30:00.000Z" }, { "fromStatus": "received", "toStatus": "confirmed", "changedBy": "admin", "reason": null, "createdAt": "2026-10-09T05:35:00.000Z" }] }` (연락처·처리 이력은 관리자 상세에만 포함. 없는 주문은 `404`) | 신규 |
 | PATCH | `/api/v1/admin/orders/{id}/status` | `{ id: String }` (경로), `{ status: String, version: Number, reason?: String }` (본문) | `{ "id": "7c1d9f64-2b0a-4a56-9f0e-3c1a8e5b2d10", "status": "confirmed", "version": 2 }` (`version` 이 다르면 409) | 신규 (설계안) |
 
 - **주문 상태**: `received`(접수) → `confirmed`(확인) → `preparing`(준비 중) → `delivering`(배달 중) → `completed`(완료). 취소(`canceled`)는 접수·확인에서만, 완료·취소 주문은 더 바꿀 수 없다. 허용되지 않은 순서는 409.
@@ -158,11 +161,11 @@
   | 내 취향 볼 | `{ ingredientKeys: String[], dressingKey?: String, quantity: Number }` (음료 불가) | 기본 볼 6,500원 + 고른 재료 + 드레싱 (화면의 `bowlPrice` 와 같다) |
   | 음료 단품 | `{ drinkKeys: [String], quantity: Number }` (음료 1개, 드레싱 불가) | 음료 가격 |
 
-- **서버가 확인하는 것**: 판매 중인 메뉴·옵션·재료인지(숨김·삭제는 존재하지 않는 값으로 보고 400, 품절은 품절 안내와 함께 400), 필수 드레싱 선택, 같은 음료·재료의 중복, 수량 1~99, 연락처 형식, 받을 날짜가 오늘(한국 시간) 이후인지, 최소 주문 금액 15,000원. 배달비는 상품 합계 30,000원 미만이면 3,000원, 이상이면 무료다.
+- **서버가 확인하는 것**: 판매 중인 메뉴·옵션·재료인지(숨김·삭제는 존재하지 않는 값으로 보고 400, 품절은 품절 안내와 함께 400), 필수 드레싱 선택, 같은 음료·재료의 중복, 수량 1~99, 연락처 형식, 받을 날짜가 오늘부터 14일 이내이고 받을 시간대가 운영시간(지금은 매일 10:00–21:00) 안의 한 시간 단위이며 지금부터 30분 이후에 시작하는지(한국 시간 기준, 화면과 같은 규칙이고 `desiredSlot` 은 화면이 만드는 `10:00–11:00` 표기여야 한다. 위반하면 `"받을 날짜를 다시 선택해주세요."` 또는 `"받을 시간대를 다시 선택해주세요."`), 최소 주문 금액 15,000원. 배달비는 상품 합계 30,000원 미만이면 3,000원, 이상이면 무료다.
 - **관리자 취소**: 별도 경로 없이 `PATCH /api/v1/admin/orders/{id}/status` 에 `{ status: "canceled", version, reason }` 을 보낸다. 사유·취소 시각·변경자가 이력에 남는다. 고객 취소(`/cancel`)는 접수·확인 상태에서만 가능하고, 관리자가 그 사이 상태를 바꿔 충돌하면 최신 상태를 다시 읽어 판단한다.
 - **재전송**: 통신 실패 후 다시 보낼 때 같은 `Idempotency-Key` 를 쓴다. 같은 내용이면 기존 주문을, 다른 내용이면 409 를 돌려준다.
 - **조회 권한**: 주문 번호만으로는 다른 사람의 주문·연락처·주소를 볼 수 없다. 연락처·주소는 허용된 상세 응답에만 포함한다.
-- 설계안의 경로 목록에는 **관리자 주문 상세 조회**(`GET /api/v1/admin/orders/{id}`)가 없다. 요구사항 BE-05 의 "관리자는 목록과 상세를 조회한다"에 맞춰 필요하면 이 경로를 추가한다.
+- 설계안의 경로 목록에 없는 **관리자 주문 상세**(`GET /api/v1/admin/orders/{id}`)와 목록의 **접수일 범위**(`from`·`to`)는 요구사항 BE-05 의 "관리자는 기간·상태별 목록과 상세를 조회한다"에 맞춰 추가했다. 고객의 **내 주문 목록**(`GET /api/v1/orders`)은 마이페이지 주문 내역에 필요해서 추가했다.
 - 고객 계정(회원)·결제는 설계안의 범위 밖이라 이 표에 없다.
 
 ## 4. 관리자 API
@@ -193,6 +196,9 @@
 | GET | `/api/v1/orders/{id}` | 다른 사람의 주문 번호 | `{ "status": 404, "message": "주문을 찾을 수 없습니다." }` |
 | POST | `/api/v1/orders/{id}/cancel` | 준비 중인 주문 | `{ "status": 409, "message": "준비가 시작된 주문은 취소할 수 없습니다." }` |
 | PATCH | `/api/v1/admin/orders/{id}/status` | 오래된 `version` | `{ "status": 409, "message": "다른 관리자가 먼저 변경했습니다. 새로 고친 뒤 다시 시도해주세요." }` |
+| POST | `/api/v1/orders` | 이미 시작된 시간대 | `{ "status": 400, "message": "받을 시간대를 다시 선택해주세요." }` |
+| GET | `/api/v1/admin/orders` | `from` 이 `to` 보다 늦음 | `{ "status": 400, "message": "조회 기간을 확인해주세요." }` |
+| GET | `/api/v1/admin/orders/{id}` | 로그인하지 않음 | `{ "status": 401, "message": "로그인이 필요합니다." }` |
 | GET | `/api/v1/admin/orders` | 로그인하지 않음 | `{ "status": 401, "message": "로그인이 필요합니다." }` |
 | PUT | `/api/admin/catalog` | `revision` 이 오래된 값 | `{ "status": 409, "message": "다른 화면에서 데이터가 변경되었습니다. 최신 내용을 불러온 뒤 다시 저장해주세요." }` |
 | PATCH | `/api/v1/admin/products/{key}` | `{ "price": -5 }` | `{ "status": 400, "message": "price 는 0 이상이어야 합니다." }` |

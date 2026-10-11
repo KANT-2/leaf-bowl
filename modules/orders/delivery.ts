@@ -17,6 +17,11 @@ export function seoulDate(now: Date, days = 0): string {
   return new Date(now.getTime() + KST_OFFSET_MS + days * 24 * 3600_000).toISOString().slice(0, 10);
 }
 
+/** 한국 시간 하루의 시작(UTC 시각). 목록의 기간 조회에서 쓴다 */
+export function seoulDayStart(day: string): Date {
+  return new Date(`${day}T00:00:00+09:00`);
+}
+
 /** 한국 시간 `day` 의 `hour` 시 정각이 UTC 로 몇 시인지 */
 function seoulInstant(day: string, hour: number): number {
   return Date.parse(`${day}T${pad(hour)}:00:00+09:00`);

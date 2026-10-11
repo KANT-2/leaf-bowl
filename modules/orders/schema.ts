@@ -64,8 +64,24 @@ export const changeStatusSchema = z
   })
   .strict();
 
-export const adminOrderListQuerySchema = z.object({
-  status: z.enum(ORDER_STATUSES).optional(),
+const day = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine(isCalendarDate, "조회 기간을 확인해주세요.");
+
+export const adminOrderListQuerySchema = z
+  .object({
+    status: z.enum(ORDER_STATUSES).optional(),
+    /** 접수일 범위 (한국 시간 기준 날짜, 양 끝 포함) */
+    from: day.optional(),
+    to: day.optional(),
+    limit: z.coerce.number().int().min(1).max(50).default(20),
+    cursor: z.string().min(1).max(300).optional(),
+  })
+  .refine((q) => !q.from || !q.to || q.from <= q.to, { message: "조회 기간을 확인해주세요." });
+
+/** 고객 본인의 주문 목록 */
+export const ownOrderListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
   cursor: z.string().min(1).max(300).optional(),
 });
@@ -76,3 +92,4 @@ export type OrderItemInput = z.infer<typeof orderItemSchema>;
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type ChangeStatusInput = z.infer<typeof changeStatusSchema>;
 export type AdminOrderListQuery = z.infer<typeof adminOrderListQuerySchema>;
+export type OwnOrderListQuery = z.infer<typeof ownOrderListQuerySchema>;
