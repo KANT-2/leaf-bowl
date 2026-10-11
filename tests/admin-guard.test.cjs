@@ -91,3 +91,12 @@ test("proxy: /admin 은 쿠키가 없으면 로그인 화면으로, 다른 경�
     assert.equal(call(path).headers.get("location"), null, path);
   }
 });
+
+test("미리보기 로그인 이동은 상대 경로라 프록시 뒤의 내부 주소(0.0.0.0:3100)로 가지 않는다", () => {
+  const { adminLoginRedirect } = require("../modules/identity/legacy-admin.ts");
+  const res = adminLoginRedirect();
+  assert.equal(res.status, 307);
+  assert.equal(res.headers.get("location"), "/admin/login"); // 절대 주소가 아니다
+  assert.ok(!/^[a-z]+:\/\//i.test(res.headers.get("location")));
+  assert.equal(res.headers.get("cache-control"), "no-store");
+});

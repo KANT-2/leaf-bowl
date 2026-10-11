@@ -16,3 +16,12 @@ export async function adminGate(request: Request): Promise<Response | null> {
     throw e;
   }
 }
+
+/**
+ * 브라우저 주소로 여는 관리자 페이지(미리보기)용: 로그인 화면으로 보내는 상대 경로 리다이렉트.
+ * 절대 주소(`new URL(path, request.url)`)를 쓰면 프록시 뒤에서 서버가 알고 있는 내부 주소
+ * (`https://0.0.0.0:3100/...`)로 보내져 접속할 수 없다. `Location` 은 상대 경로여도 유효하다(RFC 9110).
+ */
+export function adminLoginRedirect(): Response {
+  return new Response(null, { status: 307, headers: { Location: "/admin/login", "Cache-Control": "no-store" } });
+}
