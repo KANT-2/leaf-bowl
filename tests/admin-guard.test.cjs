@@ -27,13 +27,12 @@ Module._resolveFilename = function (request, ...args) {
     ...args,
   );
 };
-const { setServicesForTests } = require("../modules/container.ts");
+const { setServicesForTests, createLimits } = require("../modules/container.ts");
 const { createOrdersService } = require("../modules/orders/service.ts");
 const { createMemoryOrdersRepository } = require("../modules/orders/memory-repository.ts");
 const { createIdentityService } = require("../modules/identity/service.ts");
 const { createMemoryIdentityRepository } = require("../modules/identity/repository.ts");
 const { hashPassword } = require("../modules/identity/crypto.ts");
-const { createRateLimiter } = require("../modules/shared/rate-limit.ts");
 const { adminGate } = require("../modules/identity/legacy-admin.ts");
 const sessionRoute = require("../app/api/v1/auth/session/route.ts");
 const guestRoute = require("../app/api/v1/session/route.ts");
@@ -47,7 +46,7 @@ async function setup() {
   setServicesForTests({
     orders: createOrdersService({ repository: createMemoryOrdersRepository(), getCatalog: async () => ({}) }),
     identity: createIdentityService({ repository: createMemoryIdentityRepository([{ id: "a1", loginId: "admin", passwordHash: await hashPassword("pw") }]) }),
-    limits: { login: createRateLimiter(50, 60000), order: createRateLimiter(50, 60000), session: createRateLimiter(50, 60000) },
+    limits: createLimits({ account: 50, clientLogin: 50, order: 50, clientSession: 50, globalSession: 500 }),
   });
 }
 const req = (path, { method = "GET", cookie, body } = {}) =>

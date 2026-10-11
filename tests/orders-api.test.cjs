@@ -28,13 +28,12 @@ Module._resolveFilename = function (request, ...args) {
   );
 };
 const { customerSeed } = require("../lib/admin/customer-seed.ts");
-const { setServicesForTests, services } = require("../modules/container.ts");
+const { setServicesForTests, services, createLimits } = require("../modules/container.ts");
 const { createOrdersService } = require("../modules/orders/service.ts");
 const { createMemoryOrdersRepository } = require("../modules/orders/memory-repository.ts");
 const { createIdentityService } = require("../modules/identity/service.ts");
 const { createMemoryIdentityRepository } = require("../modules/identity/repository.ts");
 const { hashPassword } = require("../modules/identity/crypto.ts");
-const { createRateLimiter } = require("../modules/shared/rate-limit.ts");
 
 const routes = {
   session: require("../app/api/v1/session/route.ts"),
@@ -62,11 +61,7 @@ async function setup() {
       now: () => new Date(FIXED_NOW),
     }),
     identity: createIdentityService({ repository: createMemoryIdentityRepository([admin]), now: () => new Date(FIXED_NOW) }),
-    limits: {
-      login: createRateLimiter(5, 60_000),
-      order: createRateLimiter(100, 60_000),
-      session: createRateLimiter(100, 60_000),
-    },
+    limits: createLimits({ account: 5, clientLogin: 100, order: 100, clientSession: 100, globalSession: 1000 }),
   });
   return catalog;
 }
@@ -431,4 +426,33 @@ test("내 주문 목록 (마이페이지용): 본인 세션의 주문만 최신�
   assert.ok(!("phone" in first) && !("customerSessionId" in first));
   assert.equal((await mine(a, "?limit=0")).status, 400);
   assert.equal((await mine(a, "?cursor=broken")).status, 400);
+});
+
+test("재전송 해시: 옵션 선택 순서만 다르면 기존 주문을 돌려주고, 실제 선택·수량·항목 순서가 다르면 409", async () => {
+  const catalog = await setup();
+  const cookie = await guest();
+  const dressing = catalog.products.find((p) => p.type === "dressing").id;
+  const salad = (productId, drinks, quantity = 1) => ({ productId, optionSelections: { dressing: [dressing], drinks }, quantity });
+  const order = (items) => orderBody(catalog, { items });
+  const first = await place(cookie, "hash-order-0001", order([salad(0, ["drink-1", "drink-2"])]));
+  assert.equal(first.status, 201);
+  const id = (await json(first)).id;
+
+  const reordered = await place(cookie, "hash-order-0001", order([salad(0, ["drink-2", "drink-1"])]));
+  assert.equal(reordered.status, 200); // 같은 선택 집합 → 기존 주문
+  assert.equal((await json(reordered)).id, id);
+
+  for (const [label, items] of [
+    ["다른 음료", [salad(0, ["drink-1", "drink-3"])]],
+    ["음료 하나 적음", [salad(0, ["drink-1"])]],
+    ["수량 다름", [salad(0, ["drink-1", "drink-2"], 2)]],
+  ]) {
+    assert.equal((await place(cookie, "hash-order-0001", order(items))).status, 409, label);
+  }
+
+  // 주문 항목의 순서는 정규화하지 않는다: 항목 순서를 바꾼 요청은 다른 요청으로 본다
+  const ab = [salad(0, ["drink-1"]), salad(3, ["drink-2"])];
+  assert.equal((await place(cookie, "hash-order-0002", order(ab))).status, 201);
+  assert.equal((await place(cookie, "hash-order-0002", order([ab[1], ab[0]]))).status, 409);
+  assert.equal((await place(cookie, "hash-order-0002", order(ab))).status, 200);
 });
