@@ -65,7 +65,7 @@ Next.js App Router 기반으로 고객 화면과 관리자 화면을 구성하�
 | 스타일 | Tailwind CSS 4 · 화면별 CSS |
 | 컴포넌트 | Radix UI · Lucide React · Sonner |
 | 데이터 검증 | Zod |
-| 서버 저장소 | PostgreSQL 18 · Prisma 7.10 (카탈로그·리뷰·주문·세션) |
+| 서버 저장소 | PostgreSQL 18 · Prisma 7.10 (카탈로그·앱 설정·리뷰·주문·세션) |
 | 브라우저 저장소 | 장바구니·체험 프로필·취향 localStorage |
 | DB 변경 이력 | Prisma migrations · 기존 SQL 제약·뷰·트리거 보존 |
 | 검증·배포 | GitHub Actions `Frontend CI` · 개발 MCP 배포 스크립트 |
@@ -89,7 +89,7 @@ npm run dev
 
 브라우저에서 [http://localhost:3000](http://localhost:3000)을 엽니다. 관리자 화면은 [http://localhost:3000/admin](http://localhost:3000/admin)에서 확인할 수 있습니다.
 
-PostgreSQL과 `DATABASE_URL`이 필요합니다. `db:seed`는 비어 있는 카탈로그만 초기화합니다. 기존 JSON을 옮길 때는 seed보다 먼저 가져오기를 실행합니다. [DB 운영 가이드](docs/postgres.md)를 참고하세요.
+PostgreSQL과 `DATABASE_URL`이 필요합니다. `db:seed`는 실행 원본 [db/seed.sql](db/seed.sql)로 비어 있는 카탈로그를 초기화하고 배너·배송시간·가격 정책·영양정보 등의 DB 설정을 넣습니다. 기존 편집과 주문은 보존합니다. 기존 JSON을 옮길 때는 seed보다 먼저 가져오기를 실행합니다. [DB 운영 가이드](docs/postgres.md)를 참고하세요.
 
 ### 저장 경로 설정
 

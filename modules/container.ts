@@ -1,5 +1,6 @@
 import { readCatalog } from "@/lib/admin/store";
 import { prisma } from "@/lib/prisma";
+import { getDeliveryHours } from "@/lib/data/server";
 import { createPostgresIdentityRepository } from "./identity/postgres-repository";
 import { createIdentityService, type IdentityService } from "./identity/service";
 import { createPostgresOrdersRepository } from "./orders/postgres-repository";
@@ -54,6 +55,7 @@ export function createServices(): Services {
     orders: createOrdersService({
       repository: createPostgresOrdersRepository(db),
       getCatalog: async () => (await readCatalog()).catalog,
+      getHours: getDeliveryHours,
     }),
     identity: createIdentityService({ repository: identityRepository }),
     limits: createLimits(),

@@ -1,8 +1,7 @@
 import { reviewTimestamp } from "@/lib/review-time";
 import type { Snapshot } from "@/lib/admin/catalog";
 import type { Product } from "@/types/product";
-import { NUTRITION, DRESSING_KCAL, DRINK_KCAL } from "@/lib/products";
-import { HERO_SLIDES } from "@/lib/data/hero";
+import * as referencePolicy from "@/lib/pricing-policy";
 import type { Ingredient } from "@/lib/data/ingredients";
 import { reviewDisplayDate, type Review } from "@/lib/reviews";
 import { createCartSelectors } from "./cart-selectors";
@@ -19,6 +18,8 @@ const labels: Record<string, Product["category"]> = {
 };
 export function customerCatalog(snapshot: Snapshot) {
   const catalog = snapshot.catalog;
+  const defaults = snapshot.defaults;
+  const pricingPolicy = defaults?.pricingPolicy ?? referencePolicy.REFERENCE_PRICING_POLICY;
   const salads = catalog.products.filter((p) => p.type === "salad");
   const PRODUCTS: Product[] = [];
   for (const p of salads) {
@@ -60,7 +61,7 @@ export function customerCatalog(snapshot: Snapshot) {
     image: p.image,
   }));
   const nutrition = PRODUCTS.map(
-    (p, i) => NUTRITION[i] ?? { kcal: 0, protein: 0, weight: 0 },
+    (p, i) => defaults?.nutrition[String(i)] ?? { kcal: 0, protein: 0, weight: 0 },
   );
   const photoSrc = (id: number) =>
     PRODUCTS[id]?.imageUrl || "/images/hero-cutout.png";
@@ -83,7 +84,7 @@ export function customerCatalog(snapshot: Snapshot) {
       price: i.price ?? 0,
       stage: i.stage ?? "TOPPINGS",
       group: i.category,
-      emoji: "",
+      emoji: defaults?.ingredientEmojis[i.id] ?? "",
       color: i.color ?? "#e9f2e8",
       allergens: split(i.allergens),
       image: i.image || "/images/hero-cutout.png",
@@ -115,7 +116,7 @@ export function customerCatalog(snapshot: Snapshot) {
           ]
         : [];
     });
-  const heroSlides = HERO_SLIDES.map((s, i) =>
+  const heroSlides = (defaults?.heroSlides ?? []).map((s, i) =>
     i === 0
       ? {
           ...s,
@@ -134,7 +135,9 @@ export function customerCatalog(snapshot: Snapshot) {
   const getProduct = (id: number) => visibleProducts.find((p) => p.id === id);
   const productFromParam = (param: string) =>
     /^\d+$/.test(param) ? getProduct(Number(param)) : undefined;
-  const { itemAvailable, defaultItem, itemUnitPrice, itemName, itemOptions, itemAllergens } = createCartSelectors(catalog, { PRODUCTS, DRESSINGS, DRINKS, ingredients });
+  const { itemAvailable, defaultItem, itemUnitPrice, itemName, itemOptions, itemAllergens } = createCartSelectors(catalog, { PRODUCTS, DRESSINGS, DRINKS, ingredients, baseBowlPrice: pricingPolicy.baseBowlPrice });
+  const dressingKcal = dressings.map(p => defaults?.optionKcal[p.id] ?? 0);
+  const drinkKcal = drinks.map(p => defaults?.optionKcal[p.id] ?? 0);
   return {
     catalog,
     revision: snapshot.revision,
@@ -144,6 +147,9 @@ export function customerCatalog(snapshot: Snapshot) {
     DRINKS,
     NUTRITION: nutrition,
     heroSlides,
+    pricingPolicy,
+    deliveryFee: (subtotal: number) => referencePolicy.deliveryFee(subtotal, pricingPolicy),
+    bowlPrice: (list: Ingredient[]) => pricingPolicy.baseBowlPrice + list.reduce((sum, item) => sum + item.price, 0),
     ingredients,
     reviews,
     photoSrc,
@@ -158,12 +164,12 @@ export function customerCatalog(snapshot: Snapshot) {
     OPTION_IMAGES: Object.fromEntries(
       [...dressings, ...drinks].map((p) => [p.name, p.image]),
     ),
-    DRESSING_KCAL: DRESSINGS.map((_, i) => DRESSING_KCAL[i] ?? 0),
-    DRINK_KCAL: DRINKS.map((_, i) => DRINK_KCAL[i] ?? 0),
+    DRESSING_KCAL: dressingKcal,
+    DRINK_KCAL: drinkKcal,
     kcalOf: (id: number, d: number, ds: number[]) =>
       (nutrition[id]?.kcal ?? 0) +
-      (DRESSING_KCAL[d] ?? 0) +
-      ds.reduce((n, i) => n + (DRINK_KCAL[i] ?? 0), 0),
+      (dressingKcal[d] ?? 0) +
+      ds.reduce((n, i) => n + (drinkKcal[i] ?? 0), 0),
     itemAvailable,
     defaultItem,
     groupsFor: (id: number) =>

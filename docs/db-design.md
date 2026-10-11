@@ -370,6 +370,7 @@ Prisma CLI·Client·PostgreSQL adapter는 7.10.0이다. 전체 카탈로그·주
 | `0001_baseline` | 기존 `db/schema.sql`의 테이블, IDENTITY, CHECK, 부분 인덱스, 생성 열, 뷰, 상태 전이 트리거를 그대로 생성 |
 | `0002_catalog_persistence` | 다음 고객 상품 번호, 리뷰 삭제 이력·via, 원산지, 원문 알레르기, 시즌 페이지 유무, 주문 항목 순서·종류 |
 | `0003_allergen_text` | 알레르기 문구 길이 호환, 상품 삭제 후에도 주문 상품 식별자를 보존하는 스냅샷 열 |
+| `0004_app_settings` | 배너·배송시간·가격 정책·영양정보·옵션 열량·재료 이모지의 JSONB 설정 |
 
 Prisma가 표현하지 못하는 DB 규칙은 migration SQL에서 유지한다. 생성 열은 `dbgenerated()`로 표시해 INSERT 시 직접 값을 보내지 않는다. `prisma db push`나 스키마에서 자동 생성한 DDL로 baseline SQL을 대체하지 않는다.
 
@@ -389,4 +390,6 @@ Prisma가 표현하지 못하는 DB 규칙은 migration SQL에서 유지한다. 
 
 ## 실행과 이관
 
-실제 실행, 기존 JSON 백업·가져오기, 계정 설정, 테스트 DB와 배포 환경은 [PostgreSQL 운영 가이드](postgres.md)를 따른다. 새 DB에는 `npm run db:migrate`를 사용한다. 현재 앱 초기값은 `npm run db:seed`로 넣으며 기존 JSON을 가져올 때는 seed보다 먼저 `db:import`를 실행한다. 과거 `db/seed.sql`은 설계 검증용 SQL이고 앱 초기화와 함께 실행하지 않는다.
+실제 실행, 기존 JSON 백업·가져오기, 계정 설정, 테스트 DB와 배포 환경은 [PostgreSQL 운영 가이드](postgres.md)를 따른다. 새 DB에는 `npm run db:migrate`를 사용한다. 현재 앱 초기값은 `npm run db:seed`로 넣으며 기존 JSON을 가져올 때는 seed보다 먼저 `db:import`를 실행한다. `db/seed.sql`은 실제 기본 데이터의 실행 원본이며 `db:seed`와 직접 SQL 실행이 같은 데이터를 넣는다. `db/schema.sql`은 현재 전체 구조를 새 DB에 직접 생성하는 SQL이다. 기존 DB에는 버전별 migration을 사용한다.
+
+`app_settings`는 `key`, `value JSONB`, `updated_at`으로 구성한다. 기본 키는 `hero_slides`, `delivery_hours`, `pricing_policy`, `nutrition`, `option_kcal`, `ingredient_emojis`다. 고객 카탈로그는 검증한 DB 설정을 함께 전달한다. 주문 생성은 가격 정책 행을 `FOR SHARE`로 잠근 상태에서 금액을 계산하며, 설정이 없거나 잘못되면 주문을 저장하지 않는다. 설정을 직접 수정할 때는 `updated_at`도 갱신한다.

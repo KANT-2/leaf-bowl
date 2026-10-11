@@ -1,6 +1,7 @@
 import type { Catalog, OptionGroup, Product } from "@/lib/admin/catalog";
 import { AppError } from "../shared/errors";
 import type { OrderItemInput } from "./schema";
+import type { PricingPolicy } from "@/lib/data/defaults";
 
 import * as policy from "@/lib/pricing-policy";
 
@@ -10,8 +11,8 @@ export const MIN_DELIVERY_ORDER = BigInt(policy.MIN_DELIVERY_ORDER);
 export const FREE_DELIVERY_FROM = BigInt(policy.FREE_DELIVERY_FROM);
 export const BASE_BOWL_PRICE = BigInt(policy.BASE_BOWL_PRICE);
 
-export function deliveryFee(subtotal: bigint): bigint {
-  return subtotal >= FREE_DELIVERY_FROM ? BigInt(0) : DELIVERY_FEE;
+export function deliveryFee(subtotal: bigint, settings = policy.REFERENCE_PRICING_POLICY): bigint {
+  return subtotal >= BigInt(settings.freeDeliveryFrom) ? BigInt(0) : BigInt(settings.deliveryFee);
 }
 
 interface PricedOption {
@@ -59,22 +60,22 @@ function duplicates(values: string[]): boolean {
  * 화면이 보낸 선택(키)만 믿고 가격은 카탈로그에서 다시 계산한다.
  * 숨김·삭제·품절 상품, 연결되지 않은 옵션, 없는 키는 모두 400.
  */
-export function priceOrder(catalog: Catalog, items: OrderItemInput[]): PricedOrder {
-  const lines = items.map((item) => priceLine(catalog, item));
+export function priceOrder(catalog: Catalog, items: OrderItemInput[], settings: PricingPolicy = policy.REFERENCE_PRICING_POLICY): PricedOrder {
+  const lines = items.map((item) => priceLine(catalog, item, settings));
   const subtotal = lines.reduce(
     (sum, l) => sum + l.unitPrice * BigInt(l.quantity),
     BigInt(0),
   );
-  if (subtotal < MIN_DELIVERY_ORDER) {
-    throw new AppError(400, `최소 주문 금액은 ${MIN_DELIVERY_ORDER.toLocaleString("ko-KR")}원입니다.`);
+  if (subtotal < BigInt(settings.minDeliveryOrder)) {
+    throw new AppError(400, `최소 주문 금액은 ${settings.minDeliveryOrder.toLocaleString("ko-KR")}원입니다.`);
   }
-  const fee = deliveryFee(subtotal);
+  const fee = deliveryFee(subtotal, settings);
   return { lines, subtotal, deliveryFee: fee, total: subtotal + fee };
 }
 
-function priceLine(catalog: Catalog, item: OrderItemInput): PricedLine {
+function priceLine(catalog: Catalog, item: OrderItemInput, settings: PricingPolicy): PricedLine {
   if (item.productId !== undefined) return priceMenu(catalog, item, item.productId);
-  return item.ingredientKeys.length > 0 ? priceCustomBowl(catalog, item) : priceDrinkOnly(catalog, item);
+  return item.ingredientKeys.length > 0 ? priceCustomBowl(catalog, item, settings) : priceDrinkOnly(catalog, item);
 }
 
 function priceMenu(catalog: Catalog, item: OrderItemInput, customerId: number): PricedLine {
@@ -127,7 +128,7 @@ function priceMenu(catalog: Catalog, item: OrderItemInput, customerId: number): 
 }
 
 /** 내 취향 찾기 조합: 기본 볼 + 고른 재료 가격 + 드레싱 (화면의 bowlPrice 와 같은 계산) */
-function priceCustomBowl(catalog: Catalog, item: OrderItemInput): PricedLine {
+function priceCustomBowl(catalog: Catalog, item: OrderItemInput, settings: PricingPolicy): PricedLine {
   if (item.drinkKeys.length > 0) throw new AppError(400, "내 취향 볼에는 음료를 함께 담을 수 없습니다.");
   if (duplicates(item.ingredientKeys)) throw new AppError(400, "같은 재료를 중복해서 선택할 수 없습니다.");
   const ingredients = item.ingredientKeys.map((k): PricedOption => {
@@ -146,7 +147,7 @@ function priceCustomBowl(catalog: Catalog, item: OrderItemInput): PricedLine {
     dressing = { key: p.id, name: p.name, price: p.price };
   }
   const unitPrice =
-    BASE_BOWL_PRICE +
+    BigInt(settings.baseBowlPrice) +
     ingredients.reduce((n, i) => n + BigInt(i.price), BigInt(0)) +
     BigInt(dressing?.price ?? 0);
   return {

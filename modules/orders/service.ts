@@ -1,5 +1,5 @@
 import type { Catalog } from "@/lib/admin/catalog";
-import { getDeliveryHours, type DeliveryHours } from "@/lib/data/delivery";
+import { REFERENCE_DELIVERY_HOURS, type DeliveryHours } from "@/lib/data/delivery";
 import { decodeCursor, encodeCursor } from "../shared/cursor";
 import { AppError } from "../shared/errors";
 import { assertDeliverySlot, seoulDayStart } from "./delivery";
@@ -12,9 +12,9 @@ import type { ListQuery, OrderRecord } from "./types";
 
 export interface OrdersServiceDeps {
   repository: OrdersRepository;
-  /** 가격 계산 기준이 되는 카탈로그. 지금은 관리자 JSON 저장소, DB 이후에는 DB 조회 */
+  /** 메모리 어댑터 테스트의 가격 계산 기준. 실제 저장소는 트랜잭션에서 조회한다. */
   getCatalog: () => Promise<Catalog>;
-  /** 배달 운영 시간. 지금은 고정 값, DB 이후에는 DB 조회 (lib/data/delivery.ts) */
+  /** 실제 서버는 DB의 배달 운영시간 조회를 주입한다. */
   getHours?: () => Promise<DeliveryHours>;
   now?: () => Date;
 }
@@ -26,7 +26,7 @@ const CHANGED_BY_OTHER = "다른 관리자가 먼저 변경했습니다. 새로 
 export function createOrdersService({
   repository,
   getCatalog,
-  getHours = getDeliveryHours,
+  getHours = async () => REFERENCE_DELIVERY_HOURS,
   now = () => new Date(),
 }: OrdersServiceDeps) {
   async function ownOrder(customerSessionId: string, id: string): Promise<OrderRecord> {
@@ -73,7 +73,7 @@ export function createOrdersService({
           if (existing) return sameRequest(existing, hash);
           assertDeliverySlot(input, await getHours(), now());
           const catalog = await tx.getCatalog();
-          const priced = priceOrder(catalog, input.items);
+          const priced = priceOrder(catalog, input.items, await tx.getPricingPolicy());
           const order = await tx.create({
           customerSessionId,
           ordererName: input.ordererName,

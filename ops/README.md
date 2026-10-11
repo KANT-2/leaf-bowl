@@ -76,7 +76,8 @@ Python 3.12 이상, Linux, Git, Node.js 22, npm과 GitHub/npm/Google Fonts 네�
 빌드·후보·운영 Next.js 프로세스에 `TZ=UTC`를 주입한다. 배포 로그와 상태의 시각은 UTC `Z`로 기록한다. 화면 날짜·시간은 공통 변환으로 KST를 표시하며, 브라우저 시스템 시간대에 의존하지 않는다.
 
 PostgreSQL 저장을 사용하는 버전은 배포 전에 환경별 DB에 migration과 import/seed를 실행하고,
-supervisor 프로세스에 `DATABASE_URL`과 고정된 `ADMIN_DATA_DIR`를 주입해야 한다.
+supervisor 프로세스에 `DATABASE_URL`, 고정된 `ADMIN_DATA_DIR`, 실제 HTTPS 주소인 `APP_ORIGIN`을 주입해야 한다.
+`APP_ORIGIN`은 TLS 프록시 뒤에서 로그인·주문 등 쓰기 API의 출처 확인에 사용한다.
 릴리스 안의 `.env.local` 대신 supervisor 환경을 사용한다. 상세 절차는
 [PostgreSQL 실행과 이관](../docs/postgres.md)을 따른다.
 

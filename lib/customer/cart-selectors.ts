@@ -10,8 +10,9 @@ import { optionChoices } from "./options";
 const split = (value: string) => value.split(/[,·]/).map((s) => s.trim()).filter(Boolean);
 interface CartOption { id: string; name: string; price: number; available: boolean; allergens?: string[] }
 
-export function createCartSelectors(catalog: Catalog, { PRODUCTS, DRESSINGS, DRINKS, ingredients }: {
+export function createCartSelectors(catalog: Catalog, { PRODUCTS, DRESSINGS, DRINKS, ingredients, baseBowlPrice = BASE_BOWL_PRICE }: {
   PRODUCTS: Product[]; DRESSINGS: CartOption[]; DRINKS: CartOption[]; ingredients: Ingredient[];
+  baseBowlPrice?: number;
 }) {
   const salads = catalog.products.filter((p) => p.type === "salad");
   const dressingOf = (item: { dressing: number; dressingKey?: string }) => DRESSINGS.find((d) => d.id === dressingKey(item));
@@ -95,7 +96,7 @@ export function createCartSelectors(catalog: Catalog, { PRODUCTS, DRESSINGS, DRI
       ? (drinkOf(i)?.price ?? 0)
       : isCustom(i)
       ? (i.ingredientIds
-          ? BASE_BOWL_PRICE +
+          ? baseBowlPrice +
             ingredients
               .filter((x) => i.ingredientIds?.includes(x.id))
               .reduce((n, x) => n + x.price, 0)

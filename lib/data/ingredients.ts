@@ -18,7 +18,7 @@ export interface Ingredient {
 
 export type Stage = "GREENS" | "PROTEIN" | "VEGGIES" | "TOPPINGS";
 
-// 지금은 코드 안의 고정 데이터. DB 로 옮길 때는 getIngredients() 안만 바꾸면 된다.
+// 이전 JSON 데이터 변환과 테스트의 기준. 실제 앱은 SQL로 초기화한 ingredients를 읽는다.
 export const INGREDIENTS: Ingredient[] = [
   {
     id: "romaine",
@@ -237,9 +237,3 @@ export const INGREDIENTS: Ingredient[] = [
     color: "#e7ece0",
   },
 ];
-
-/** 카드에 나오는 순서대로 재료 목록을 가져온다. */
-export async function getIngredients(): Promise<Ingredient[]> {
-  "use cache";
-  return INGREDIENTS;
-}

@@ -8,12 +8,7 @@ import {
   isAtLeast30MinAhead,
   timeOptions,
 } from "@/lib/delivery-slots";
-import {
-  FREE_DELIVERY_FROM,
-  MIN_DELIVERY_ORDER,
-  deliveryFee,
-  money,
-} from "@/lib/products";
+import { money } from "@/lib/products";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -32,6 +27,9 @@ interface BodyProps {
 
 export default function CartBody({ openedAt, hours, closeBtn }: BodyProps) {
   const cat = useCustomerCatalog();
+  const { deliveryFee } = cat;
+  const MIN_DELIVERY_ORDER = cat.pricingPolicy.minDeliveryOrder;
+  const FREE_DELIVERY_FROM = cat.pricingPolicy.freeDeliveryFrom;
   const router = useRouter();
   const { itemUnitPrice, itemAvailable, DRINKS } = cat;
   const { items, count, close, addDrink, addVariant } = useCart();
