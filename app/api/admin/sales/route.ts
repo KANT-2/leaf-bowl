@@ -1,9 +1,9 @@
 import { connection } from 'next/server';
-import { readCatalog } from '@/lib/admin/store';
-import { readSalesData } from '@/lib/admin/sales-store';
-import { buildSalesReport, salesPeriods, salesProductTypes, type SalesProductType, type SalesPeriod } from '@/lib/admin/sales';
-import { jsonError } from '@/lib/admin/server';
-import { adminGate } from '@/modules/identity/legacy-admin';
+import { readCatalog } from "@/application/catalog";
+import { readSalesData } from "@/application/sales";
+import { buildSalesReport, salesPeriods, salesProductTypes, type SalesProductType, type SalesPeriod } from "@/modules/reports/sales";
+import { jsonError } from "@/infrastructure/http/request";
+import { adminGate } from '@/application/admin-access';
 
 export async function GET(request: Request) {
   await connection();

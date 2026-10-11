@@ -1,10 +1,10 @@
-import { kstDate, kstSlotStart } from "@/lib/time";
-import { timeOptions } from "@/lib/delivery-slots";
-import type { DeliveryHours } from "@/lib/data/delivery";
+import { kstDate, kstSlotStart } from "@/modules/shared/time";
+import { timeOptions } from "@/modules/delivery/slots";
+import { type DeliveryHours } from "@/modules/delivery/hours";
 import { AppError } from "../shared/errors";
 
 /**
- * 받을 날짜·시간대 검증. 규칙은 화면(lib/checkout-validation.ts, lib/delivery-slots.ts)과 같다:
+ * 받을 날짜·시간대 검증. 규칙은 화면(features/checkout/validation.ts, modules/delivery/slots.ts)과 같다:
  * 오늘부터 14일 이내, 운영시간 안의 한 시간 단위, 지금부터 30분 이후에 시작하는 시간대만 허용한다.
  * 서버·화면 모두 공통 KST 달력·슬롯 계산을 사용하며 저장 시각은 UTC다.
  */
@@ -23,8 +23,12 @@ export function seoulDayStart(day: string): Date {
 }
 
 /** 화면과 같은 운영 시간·30분 이후 슬롯을 사용한다. */
-export function slotLabels(day: string, hours: DeliveryHours, now: Date): string[] {
-  return timeOptions(day, now.getTime(), hours).map(slot => slot.label);
+export function slotLabels(
+  day: string,
+  hours: DeliveryHours,
+  now: Date,
+): string[] {
+  return timeOptions(day, now.getTime(), hours).map((slot) => slot.label);
 }
 
 export function assertDeliverySlot(
@@ -33,7 +37,10 @@ export function assertDeliverySlot(
   now: Date,
 ): void {
   const { desiredDate, desiredSlot } = slot;
-  if (desiredDate < seoulDate(now, 0) || desiredDate > seoulDate(now, MAX_DAYS_AHEAD)) {
+  if (
+    desiredDate < seoulDate(now, 0) ||
+    desiredDate > seoulDate(now, MAX_DAYS_AHEAD)
+  ) {
     throw new AppError(400, "받을 날짜를 다시 선택해주세요.");
   }
   if (!slotLabels(desiredDate, hours, now).includes(desiredSlot)) {

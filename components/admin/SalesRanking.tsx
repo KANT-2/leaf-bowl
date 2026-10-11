@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import { BarChart3, RefreshCw, Trophy, ShoppingBag } from 'lucide-react';
 import { Button } from './button';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from './table';
-import type { SalesProductType, SalesPeriod, SalesReport, SalesRow } from '@/lib/admin/sales';
-import { redirectIfAdminUnauthorized } from "@/lib/admin/session-client";
+import type { SalesProductType, SalesPeriod, SalesReport, SalesRow } from "@/modules/reports/sales";
+import { redirectIfAdminUnauthorized } from "@/features/admin/session-client";
 import styles from './SalesRanking.module.css';
 
 const periods: { value: SalesPeriod; label: string }[] = [

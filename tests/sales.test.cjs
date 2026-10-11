@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const ts = require('typescript');
 require("./register-typescript.cjs");
 require.extensions['.ts'] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText, filename);
-const { buildSalesReport, salesDataSchema, salesPeriodStart } = require('../lib/admin/sales.ts');
+const { buildSalesReport, salesDataSchema, salesPeriodStart } = require('../modules/reports/sales.ts');
 const now = new Date('2026-10-09T03:00:00Z');
 const products = [
   { id: 'a', type: 'salad', name: 'A 샐러드', image: '/a.png', deleted: false, badge: 'BEST' },
@@ -72,7 +72,7 @@ test('rejects duplicate orders, invalid refunds, quantities and missing payment 
 });
 
 test('completed order snapshots count options without double-counting standalone drinks', () => {
-  const { salesItems } = require('../lib/admin/sales-store.ts');
+  const { salesItems } = require('../application/sales.ts');
   const options = { drinks: [{ key: 'drink', name: '음료', price: 4000 }], ingredients: [] };
   const items = salesItems([
     { productId: 'a', productType: 'salad', name: 'A 샐러드', quantity: 2, options: { ...options, dressing: { key: 'lemon', name: '레몬', price: 0 } } },

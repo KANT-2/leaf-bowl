@@ -1,7 +1,7 @@
 import Image from "next/image";
-import type { Ingredient } from "@/lib/data/ingredients";
-import { ingredientPhoto } from "@/lib/match";
-import { money } from "@/lib/products";
+import { type Ingredient } from "@/modules/bowl/ingredient";
+import { ingredientPhoto } from "@/modules/bowl/operations";
+import { money } from "@/modules/shared/format";
 const two = (n: number) => String(n).padStart(2, "0");
 
 export function CardFace({

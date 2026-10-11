@@ -1,6 +1,6 @@
 "use client";
 
-import type { DeliveryHours } from "@/lib/data/delivery";
+import { type DeliveryHours } from "@/modules/delivery/hours";
 import { useEffect, useRef } from "react";
 import CartBody from "./cart/CartBody";
 import { useCart } from "./CartProvider";

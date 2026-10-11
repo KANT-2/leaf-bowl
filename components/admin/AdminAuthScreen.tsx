@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ArrowLeft, Eye, EyeOff, Leaf, LockKeyhole, LogOut, ShieldCheck } from 'lucide-react';
 import { Button } from './button';
 import { Input } from './input';
-import { submitAdminAuth } from '@/lib/admin/auth-client';
+import { submitAdminAuth } from "@/features/admin/auth-client";
 import './auth.css';
 
 export default function AdminAuthScreen({ mode }: { mode: 'login' | 'logout' }) {

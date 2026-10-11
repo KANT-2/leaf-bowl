@@ -1,7 +1,8 @@
 "use client";
 import { Button } from "@/components/admin/button";
 import { Input } from "@/components/admin/input";
-import { saladCategories, type Catalog } from "@/lib/admin/catalog";
+import { saladCategories } from "@/features/admin/catalog-presentation";
+import { type Catalog } from "@/modules/catalog/schema";
 import { useRef, useState } from "react";
 import { Picker } from "./EditorFields";
 

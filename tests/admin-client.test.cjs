@@ -2,7 +2,7 @@
 const {test}=require("node:test");
 const assert=require("node:assert/strict");
 require("./register-typescript.cjs");
-const {request}=require("../lib/admin/request.ts");
+const {request}=require("../features/admin/request.ts");
 
 test("admin requests reject malformed success responses, conflicts, uploads and network errors",async()=>{
   const previous=global.fetch;

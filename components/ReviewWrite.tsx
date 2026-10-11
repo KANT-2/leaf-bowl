@@ -5,9 +5,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useReviews } from "./ReviewsProvider";
 import { useToast } from "./ToastProvider";
 import {useCustomerCatalog} from "./CustomerCatalogProvider";
-import { createReviewSubmission } from "@/lib/review-submission";
-import { shrinkImage } from "@/lib/image";
-import { RATE_LABELS, REVIEW_PHOTO_MAX, type Review } from "@/lib/reviews";
+import { createReviewSubmission } from "@/features/reviews/submission";
+import { shrinkImage } from "@/features/shared/image";
+import { RATE_LABELS, REVIEW_PHOTO_MAX, type Review } from "@/modules/reviews/model";
 
 const len = (s: string) => [...s].length;
 

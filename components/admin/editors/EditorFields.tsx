@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/admin/select";
-import { request } from "@/lib/admin/request";
+import { request } from "@/features/admin/request";
 import { Image as ImageIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";

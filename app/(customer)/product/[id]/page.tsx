@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { readCustomerCatalog } from '@/lib/customer/server';
+import { readCustomerCatalog } from "@/application/customer-catalog";
 import CustomerProductPage from '@/components/CustomerProductPage';
-import { getDeliveryHours } from '@/lib/data/server';
+import { getDeliveryHours } from "@/infrastructure/settings/postgres";
 
 export const instant = false;
 export async function generateMetadata({params}:PageProps<"/product/[id]">):Promise<Metadata>{

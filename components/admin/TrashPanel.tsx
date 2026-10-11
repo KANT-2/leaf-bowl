@@ -1,7 +1,7 @@
 "use client";
 import { Button } from "@/components/admin/button";
-import { type Catalog } from "@/lib/admin/catalog";
-import { statusNames } from "@/lib/admin/editor-helpers";
+import { type Catalog } from "@/modules/catalog/schema";
+import { statusNames } from "@/features/admin/editor-helpers";
 import { RotateCcw, Trash2 } from "lucide-react";
 export default function TrashPanel({
   catalog,

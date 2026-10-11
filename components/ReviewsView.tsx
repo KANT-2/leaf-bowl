@@ -9,10 +9,10 @@ import ReviewItem from "./ReviewItem";
 import { useReviewWrite } from "./ReviewWrite";
 import { useReviews } from "./ReviewsProvider";
 import StarRating from "./StarRating";
-import { useReducedMotion } from "@/lib/hooks";
+import { useReducedMotion } from "@/features/shared/hooks";
 import {useCustomerCatalog} from "./CustomerCatalogProvider";
-import { money } from "@/lib/products";
-import { SORTERS, SORT_LABELS, statsOf, type SortKey } from "@/lib/reviews";
+import { money } from "@/modules/shared/format";
+import { SORTERS, SORT_LABELS, statsOf, type SortKey } from "@/modules/reviews/model";
 
 const PAGE = 10;
 

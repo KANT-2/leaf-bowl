@@ -1,7 +1,8 @@
 "use client";
 import { Button } from "@/components/admin/button";
-import { money, type Catalog, type OptionGroup } from "@/lib/admin/catalog";
-import { blankGroup } from "@/lib/admin/editor-helpers";
+import { money } from "@/features/admin/catalog-presentation";
+import { type Catalog, type OptionGroup } from "@/modules/catalog/schema";
+import { blankGroup } from "@/features/admin/editor-helpers";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 export default function OptionsPanel({
   catalog,

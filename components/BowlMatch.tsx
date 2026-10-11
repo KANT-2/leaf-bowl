@@ -13,16 +13,18 @@ import {
 } from "react";
 import { useCart } from "./CartProvider";
 import { useToast } from "./ToastProvider";
-import type { Ingredient } from "@/lib/data/ingredients";
+import { type Ingredient } from "@/modules/bowl/ingredient";
 import {
   STAGES,
-  decisionsStore,
   mainIngredient,
   matchProduct,
+} from "@/modules/bowl/operations";
+import {
+  decisionsStore,
   recipeStore,
-  type Decision,
-} from "@/lib/match";
-import { money } from "@/lib/products";
+} from "@/infrastructure/browser/bowl-store";
+import { type Decision } from "@/modules/bowl/model";
+import { money } from "@/modules/shared/format";
 
 const two = (n: number) => String(n).padStart(2, "0");
 const unique = (list: string[]) => [...new Set(list)];
@@ -45,7 +47,14 @@ export default function BowlMatch() {
   return <BowlMatchBody ingredients={ingredients} />;
 }
 function BowlMatchBody({ ingredients }: { ingredients: Ingredient[] }) {
-  const { DRESSINGS, PRODUCTS, photoSrc, bowlPrice, pricingPolicy } = useCustomerCatalog();
+  const {
+    DRESSINGS,
+    PRODUCTS,
+    photoSrc,
+    bowlPrice,
+    pricingPolicy,
+    catalogConfig,
+  } = useCustomerCatalog();
   const { addCustom, open } = useCart();
   const toast = useToast();
   const total = ingredients.length;
@@ -224,8 +233,10 @@ function BowlMatchBody({ ingredients }: { ingredients: Ingredient[] }) {
     PRODUCTS.find(
       (p) =>
         p?.id ===
-          matchProduct(selected.length ? mainIngredient(selected).id : "") &&
-        p.status === "active",
+          matchProduct(
+            selected.length ? mainIngredient(selected).id : "",
+            catalogConfig.bowlRecommendations,
+          ) && p.status === "active",
     ) ??
     PRODUCTS.find((p) => p?.status === "active") ??
     PRODUCTS.find((p) => p?.status !== "hidden")!;

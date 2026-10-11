@@ -9,18 +9,14 @@ import {
   TableRow,
 } from "@/components/admin/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/admin/tabs";
-import {
-  money,
-  saladCategories,
-  type Catalog,
-  type Product,
-} from "@/lib/admin/catalog";
+import { money, saladCategories } from "@/features/admin/catalog-presentation";
+import { type Catalog, type Product } from "@/modules/catalog/schema";
 import {
   blankProduct,
   hasDressingOption,
   hasDrinkOption,
   statusNames,
-} from "@/lib/admin/editor-helpers";
+} from "@/features/admin/editor-helpers";
 import { CupSoda, Leaf, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import CategoryManager from "./editors/CategoryManager";
@@ -66,7 +62,7 @@ export default function ProductsPanel({
         <Button
           onClick={() =>
             setProduct({
-              ...blankProduct(type),
+              ...blankProduct(type, type === "salad" ? saladCategories(catalog)[0] ?? "" : type === "dressing" ? "드레싱" : "음료"),
               ...(type === "salad" && catalog
                 ? { category: saladCategories(catalog)[0] }
                 : {}),

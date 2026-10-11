@@ -1,6 +1,6 @@
-import { publicSnapshot } from "@/lib/customer/catalog";
+import { publicSnapshot } from "@/modules/catalog/public-snapshot";
 import { connection } from "next/server";
-import { readCatalog } from "@/lib/admin/store";
+import { readCatalog } from "@/application/catalog";
 export async function GET() {
   await connection();
   try {

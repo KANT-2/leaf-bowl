@@ -1,6 +1,6 @@
-import { publicSnapshot } from "@/lib/customer/catalog";
+import { publicSnapshot } from "@/modules/catalog/public-snapshot";
 import { connection } from "next/server";
-import { readCatalog } from "@/lib/admin/store";
+import { readCatalog } from "@/application/catalog";
 import CustomerCatalogProvider from "@/components/CustomerCatalogProvider";
 import type { Metadata, Viewport } from "next";
 import AuthProvider from "@/components/AuthProvider";
@@ -11,7 +11,7 @@ import Header from "@/components/Header";
 import ReviewWriteProvider from "@/components/ReviewWrite";
 import ReviewsProvider from "@/components/ReviewsProvider";
 import ToastProvider from "@/components/ToastProvider";
-import { getDeliveryHours } from "@/lib/data/server";
+import { getDeliveryHours } from "@/infrastructure/settings/postgres";
 import "../globals.css";
 
 export const instant = false;

@@ -1,9 +1,9 @@
 import { requireAdmin } from "@/modules/identity/guard";
-import { services } from "@/modules/container";
+import { services } from "@/application/container";
 import { adminDetailView } from "@/modules/orders/presenter";
 import { orderIdSchema } from "@/modules/orders/schema";
 import { AppError } from "@/modules/shared/errors";
-import { jsonResponse, run } from "@/modules/shared/http";
+import { jsonResponse, run } from "@/infrastructure/http/response";
 
 /** 관리자 주문 상세: 연락처·처리 이력 포함 */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {

@@ -30,7 +30,14 @@ export function requestHash(input: CreateOrderInput): string {
       drinkKeys: sorted(i.drinkKeys),
       ingredientKeys: sorted(i.ingredientKeys),
       ...(i.optionSelections
-        ? { optionSelections: Object.fromEntries(Object.entries(i.optionSelections).map(([group, keys]) => [group, sorted(keys)])) }
+        ? {
+            optionSelections: Object.fromEntries(
+              Object.entries(i.optionSelections).map(([group, keys]) => [
+                group,
+                sorted(keys),
+              ]),
+            ),
+          }
         : {}),
     })),
   };

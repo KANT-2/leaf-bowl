@@ -2,8 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { notifyCatalogSaved } from "@/components/CustomerCatalogProvider";
-import type { Catalog, Snapshot } from "@/lib/admin/catalog";
-import { request } from "@/lib/admin/request";
+import { type Catalog, type Snapshot } from "@/modules/catalog/schema";
+import { request } from "@/features/admin/request";
 
 export function useAdminCatalog(pollReviews: boolean) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);

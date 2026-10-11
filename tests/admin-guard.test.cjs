@@ -27,13 +27,14 @@ Module._resolveFilename = function (request, ...args) {
     ...args,
   );
 };
-const { setServicesForTests, createLimits } = require("../modules/container.ts");
+const { setServicesForTests, createLimits } = require("../application/container.ts");
+const { appDefaults } = require("./fixtures/settings.cjs");
 const { createOrdersService } = require("../modules/orders/service.ts");
-const { createMemoryOrdersRepository } = require("../modules/orders/memory-repository.ts");
+const { createMemoryOrdersRepository } = require("../tests/fixtures/memory-orders.ts");
 const { createIdentityService } = require("../modules/identity/service.ts");
 const { createMemoryIdentityRepository } = require("../modules/identity/repository.ts");
 const { hashPassword } = require("../modules/identity/crypto.ts");
-const { adminGate } = require("../modules/identity/legacy-admin.ts");
+const { adminGate } = require("../application/admin-access.ts");
 const sessionRoute = require("../app/api/v1/auth/session/route.ts");
 const guestRoute = require("../app/api/v1/session/route.ts");
 const loginRoute = require("../app/api/v1/auth/login/route.ts");
@@ -44,7 +45,7 @@ const { NextRequest } = require("next/server");
 const B = "http://localhost:3000";
 async function setup() {
   setServicesForTests({
-    orders: createOrdersService({ repository: createMemoryOrdersRepository(), getCatalog: async () => ({}) }),
+    orders: createOrdersService({ repository: createMemoryOrdersRepository({ getCatalog: async () => ({}), getPricingPolicy: async () => appDefaults().pricingPolicy, getDeliveryHours: async () => appDefaults().deliveryHours }) }),
     identity: createIdentityService({ repository: createMemoryIdentityRepository([{ id: "a1", loginId: "admin", passwordHash: await hashPassword("pw") }]) }),
     limits: createLimits({ account: 50, clientLogin: 50, order: 50, clientSession: 50, globalSession: 500 }),
   });
@@ -93,7 +94,7 @@ test("proxy: /admin 은 쿠키가 없으면 로그인 화면으로, 다른 경�
 });
 
 test("미리보기 로그인 이동은 상대 경로라 프록시 뒤의 내부 주소(0.0.0.0:3100)로 가지 않는다", () => {
-  const { adminLoginRedirect } = require("../modules/identity/legacy-admin.ts");
+  const { adminLoginRedirect } = require("../application/admin-access.ts");
   const res = adminLoginRedirect();
   assert.equal(res.status, 307);
   assert.equal(res.headers.get("location"), "/admin/login"); // 절대 주소가 아니다

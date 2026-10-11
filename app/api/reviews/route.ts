@@ -1,15 +1,15 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { publicSnapshot } from "@/lib/customer/catalog";
+import { publicSnapshot } from "@/modules/catalog/public-snapshot";
 import { z } from "zod";
 import { unstable_rethrow } from "next/navigation";
 import { AppError } from "@/modules/shared/errors";
-import { readJsonBody } from "@/modules/shared/http";
-import { appendCustomerReview, dataDirectory } from "@/lib/admin/store";
+import { readJsonBody } from "@/infrastructure/http/response";
+import { appendCustomerReview, dataDirectory } from "@/application/catalog";
 import {
   sameOrigin,
   jsonError,
-} from "@/lib/admin/server";
+} from "@/infrastructure/http/request";
 const schema = z.object({
   id: z
     .string()

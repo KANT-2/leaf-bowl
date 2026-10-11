@@ -1,9 +1,9 @@
 import { requireAdmin } from "@/modules/identity/guard";
-import { services } from "@/modules/container";
+import { services } from "@/application/container";
 import { statusView } from "@/modules/orders/presenter";
 import { changeStatusSchema, orderIdSchema } from "@/modules/orders/schema";
 import { AppError } from "@/modules/shared/errors";
-import { assertSameOrigin, jsonResponse, parseOrThrow, readJsonBody, run } from "@/modules/shared/http";
+import { assertSameOrigin, jsonResponse, parseOrThrow, readJsonBody, run } from "@/infrastructure/http/response";
 
 /** 주문 상태 변경. version 이 오래되었거나 허용되지 않은 순서면 409 */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {

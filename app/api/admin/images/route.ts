@@ -1,8 +1,8 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { dataDirectory } from '@/lib/admin/store';
-import { jsonError, sameOrigin, readLimited, BodyTooLarge } from '@/lib/admin/server';
-import { adminGate } from '@/modules/identity/legacy-admin';
+import { dataDirectory } from "@/application/catalog";
+import { jsonError, sameOrigin, readLimited, BodyTooLarge } from "@/infrastructure/http/request";
+import { adminGate } from '@/application/admin-access';
 export async function POST(request: Request) { if (!sameOrigin(request))
     return jsonError('허용되지 않은 요청입니다.', 403); const denied = await adminGate(request); if (denied)
     return denied; try {

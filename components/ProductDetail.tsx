@@ -3,18 +3,12 @@ import Image from "next/image";
 import { useState } from "react";
 import { useCustomerCatalog } from "./CustomerCatalogProvider";
 import { useCart } from "./CartProvider";
-import { money, type Product } from "@/lib/products";
+import { money } from "@/modules/shared/format";
+import { type Product } from "@/modules/catalog/customer-product";
 
 export default function ProductDetail({ product: p }: { product: Product }) {
-  const {
-    catalog,
-    groupsFor,
-    DRESSINGS,
-    DRINKS,
-    NUTRITION,
-    DRESSING_KCAL,
-    DRINK_KCAL,
-  } = useCustomerCatalog();
+  const { catalog, groupsFor, DRESSINGS, DRINKS, kcalOf } =
+    useCustomerCatalog();
   const { add, open } = useCart();
   const [selected, setSelected] = useState<Record<string, string[]>>({});
   const [qty, setQty] = useState(1);
@@ -144,13 +138,11 @@ export default function ProductDetail({ product: p }: { product: Product }) {
             )}
           </fieldset>
         ))}
-        {NUTRITION[p.id]?.kcal > 0 && (
+        {kcalOf(p.id, dressing, drinks) !== undefined && (
           <p className="pv-kcal" aria-live="polite">
             선택한 구성 약{" "}
             <b>
-              {NUTRITION[p.id].kcal +
-                (DRESSING_KCAL[dressing] ?? 0) +
-                drinks.reduce((n, i) => n + (DRINK_KCAL[i] ?? 0), 0)}
+              {kcalOf(p.id, dressing, drinks)}
               kcal
             </b>
             <span>영양 예시 값 · 추가 토핑 영양은 포함되지 않습니다.</span>

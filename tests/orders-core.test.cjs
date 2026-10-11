@@ -2,8 +2,11 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 require("./register-typescript.cjs");
-const { customerSeed } = require("../lib/admin/customer-seed.ts");
-const { priceOrder, deliveryFee } = require("../modules/orders/pricing.ts");
+const { customerSeed } = require("../seed/legacy/catalog.ts");
+const pricing = require("../modules/orders/pricing.ts");
+const policy = require("./fixtures/settings.cjs").appDefaults().pricingPolicy;
+const priceOrder = (catalog, items) => pricing.priceOrder(catalog, items, policy);
+const deliveryFee = subtotal => pricing.deliveryFee(subtotal, policy);
 const status = require("../modules/orders/status.ts");
 const schema = require("../modules/orders/schema.ts");
 const { requestHash } = require("../modules/orders/request-hash.ts");
@@ -111,7 +114,7 @@ test("pricing: 거부해야 하는 주문", () => {
 });
 
 test("pricing: 내 취향 조합은 화면의 bowlPrice(기본 볼 + 재료)와 같고, 품절·숨김 재료는 거부", () => {
-  const { BASE_BOWL_PRICE } = require("../lib/match.ts");
+  const BASE_BOWL_PRICE = policy.baseBowlPrice;
   const c = catalog();
   const priced = c.ingredients.filter((i) => i.price !== undefined && i.status === "active" && !i.deleted).slice(0, 4);
   assert.equal(priced.length, 4);
@@ -227,7 +230,9 @@ test("pricing: 모든 연결 그룹의 필수·다중 선택과 고객 화면 �
   const selections = { [c.groups.find((g) => g.source === "dressings").id]: [dressingKey(c, "참깨")], [drinkGroup.id]: [drinkKey(c, "오렌지 주스")], extra: ["nuts"] };
   const input = schema.orderItemSchema.parse({ productId: 0, optionSelections: selections, quantity: 2 });
   const priced = priceOrder(c, [input]);
-  const { customerCatalog } = require("../lib/customer/catalog.ts");
+  const { customerCatalog: projectCustomerCatalog } = require("../modules/catalog/customer-view.ts");
+    const { withDefaults } = require("./fixtures/settings.cjs");
+    const customerCatalog = value => projectCustomerCatalog(withDefaults(value));
   const client = customerCatalog({ catalog: c, revision: 1, updatedAt: "" });
   assert.equal(Number(priced.lines[0].unitPrice), client.itemUnitPrice({ id: 0, dressing: -1, drinks: [], optionSelections: selections, qty: 2 }));
   assert.equal(priced.lines[0].options.custom[0].name, "견과");

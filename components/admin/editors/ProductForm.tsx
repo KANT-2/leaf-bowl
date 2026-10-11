@@ -3,13 +3,9 @@ import { Button } from "@/components/admin/button";
 import { Checkbox } from "@/components/admin/checkbox";
 import { Input } from "@/components/admin/input";
 import { Textarea } from "@/components/admin/textarea";
-import { ingredientAllergens } from "@/lib/admin/allergens";
-import {
-  type Catalog,
-  type OptionGroup,
-  type Product,
-} from "@/lib/admin/catalog";
-import { statusNames } from "@/lib/admin/editor-helpers";
+import { ingredientAllergens } from "@/modules/catalog/allergens";
+import { type Catalog, type OptionGroup, type Product } from "@/modules/catalog/schema";
+import { statusNames } from "@/features/admin/editor-helpers";
 import { useState } from "react";
 import { Picker, Upload } from "./EditorFields";
 

@@ -17,7 +17,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/admin/dialog";
-import { saladCategories, type Catalog } from "@/lib/admin/catalog";
+import { saladCategories } from "@/features/admin/catalog-presentation";
+import { type Catalog } from "@/modules/catalog/schema";
 import GroupForm from "./editors/GroupForm";
 import ProductForm from "./editors/ProductForm";
 import type { CatalogEditors } from "./use-catalog-editors";

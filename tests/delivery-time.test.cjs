@@ -3,7 +3,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { execFileSync } = require("node:child_process");
 require("./register-typescript.cjs");
-const { deliveryWindowUTC, deliveryWindowKST } = require("../lib/delivery-time.ts");
+const { deliveryWindowUTC, deliveryWindowKST } = require("../modules/delivery/time.ts");
 const { createOrderSchema } = require("../modules/orders/schema.ts");
 const { requestHash } = require("../modules/orders/request-hash.ts");
 
@@ -37,8 +37,8 @@ test("server input requires UTC Z instants and legacy input normalizes to the sa
 
 test("slot calculation and UTC serialization are independent of server TZ including DST boundaries", () => {
   const script = `require('./tests/register-typescript.cjs');
-    const { dateValue, timeOptions } = require('./lib/delivery-slots.ts');
-    const { deliveryWindowUTC, deliveryWindowKST } = require('./lib/delivery-time.ts');
+    const { dateValue, timeOptions } = require('./modules/delivery/slots.ts');
+    const { deliveryWindowUTC, deliveryWindowKST } = require('./modules/delivery/time.ts');
     const output = ['2026-10-12T15:10:00Z','2026-03-08T03:00:00Z','2026-11-01T03:00:00Z'].map(at => {
       const now = Date.parse(at), day = dateValue(now,0);
       const slots = timeOptions(day,now,{open:10,close:21});
@@ -56,7 +56,7 @@ test("local order history migrates KST records and saves new UTC windows without
   let raw = JSON.stringify([{ id: "old", createdAt: 1, day: "2026-10-13", timeLabel: "12:00–13:00", address: "서울", total: 23000, items: [] }]);
   global.localStorage = { getItem: () => raw, setItem: (_key, value) => raw = value };
   try {
-    const { ordersStore, recordOrder } = require("../lib/orders.ts");
+    const { ordersStore, recordOrder } = require("../infrastructure/browser/legacy-orders.ts");
     const old = ordersStore.getSnapshot()[0];
     assert.equal(old.desiredStartAt, "2026-10-13T03:00:00.000Z");
     assert.equal(old.day, undefined);

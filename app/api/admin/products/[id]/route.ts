@@ -1,10 +1,10 @@
 import type { NextRequest } from "next/server";
-import { parseProductUpdate } from "@/lib/product-validation";
-import { updateProduct } from "@/lib/products-repository";
-import { services } from "@/modules/container";
+import { parseProductUpdate } from "@/modules/catalog/product-validation";
+import { updateProduct } from "@/application/products";
+import { services } from "@/application/container";
 import { requireAdmin } from "@/modules/identity/guard";
 import { AppError, errorBody } from "@/modules/shared/errors";
-import { sameOrigin, readLimited, BodyTooLarge } from "@/lib/admin/server";
+import { sameOrigin, readLimited, BodyTooLarge } from "@/infrastructure/http/request";
 
 export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/products/[id]">) {
   if (!sameOrigin(request)) return Response.json({ message: "허용되지 않은 요청입니다." }, { status: 403 });

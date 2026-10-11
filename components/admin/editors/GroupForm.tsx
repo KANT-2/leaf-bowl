@@ -2,8 +2,8 @@
 import { Button } from "@/components/admin/button";
 import { Input } from "@/components/admin/input";
 import { Switch } from "@/components/admin/switch";
-import { type OptionGroup } from "@/lib/admin/catalog";
-import { uid } from "@/lib/admin/editor-helpers";
+import { type OptionGroup } from "@/modules/catalog/schema";
+import { uid } from "@/features/admin/editor-helpers";
 import { Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Picker } from "./EditorFields";

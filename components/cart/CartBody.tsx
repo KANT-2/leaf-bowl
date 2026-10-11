@@ -1,14 +1,14 @@
 "use client";
-import { hasCustomIngredientIds, isCustom, isDrink, itemKey, withChoice } from "@/lib/cart";
-import { drinkKey } from "@/lib/cart-identifiers";
-import { deliveryWindowUTC } from "@/lib/delivery-time";
-import type { DeliveryHours } from "@/lib/data/delivery";
+import { hasCustomIngredientIds, isCustom, isDrink, itemKey, withChoice } from "@/modules/cart/identity";
+import { drinkKey } from "@/modules/cart/identifiers";
+import { deliveryWindowUTC } from "@/modules/delivery/time";
+import { type DeliveryHours } from "@/modules/delivery/hours";
 import {
   dateValue,
   isAtLeast30MinAhead,
   timeOptions,
-} from "@/lib/delivery-slots";
-import { money } from "@/lib/products";
+} from "@/modules/delivery/slots";
+import { money } from "@/modules/shared/format";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -17,7 +17,7 @@ import { useCart } from "../CartProvider";
 import { useCustomerCatalog } from "../CustomerCatalogProvider";
 import { useToast } from "../ToastProvider";
 
-import { type ChoiceSlot } from "@/lib/customer/cart-choice";
+import { type ChoiceSlot } from "@/features/cart/choice";
 import CartLine from "./CartLine";
 interface BodyProps {
   openedAt: number;

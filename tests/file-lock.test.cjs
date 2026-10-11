@@ -29,7 +29,7 @@ Module._resolveFilename = function (request, ...args) {
   );
 };
 
-const { withFileLock } = require("../lib/admin/file-lock.ts");
+const { withFileLock } = require("../seed/file-lock.ts");
 const { spawnSync, spawn } = require("node:child_process");
 
 test("dead owner and interrupted recovery are restored without removing a live owner", async () => {
@@ -70,7 +70,7 @@ test("separate processes serialize updates and compete safely to recover a dead 
   fs.writeFileSync(path.join(directory, "count"), "0");
   const loader = fs.readFileSync(__filename, "utf8").split('const { withFileLock }')[0];
   const worker = loader + `
-    const { withFileLock } = require(${JSON.stringify(path.resolve(__dirname, "../lib/admin/file-lock.ts"))});
+    const { withFileLock } = require(${JSON.stringify(path.resolve(__dirname, "../seed/file-lock.ts"))});
     (async () => { for(let i=0;i<4;i++) await withFileLock(${JSON.stringify(directory)}, async () => {
       const file=path.join(${JSON.stringify(directory)}, "count");
       const count=Number(fs.readFileSync(file,"utf8"));

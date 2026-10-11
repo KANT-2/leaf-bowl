@@ -2,7 +2,7 @@
 
 import { useCustomerCatalog } from "./CustomerCatalogProvider";
 import ReviewPhotos from "./ReviewPhotos";
-import { reviewDisplayDate, type Review } from "@/lib/reviews";
+import { reviewDisplayDate, type Review } from "@/modules/reviews/model";
 
 export default function ReviewCard({ review: r }: { review: Review }) {
   const { PRODUCTS } = useCustomerCatalog();

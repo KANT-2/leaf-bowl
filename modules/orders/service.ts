@@ -1,38 +1,41 @@
-import type { Catalog } from "@/lib/admin/catalog";
-import { REFERENCE_DELIVERY_HOURS, type DeliveryHours } from "@/lib/data/delivery";
 import { decodeCursor, encodeCursor } from "../shared/cursor";
 import { AppError } from "../shared/errors";
 import { assertDeliverySlot, seoulDayStart } from "./delivery";
 import { priceOrder } from "./pricing";
 import { requestHash } from "./request-hash";
 import { DuplicateRequestError, type OrdersRepository } from "./repository";
-import type { AdminOrderListQuery, ChangeStatusInput, CreateOrderInput, OwnOrderListQuery } from "./schema";
+import type {
+  AdminOrderListQuery,
+  ChangeStatusInput,
+  CreateOrderInput,
+  OwnOrderListQuery,
+} from "./schema";
 import { assertTransition, resolveCancel } from "./status";
 import type { ListQuery, OrderRecord } from "./types";
 
 export interface OrdersServiceDeps {
   repository: OrdersRepository;
-  /** 메모리 어댑터 테스트의 가격 계산 기준. 실제 저장소는 트랜잭션에서 조회한다. */
-  getCatalog: () => Promise<Catalog>;
-  /** 실제 서버는 DB의 배달 운영시간 조회를 주입한다. */
-  getHours?: () => Promise<DeliveryHours>;
   now?: () => Date;
 }
 
-const SAME_KEY_DIFFERENT_BODY = "같은 요청 번호로 다른 내용의 주문이 이미 있습니다.";
+const SAME_KEY_DIFFERENT_BODY =
+  "같은 요청 번호로 다른 내용의 주문이 이미 있습니다.";
 const NOT_FOUND = "주문을 찾을 수 없습니다.";
-const CHANGED_BY_OTHER = "다른 관리자가 먼저 변경했습니다. 새로 고친 뒤 다시 시도해주세요.";
+const CHANGED_BY_OTHER =
+  "다른 관리자가 먼저 변경했습니다. 새로 고친 뒤 다시 시도해주세요.";
 
 export function createOrdersService({
   repository,
-  getCatalog,
-  getHours = async () => REFERENCE_DELIVERY_HOURS,
   now = () => new Date(),
 }: OrdersServiceDeps) {
-  async function ownOrder(customerSessionId: string, id: string): Promise<OrderRecord> {
+  async function ownOrder(
+    customerSessionId: string,
+    id: string,
+  ): Promise<OrderRecord> {
     const order = await repository.findById(id);
     // 다른 사람의 주문은 존재 여부도 알려주지 않는다
-    if (!order || order.customerSessionId !== customerSessionId) throw new AppError(404, NOT_FOUND);
+    if (!order || order.customerSessionId !== customerSessionId)
+      throw new AppError(404, NOT_FOUND);
     return order;
   }
 
@@ -42,7 +45,11 @@ export function createOrdersService({
   }
 
   /** 다음 쪽이 있는지 보려고 limit + 1 개를 읽고, 있으면 마지막 항목으로 cursor 를 만든다 */
-  async function page(limit: number, cursor: string | undefined, filter: Omit<ListQuery, "limit" | "after">): Promise<Page> {
+  async function page(
+    limit: number,
+    cursor: string | undefined,
+    filter: Omit<ListQuery, "limit" | "after">,
+  ): Promise<Page> {
     const after = cursor ? decodeCursor(cursor) : undefined;
     const rows = await repository.list({ ...filter, limit: limit + 1, after });
     const items = rows.slice(0, limit);
@@ -50,12 +57,21 @@ export function createOrdersService({
     return {
       items,
       nextCursor:
-        rows.length > limit && last ? encodeCursor({ createdAt: last.createdAt.toISOString(), id: last.id }) : null,
+        rows.length > limit && last
+          ? encodeCursor({
+              createdAt: last.createdAt.toISOString(),
+              id: last.id,
+            })
+          : null,
     };
   }
 
-  function sameRequest(existing: OrderRecord, hash: string): { order: OrderRecord; created: false } {
-    if (existing.requestHash !== hash) throw new AppError(409, SAME_KEY_DIFFERENT_BODY);
+  function sameRequest(
+    existing: OrderRecord,
+    hash: string,
+  ): { order: OrderRecord; created: false } {
+    if (existing.requestHash !== hash)
+      throw new AppError(409, SAME_KEY_DIFFERENT_BODY);
     return { order: existing, created: false };
   }
 
@@ -68,40 +84,50 @@ export function createOrdersService({
     ): Promise<{ order: OrderRecord; created: boolean }> {
       const hash = requestHash(input);
       try {
-        return await repository.transaction(async tx => {
-          const existing = await tx.findByRequest(customerSessionId, idempotencyKey);
+        return await repository.transaction(async (tx) => {
+          const existing = await tx.findByRequest(
+            customerSessionId,
+            idempotencyKey,
+          );
           if (existing) return sameRequest(existing, hash);
-          assertDeliverySlot(input, await getHours(), now());
           const catalog = await tx.getCatalog();
-          const priced = priceOrder(catalog, input.items, await tx.getPricingPolicy());
+          assertDeliverySlot(input, await tx.getDeliveryHours(), now());
+          const priced = priceOrder(
+            catalog,
+            input.items,
+            await tx.getPricingPolicy(),
+          );
           const order = await tx.create({
-          customerSessionId,
-          ordererName: input.ordererName,
-          phone: input.phone,
-          address: input.address,
-          addressDetail: input.addressDetail,
-          desiredStartAt: new Date(input.desiredStartAt),
-          desiredEndAt: new Date(input.desiredEndAt),
-          subtotal: priced.subtotal,
-          deliveryFee: priced.deliveryFee,
-          total: priced.total,
-          requestKey: idempotencyKey,
-          requestHash: hash,
-          items: priced.lines.map((l) => ({
-            productId: l.productId,
-            productType: l.productId === null ? "custom" : catalog.products.find(p => p.id === l.productId)?.type === "drink" ? "drink" : "salad",
-            name: l.name,
-            options: l.options,
-            unitPrice: l.unitPrice,
-            quantity: l.quantity,
-          })),
+            customerSessionId,
+            ordererName: input.ordererName,
+            phone: input.phone,
+            address: input.address,
+            addressDetail: input.addressDetail,
+            desiredStartAt: new Date(input.desiredStartAt),
+            desiredEndAt: new Date(input.desiredEndAt),
+            subtotal: priced.subtotal,
+            deliveryFee: priced.deliveryFee,
+            total: priced.total,
+            requestKey: idempotencyKey,
+            requestHash: hash,
+            items: priced.lines.map((l) => ({
+              productId: l.productId,
+              productType: l.productType,
+              name: l.name,
+              options: l.options,
+              unitPrice: l.unitPrice,
+              quantity: l.quantity,
+            })),
           });
           return { order, created: true };
-        }, getCatalog);
+        });
       } catch (e) {
         if (!(e instanceof DuplicateRequestError)) throw e;
         // 동시에 같은 키가 먼저 저장됨: 저장된 주문을 다시 읽어 같은 규칙으로 처리
-        const winner = await repository.findByRequest(customerSessionId, idempotencyKey);
+        const winner = await repository.findByRequest(
+          customerSessionId,
+          idempotencyKey,
+        );
         if (!winner) throw e;
         return sameRequest(winner, hash);
       }
@@ -109,7 +135,11 @@ export function createOrdersService({
 
     getOrder: ownOrder,
 
-    async cancelOrder(customerSessionId: string, id: string, reason?: string): Promise<OrderRecord> {
+    async cancelOrder(
+      customerSessionId: string,
+      id: string,
+      reason?: string,
+    ): Promise<OrderRecord> {
       // 그 사이 관리자가 상태를 바꿔 갱신이 비면 최신 상태를 다시 읽어 판단한다 (최대 3회).
       // 확인 상태는 아직 취소할 수 있으므로 재시도하고, 준비 시작 후라면 resolveCancel 이 409 를 낸다.
       for (let attempt = 0; attempt < 3; attempt++) {
@@ -126,13 +156,21 @@ export function createOrdersService({
         });
         if (updated) return updated;
       }
-      throw new AppError(409, "주문 상태가 계속 바뀌고 있어 취소하지 못했습니다. 다시 시도해주세요.");
+      throw new AppError(
+        409,
+        "주문 상태가 계속 바뀌고 있어 취소하지 못했습니다. 다시 시도해주세요.",
+      );
     },
 
-    async changeStatus(adminUserId: string, id: string, input: ChangeStatusInput): Promise<OrderRecord> {
+    async changeStatus(
+      adminUserId: string,
+      id: string,
+      input: ChangeStatusInput,
+    ): Promise<OrderRecord> {
       const order = await repository.findById(id);
       if (!order) throw new AppError(404, NOT_FOUND);
-      if (order.version !== input.version) throw new AppError(409, CHANGED_BY_OTHER);
+      if (order.version !== input.version)
+        throw new AppError(409, CHANGED_BY_OTHER);
       assertTransition(order.status, input.status);
       const updated = await repository.updateStatus({
         id,
@@ -152,12 +190,17 @@ export function createOrdersService({
       return page(query.limit, query.cursor, {
         status: query.status,
         from: query.from ? seoulDayStart(query.from) : undefined,
-        to: query.to ? new Date(seoulDayStart(query.to).getTime() + 24 * 3600_000) : undefined,
+        to: query.to
+          ? new Date(seoulDayStart(query.to).getTime() + 24 * 3600_000)
+          : undefined,
       });
     },
 
     /** 고객: 본인 세션의 주문만 최신순 */
-    listOwnOrders(customerSessionId: string, query: OwnOrderListQuery): Promise<Page> {
+    listOwnOrders(
+      customerSessionId: string,
+      query: OwnOrderListQuery,
+    ): Promise<Page> {
       return page(query.limit, query.cursor, { customerSessionId });
     },
 

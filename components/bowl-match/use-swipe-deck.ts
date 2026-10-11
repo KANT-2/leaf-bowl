@@ -1,8 +1,9 @@
 "use client";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { Ingredient } from "@/lib/data/ingredients";
-import { decisionsStore, type Decision } from "@/lib/match";
-import { useReducedMotion } from "@/lib/hooks";
+import { type Ingredient } from "@/modules/bowl/ingredient";
+import { decisionsStore } from "@/infrastructure/browser/bowl-store";
+import { type Decision } from "@/modules/bowl/model";
+import { useReducedMotion } from "@/features/shared/hooks";
 
 /** 카드를 넘길 때 옆으로 날아가는 거리(px)와 기울기(도) */
 const FLY_X = 420;

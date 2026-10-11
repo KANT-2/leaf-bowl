@@ -6,7 +6,8 @@ import { useCart } from "./CartProvider";
 import FoodImage from "./FoodImage";
 import SoldOutCover from "./SoldOutCover";
 import { useReviews } from "./ReviewsProvider";
-import { money, type Product } from "@/lib/products";
+import { money } from "@/modules/shared/format";
+import { type Product } from "@/modules/catalog/customer-product";
 
 export const CARD_SIZES =
   "(max-width: 600px) 50vw, (max-width: 1240px) 25vw, 300px";
@@ -66,7 +67,9 @@ export default function ProductCard({
       </h3>
       <p>{p.ingredients}</p>
       <span className="card-nutri">
-        {NUTRITION[p.id].kcal}kcal · 단백질 {NUTRITION[p.id].protein}g
+        {NUTRITION[p.id]
+          ? `${NUTRITION[p.id]!.kcal}kcal · 단백질 ${NUTRITION[p.id]!.protein}g`
+          : "영양 정보 준비 중"}
       </span>
       <strong>{money(p.price)}</strong>
       {soldOut && <span className="card-soldout">현재 주문할 수 없어요</span>}

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const store = require("../lib/admin/store.ts");
+const store = require("../application/catalog.ts");
 const { AppError } = require("../modules/shared/errors.ts");
 const { POST } = require("../app/api/reviews/route.ts");
 const request = body => new Request("http://localhost:3000/api/reviews", { method: "POST", headers: { origin: "http://localhost:3000", "content-type": "application/json" }, body });

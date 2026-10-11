@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useCart } from "./CartProvider";
-import { MATCH_URL } from "@/lib/products";
+import { MATCH_URL } from "@/features/customer/routes";
 
 const KEY = "bb-match-collapsed";
 

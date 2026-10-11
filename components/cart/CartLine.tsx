@@ -1,14 +1,14 @@
 "use client";
-import { hasCustomIngredientIds, isCustom, isDrink } from "@/lib/cart";
-import { drinkKey } from "@/lib/cart-identifiers";
+import { hasCustomIngredientIds, isCustom, isDrink } from "@/modules/cart/identity";
+import { drinkKey } from "@/modules/cart/identifiers";
 import {
   choiceSlot,
   withRo,
   type ChoiceSlot,
-} from "@/lib/customer/cart-choice";
-import type { CustomerCatalog } from "@/lib/customer/catalog";
-import { money } from "@/lib/products";
-import type { CartItem } from "@/lib/storage";
+} from "@/features/cart/choice";
+import type { CustomerCatalog } from "@/modules/catalog/customer-view";
+import { money } from "@/modules/shared/format";
+import { type CartItem } from "@/modules/cart/types";
 import Image from "next/image";
 import Link from "next/link";
 import { useCart } from "../CartProvider";

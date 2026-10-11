@@ -6,7 +6,7 @@ import MatchFloat from "@/components/MatchFloat";
 import ProductCard from "@/components/ProductCard";
 import ReviewRotator from "@/components/ReviewRotator";
 import { useCustomerCatalog } from "./CustomerCatalogProvider";
-import { MATCH_URL } from "@/lib/products";
+import { MATCH_URL } from "@/features/customer/routes";
 
 export default function CustomerHome() {
   const { revision, heroSlides: slides, visibleProducts: PRODUCTS } = useCustomerCatalog();

@@ -1,9 +1,9 @@
 import { connection } from 'next/server';
 import { z } from 'zod';
-import { catalogSchema } from '@/lib/admin/catalog';
-import { readCatalog, writeCatalog } from '@/lib/admin/store';
-import { jsonError, sameOrigin, readLimited, BodyTooLarge } from '@/lib/admin/server';
-import { adminGate } from '@/modules/identity/legacy-admin';
+import { catalogSchema } from "@/modules/catalog/schema";
+import { readCatalog, writeCatalog } from "@/application/catalog";
+import { jsonError, sameOrigin, readLimited, BodyTooLarge } from "@/infrastructure/http/request";
+import { adminGate } from '@/application/admin-access';
 
 export async function GET(request: Request) { await connection(); const denied = await adminGate(request); if (denied)
     return denied; try {

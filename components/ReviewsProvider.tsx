@@ -2,10 +2,10 @@
 
 import { useCustomerCatalog, notifyCatalogSaved } from "./CustomerCatalogProvider";
 import { createContext, useCallback, useContext, useMemo, useEffect, useRef, useSyncExternalStore } from "react";
-import { startReviewMigration } from "@/lib/review-migration";
-import { createLocalStore } from "@/lib/local-store";
-import { statsOf, type Review, type ReviewStats } from "@/lib/reviews";
-import { REVIEW_KEY, loadUserReviews, saveUserReviews } from "@/lib/storage";
+import { startReviewMigration } from "@/features/reviews/migration";
+import { createLocalStore } from "@/infrastructure/browser/local-store";
+import { statsOf, type Review, type ReviewStats } from "@/modules/reviews/model";
+import { REVIEW_KEY, loadUserReviews, saveUserReviews } from "@/infrastructure/browser/review-storage";
 
 const EMPTY: Review[] = [];
 const store = createLocalStore<Review[]>(REVIEW_KEY, loadUserReviews, saveUserReviews, EMPTY);

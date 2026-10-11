@@ -1,9 +1,9 @@
 import { requireGuest } from "@/modules/identity/guard";
-import { services } from "@/modules/container";
+import { services } from "@/application/container";
 import { cancelView } from "@/modules/orders/presenter";
 import { cancelOrderSchema, orderIdSchema } from "@/modules/orders/schema";
 import { AppError } from "@/modules/shared/errors";
-import { assertSameOrigin, jsonResponse, parseOrThrow, readJsonBody, run } from "@/modules/shared/http";
+import { assertSameOrigin, jsonResponse, parseOrThrow, readJsonBody, run } from "@/infrastructure/http/response";
 
 /** 접수·확인 상태에서만 취소할 수 있다. 이미 취소된 주문의 재요청은 현재 결과를 그대로 돌려준다 */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {

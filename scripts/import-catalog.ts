@@ -1,6 +1,6 @@
 import { loadEnvConfig } from "@next/env";
-import { importCatalogFile } from "@/lib/admin/import-catalog";
-import { prisma } from "@/lib/prisma";
+import { importCatalogFile } from "@/seed/import-catalog";
+import { prisma } from "@/infrastructure/database/prisma";
 
 loadEnvConfig(process.cwd());
 

@@ -31,7 +31,10 @@ export const STATUS_LABEL: Record<OrderStatus, string> = {
 };
 
 export function isOrderStatus(value: unknown): value is OrderStatus {
-  return typeof value === "string" && (ORDER_STATUSES as readonly string[]).includes(value);
+  return (
+    typeof value === "string" &&
+    (ORDER_STATUSES as readonly string[]).includes(value)
+  );
 }
 
 export function canTransition(from: OrderStatus, to: OrderStatus): boolean {

@@ -19,13 +19,8 @@ import {
 } from "@/components/admin/dialog";
 import { Input } from "@/components/admin/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/admin/tabs";
-import {
-  reviewDateTime,
-  reviewMenuLabel,
-  type Catalog,
-  type Review,
-} from "@/lib/admin/catalog";
-import { exampleReviews } from "@/lib/admin/reviews";
+import { reviewDateTime, reviewMenuLabel } from "@/features/admin/catalog-presentation";
+import { type Catalog, type Review } from "@/modules/catalog/schema";
 import { RotateCcw, Trash2 } from "lucide-react";
 import { useState } from "react";
 
@@ -61,7 +56,7 @@ export default function ReviewManager({
     url.searchParams.set("reviewType", value);
     window.history.replaceState(window.history.state, "", url);
   }
-  const reviews: Review[] = catalog.reviews ?? exampleReviews;
+  const reviews: Review[] = catalog.reviews ?? [];
   const detail = reviews.find((r) => r.id === detailId);
   const visible = reviews.filter((r) => !r.deleted),
     removed = reviews.filter((r) => r.deleted),

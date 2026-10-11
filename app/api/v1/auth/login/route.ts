@@ -2,8 +2,8 @@ import { sessionCookie } from "@/modules/identity/cookies";
 import { loginRateKey } from "@/modules/identity/crypto";
 import { loginSchema } from "@/modules/identity/guard";
 import { ADMIN_COOKIE } from "@/modules/identity/service";
-import { services } from "@/modules/container";
-import { assertSameOrigin, jsonResponse, parseOrThrow, readJsonBody, run } from "@/modules/shared/http";
+import { services } from "@/application/container";
+import { assertSameOrigin, jsonResponse, parseOrThrow, readJsonBody, run } from "@/infrastructure/http/response";
 import { clientKey } from "@/modules/shared/rate-limit";
 
 export async function POST(request: Request) {

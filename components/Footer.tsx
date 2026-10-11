@@ -1,7 +1,7 @@
 "use client";
 import {useCustomerCatalog} from "./CustomerCatalogProvider";
 import Link from "next/link";
-import { formatDeliveryHours, type DeliveryHours } from "@/lib/data/delivery";
+import { formatDeliveryHours, type DeliveryHours } from "@/modules/delivery/hours";
 
 export default function Footer({hours}:{hours:DeliveryHours}) {
   const {catalog}=useCustomerCatalog();

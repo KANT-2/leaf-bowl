@@ -8,18 +8,21 @@ require("./register-typescript.cjs");
 const {
   customerSeed,
   migrateCatalog,
-} = require("../lib/admin/customer-seed.ts");
-const { catalogSchema } = require("../lib/admin/catalog.ts");
-const { customerCatalog } = require("../lib/customer/catalog.ts");
-const { PRODUCTS } = require("../data/products.ts");
+} = require("../seed/legacy/catalog.ts");
+const { catalogSchema } = require("../modules/catalog/schema.ts");
+const { customerCatalog: projectCustomerCatalog } = require("../modules/catalog/customer-view.ts");
+    const { withDefaults } = require("./fixtures/settings.cjs");
+    const customerCatalog = value => projectCustomerCatalog(withDefaults(value));
+const { PRODUCTS } = require("../seed/legacy/products.ts");
 const snapshot = (catalog) => ({
   catalog,
+  defaults: require("./fixtures/settings.cjs").appDefaults(),
   revision: 1,
   updatedAt: new Date().toISOString(),
 });
 test("public snapshot validates redacted slots separately from writable admin catalog", () => {
-  const { publicSnapshot } = require("../lib/customer/catalog.ts");
-  const { publicSnapshotSchema } = require("../lib/customer/snapshot.ts");
+  const { publicSnapshot } = require("../modules/catalog/public-snapshot.ts");
+  const { publicSnapshotSchema } = require("../modules/catalog/public-schema.ts");
   const seed = customerSeed();
   seed.products[1].status = "hidden";
   seed.products[2].deleted = true;
@@ -98,7 +101,7 @@ test("persistent edits survive restart; revision conflicts and review moderation
       readCatalog,
       writeCatalog,
       appendCustomerReview,
-    } = require("../lib/admin/file-store.ts");
+    } = require("../tests/fixtures/file-catalog.ts");
     const initial = await readCatalog();
     initial.catalog.products[0].price = 16000;
     const saved = await writeCatalog(initial.catalog, initial.revision);
@@ -172,13 +175,13 @@ test("custom options, new-item cart persistence and public visibility are consis
   assert.equal(customerCatalog(snapshot(seed)).itemAvailable(item), false);
   seed.products[1].status = "hidden";
   seed.reviews[0].deleted = true;
-  const { publicSnapshot } = require("../lib/customer/catalog.ts");
+  const { publicSnapshot } = require("../modules/catalog/public-snapshot.ts");
   const publicData = publicSnapshot(snapshot(seed));
   assert.equal(publicData.catalog.products[1].name, "");
   assert.ok(
     !publicData.catalog.reviews.some((r) => r.id === seed.reviews[0].id),
   );
-  const storage = require("../lib/storage.ts");
+  const storage = require("../infrastructure/browser/cart-storage.ts");
   const memory = new Map();
   global.localStorage = {
     setItem: (key, value) => memory.set(key, value),
@@ -199,7 +202,7 @@ test("permanently removed product IDs are not reused after a review write", asyn
   const previous = process.env.ADMIN_DATA_DIR;
   process.env.ADMIN_DATA_DIR = directory;
   try {
-    const { readCatalog, writeCatalog, appendCustomerReview } = require("../lib/admin/file-store.ts");
+    const { readCatalog, writeCatalog, appendCustomerReview } = require("../tests/fixtures/file-catalog.ts");
     let state = await readCatalog();
     const prototype = state.catalog.products.find(p=>p.type==="salad");
     state = await writeCatalog({...state.catalog,products:[...state.catalog.products,{...prototype,id:"new-first"}]},state.revision);
@@ -216,7 +219,7 @@ test("permanently removed product IDs are not reused after a review write", asyn
 });
 
 test('allergen suggestions use registered ingredients and flag unknown names',()=>{
- const {ingredientAllergens}=require('../lib/admin/allergens.ts');
+ const {ingredientAllergens}=require('../modules/catalog/allergens.ts');
  const ingredients=[{name:'탱글한 새우',allergens:'새우',deleted:false},{name:'방울토마토',allergens:'토마토, 새우',deleted:false},{name:'우유',allergens:'우유',deleted:true}];
  assert.deepEqual(ingredientAllergens('새우 · 방울토마토, 새우\n미등록 재료',ingredients),{allergens:'새우, 토마토',unknown:['미등록 재료']});
  assert.deepEqual(ingredientAllergens('우유',ingredients),{allergens:'',unknown:['우유']});
@@ -227,8 +230,8 @@ test('origin details survive catalog validation and persistent storage',async()=
  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'front5-origins-'));
  const previous=process.env.ADMIN_DATA_DIR;process.env.ADMIN_DATA_DIR=directory;
  try{
-  const {catalogSchema}=require('../lib/admin/catalog.ts');
-  const {readCatalog,writeCatalog}=require('../lib/admin/file-store.ts');
+  const {catalogSchema}=require('../modules/catalog/schema.ts');
+  const {readCatalog,writeCatalog}=require('../tests/fixtures/file-catalog.ts');
   let state=await readCatalog();
   const ingredients=state.catalog.ingredients.map((i,index)=>index===0?{...i,origin:'국내산',originDetail:'충청남도',allergens:'대두, 우유'}:i);
   const validated=catalogSchema.parse({...state.catalog,ingredients});
@@ -244,7 +247,7 @@ test('permanently deleted reviews stay removed after reload and later saves', as
   const previous = process.env.ADMIN_DATA_DIR;
   process.env.ADMIN_DATA_DIR = directory;
   try {
-    const { readCatalog, writeCatalog } = require('../lib/admin/file-store.ts');
+    const { readCatalog, writeCatalog } = require('../tests/fixtures/file-catalog.ts');
     let state = await readCatalog();
     const target = state.catalog.reviews[0];
     const otherIds = state.catalog.reviews.slice(1).map(r => r.id);
@@ -269,7 +272,7 @@ test('purged review retries cannot restore content and deletion IDs remain inter
   const previous = process.env.ADMIN_DATA_DIR;
   process.env.ADMIN_DATA_DIR = directory;
   try {
-    const { readCatalog, writeCatalog, appendCustomerReview } = require('../lib/admin/file-store.ts');
+    const { readCatalog, writeCatalog, appendCustomerReview } = require('../tests/fixtures/file-catalog.ts');
     const payload = { id: 'purged-retry', pid: 0, author: '검증', stars: 5, title: '삭제 대상', text: '삭제할 본문', via: 'delivery' };
     let state = await appendCustomerReview(payload);
     const removedReview = state.catalog.reviews.find(r => r.id === payload.id);
@@ -306,7 +309,7 @@ test('purged review retries cannot restore content and deletion IDs remain inter
 
 
 test("review retries keep an ID and duplicated/deleted requests leave no orphan photos", async () => {
-  const { createReviewSubmission } = require("../lib/review-submission.ts");
+  const { createReviewSubmission } = require("../features/reviews/submission.ts");
   const submit = createReviewSubmission();
   const draft = { pid: 0, author: "익명", stars: 5, title: "맛있어요", text: "아주 신선하고 맛있어요.", via: "delivery" };
   const photo = "data:image/png;base64," + Buffer.from([137,80,78,71,13,10,26,10,1]).toString("base64");
@@ -316,12 +319,16 @@ test("review retries keep an ID and duplicated/deleted requests leave no orphan 
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "review-retry-"));
   const oldDirectory = process.env.ADMIN_DATA_DIR;
   process.env.ADMIN_DATA_DIR = directory;
-  const store = require("../lib/admin/store.ts");
+  const store = require("../application/catalog.ts");
   const originalStore = { ...store };
-  Object.assign(store, require("../lib/admin/file-store.ts"));
+  const fileStore = require("./fixtures/file-catalog.ts");
+  Object.assign(store, fileStore, {
+    readCatalog: async () => withDefaults(await fileStore.readCatalog()),
+    appendCustomerReview: async input => withDefaults(await fileStore.appendCustomerReview(input)),
+  });
   try {
     const { POST } = require("../app/api/reviews/route.ts");
-    const { readCatalog, writeCatalog } = require("../lib/admin/file-store.ts");
+    const { readCatalog, writeCatalog } = require("../tests/fixtures/file-catalog.ts");
     const request = () => new Request("http://localhost/api/reviews", { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost" }, body: JSON.stringify({ ...first, photos: [photo] }) });
     const results = await Promise.all([POST(request()), POST(request())]);
     assert.deepEqual(results.map((r) => r.status), [200, 200]);
@@ -342,7 +349,7 @@ test("review retries keep an ID and duplicated/deleted requests leave no orphan 
 });
 
 test("local review migration retries failures, acknowledges success and cancels pending work", async () => {
-  const { startReviewMigration } = require("../lib/review-migration.ts");
+  const { startReviewMigration } = require("../features/reviews/migration.ts");
   const migrated = new Set();
   let sends = 0;
   let refreshes = 0;

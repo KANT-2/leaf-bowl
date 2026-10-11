@@ -2,10 +2,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
-import type { Ingredient } from "@/lib/data/ingredients";
-import type { Product } from "@/types/product";
-import type { CustomerCatalog } from "@/lib/customer/catalog";
-import { money } from "@/lib/products";
+import { type Ingredient } from "@/modules/bowl/ingredient";
+import type { Product } from "@/modules/catalog/customer-product";
+import type { CustomerCatalog } from "@/modules/catalog/customer-view";
+import { money } from "@/modules/shared/format";
 
 interface Props {
   resultOpen: boolean;

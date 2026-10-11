@@ -14,8 +14,8 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/admin/sidebar";
-import { type Product } from "@/lib/admin/catalog";
-import { blankProduct } from "@/lib/admin/editor-helpers";
+import { type Product } from "@/modules/catalog/schema";
+import { blankProduct } from "@/features/admin/editor-helpers";
 import {
   BarChart3,
   Eye,
@@ -135,7 +135,7 @@ export default function Admin() {
             throw Error("입력은 빈 객체여야 합니다.");
           setView("products");
           setType("salad");
-          setProduct(blankProduct("salad"));
+          setProduct(blankProduct("salad", stateRef.current?.catalog.categories?.[0] ?? ""));
           return { status: "form_opened" };
         },
       },
@@ -283,8 +283,9 @@ export default function Admin() {
                   onSave={(c) => save({ ...catalog, content: c })}
                 />
               )}
-              {view === "origins" && (
+              {view === "origins" && snapshot?.defaults && (
                 <OriginAllergyManager
+                  config={snapshot.defaults.catalogConfig}
                   catalog={catalog}
                   busy={busy}
                   onSave={save}

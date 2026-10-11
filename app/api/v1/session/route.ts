@@ -1,7 +1,7 @@
 import { readCookie, sessionCookie } from "@/modules/identity/cookies";
 import { GUEST_COOKIE } from "@/modules/identity/service";
-import { services } from "@/modules/container";
-import { assertSameOrigin, jsonResponse, run } from "@/modules/shared/http";
+import { services } from "@/application/container";
+import { assertSameOrigin, jsonResponse, run } from "@/infrastructure/http/response";
 import { clientKey } from "@/modules/shared/rate-limit";
 
 /** 비회원 방문자 세션 발급. 이미 유효한 세션이 있으면 새로 만들지 않는다 (이전 주문을 계속 볼 수 있게) */

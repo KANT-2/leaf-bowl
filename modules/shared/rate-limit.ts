@@ -11,8 +11,13 @@ export interface RateLimiterOptions {
  * 만료된 키는 시간 구간이 한 번 지날 때마다 한 번만 훑어서 지우고, 키 개수는 maxKeys 로 제한한다(가득 차면 가장 오래된 키 제거).
  * (예전에는 요청마다 전체 키를 순회해서 서로 다른 키 2만 개를 넣는 데 4초가 걸렸다.)
  */
-export function createRateLimiter(limit: number, windowMs: number, options: RateLimiterOptions | (() => number) = {}) {
-  const { now = Date.now, maxKeys = 10_000 } = typeof options === "function" ? { now: options } : options;
+export function createRateLimiter(
+  limit: number,
+  windowMs: number,
+  options: RateLimiterOptions | (() => number) = {},
+) {
+  const { now = Date.now, maxKeys = 10_000 } =
+    typeof options === "function" ? { now: options } : options;
   const hits = new Map<string, { count: number; resetAt: number }>();
   let nextSweepAt = 0;
 
@@ -27,13 +32,18 @@ export function createRateLimiter(limit: number, windowMs: number, options: Rate
       if (at >= nextSweepAt) sweep(at);
       const entry = hits.get(key);
       if (entry && entry.resetAt > at) {
-        if (entry.count >= limit) throw new AppError(429, "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.");
+        if (entry.count >= limit)
+          throw new AppError(
+            429,
+            "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.",
+          );
         entry.count += 1;
         return;
       }
       // 가득 차면 가장 오래 전에 들어온 키를 버린다 (Map 은 넣은 순서를 기억한다). 만료된 키는 위의 구간별 정리가 맡으므로
       // 여기서 다시 훑지 않는다 — 새 키마다 전체를 훑으면 상한에 도달한 뒤 다시 O(n) 이 된다.
-      if (!entry && hits.size >= maxKeys) hits.delete(hits.keys().next().value as string);
+      if (!entry && hits.size >= maxKeys)
+        hits.delete(hits.keys().next().value as string);
       hits.delete(key); // 만료된 키를 다시 넣을 때 순서를 맨 뒤로
       hits.set(key, { count: 1, resetAt: at + windowMs });
     },
@@ -56,6 +66,9 @@ export type RateLimiter = ReturnType<typeof createRateLimiter>;
 export function clientKey(request: Request): string | null {
   const hops = Number(process.env.TRUSTED_PROXY_HOPS ?? 0);
   if (!Number.isInteger(hops) || hops < 1) return null;
-  const parts = (request.headers.get("x-forwarded-for") ?? "").split(",").map((p) => p.trim()).filter(Boolean);
+  const parts = (request.headers.get("x-forwarded-for") ?? "")
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
   return parts[parts.length - hops] ?? null;
 }

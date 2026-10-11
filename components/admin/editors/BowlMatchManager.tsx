@@ -27,8 +27,8 @@ import {
   TableRow,
 } from "@/components/admin/table";
 import { Textarea } from "@/components/admin/textarea";
-import { type Catalog, type Ingredient } from "@/lib/admin/catalog";
-import { uid } from "@/lib/admin/editor-helpers";
+import { type Catalog, type Ingredient } from "@/modules/catalog/schema";
+import { uid } from "@/features/admin/editor-helpers";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";

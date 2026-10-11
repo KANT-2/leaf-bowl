@@ -1,7 +1,7 @@
 "use client";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { publicSnapshotSchema, type PublicSnapshot } from "@/lib/customer/snapshot";
-import { customerCatalog, type CustomerCatalog } from "@/lib/customer/catalog";
+import { publicSnapshotSchema, type PublicSnapshot } from "@/modules/catalog/public-schema";
+import { customerCatalog, type CustomerCatalog } from "@/modules/catalog/customer-view";
 const Context = createContext<CustomerCatalog | null>(null);
 export function useCustomerCatalog() {
   const context = useContext(Context);

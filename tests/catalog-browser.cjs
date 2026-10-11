@@ -1,11 +1,9 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 // API interception changes test responses only; live administrator data is preserved.
-const fs = require("fs");
-const path = require("path");
-const modulePath = process.env.PATH.split(path.delimiter)
-  .map((p) => path.resolve(p, "../playwright"))
-  .find((p) => fs.existsSync(path.join(p, "package.json")));
-const { chromium } = modulePath ? require(modulePath) : require("playwright");
+require("./register-typescript.cjs");
+const { publicSnapshot } = require("../modules/catalog/public-snapshot.ts");
+const { signInAdmin } = require("./browser-helpers.cjs");
+const { chromium } = require("./playwright.cjs");
 const base = process.env.FRONT5_BASE_URL || "http://localhost:3000";
 const assert = require("assert/strict");
 (async () => {
@@ -16,6 +14,7 @@ const assert = require("assert/strict");
   const context = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
   });
+  await signInAdmin(context, base);
   const page = await context.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -23,7 +22,7 @@ const assert = require("assert/strict");
   const original = await response.json();
   let snapshot = structuredClone(original);
   await page.route("**/api/catalog", (route) =>
-    route.fulfill({ json: snapshot }),
+    route.fulfill({ json: publicSnapshot(snapshot) }),
   );
   console.log("Checking menu");
   await page.route('**/api/reviews', async route=>{

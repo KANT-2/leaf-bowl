@@ -2,10 +2,11 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 require("./register-typescript.cjs");
-const { customerSeed } = require("../lib/admin/customer-seed.ts");
-const { setServicesForTests, services, createLimits } = require("../modules/container.ts");
+const { customerSeed } = require("../seed/legacy/catalog.ts");
+const { setServicesForTests, services, createLimits } = require("../application/container.ts");
+const { appDefaults } = require("./fixtures/settings.cjs");
 const { createOrdersService } = require("../modules/orders/service.ts");
-const { createMemoryOrdersRepository } = require("../modules/orders/memory-repository.ts");
+const { createMemoryOrdersRepository } = require("../tests/fixtures/memory-orders.ts");
 const { createIdentityService } = require("../modules/identity/service.ts");
 const { createMemoryIdentityRepository } = require("../modules/identity/repository.ts");
 const { hashPassword } = require("../modules/identity/crypto.ts");
@@ -31,8 +32,7 @@ async function setup() {
   const admin = { id: "admin-1", loginId: "admin", passwordHash: await hashPassword("test-password") };
   setServicesForTests({
     orders: createOrdersService({
-      repository: createMemoryOrdersRepository(clock),
-      getCatalog: async () => catalog,
+      repository: createMemoryOrdersRepository({ now: clock, getCatalog: async () => catalog, getPricingPolicy: async () => appDefaults().pricingPolicy, getDeliveryHours: async () => appDefaults().deliveryHours }),
       now: () => new Date(FIXED_NOW),
     }),
     identity: createIdentityService({ repository: createMemoryIdentityRepository([admin]), now: () => new Date(FIXED_NOW) }),
@@ -345,7 +345,7 @@ test("관리자 취소는 사유·시각·변경자를 기록하고, 음료 단�
 
 test("관리자 화면 어댑터로 실제 로그인·로그아웃 API 계약을 검증한다", async () => {
   await setup();
-  const { submitAdminAuth } = require("../lib/admin/auth-client.ts");
+  const { submitAdminAuth } = require("../features/admin/auth-client.ts");
   const originalFetch = global.fetch;
   const originalWindow = global.window;
   global.window = { setTimeout, clearTimeout };

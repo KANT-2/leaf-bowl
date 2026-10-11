@@ -1,7 +1,7 @@
 "use client";
 import { Button } from "@/components/admin/button";
 import { Input } from "@/components/admin/input";
-import { type Catalog } from "@/lib/admin/catalog";
+import { type Catalog } from "@/modules/catalog/schema";
 import { MapPin } from "lucide-react";
 import { useState } from "react";
 

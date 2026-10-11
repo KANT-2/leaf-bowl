@@ -7,9 +7,9 @@ import FoodImage from "./FoodImage";
 import ReviewCard from "./ReviewCard";
 import { useReviews } from "./ReviewsProvider";
 import StarRating from "./StarRating";
-import { useReducedMotion } from "@/lib/hooks";
+import { useReducedMotion } from "@/features/shared/hooks";
 
-import { newest } from "@/lib/reviews";
+import { newest } from "@/modules/reviews/model";
 
 /** 다음 제품으로 넘어가기까지의 시간 (밀리초) */
 export const ROTATE_MS = 6000;

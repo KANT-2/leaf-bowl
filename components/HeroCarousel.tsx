@@ -3,8 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import type { HeroSlide } from "@/lib/data/hero";
-import { useReducedMotion } from "@/lib/hooks";
+import { type HeroSlide } from "@/modules/settings/hero";
+import { useReducedMotion } from "@/features/shared/hooks";
 
 /** 다음 배너로 넘어가기까지의 시간 (밀리초) */
 export const HERO_MS = 6000;

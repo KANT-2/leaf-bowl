@@ -1,6 +1,6 @@
 import { loadEnvConfig } from "@next/env";
-import { prisma } from "@/lib/prisma";
-import { applyDefaultSql } from "@/lib/admin/sql-seed";
+import { prisma } from "@/infrastructure/database/prisma";
+import { applyDefaultSql } from "@/seed/sql";
 import { hashPassword } from "@/modules/identity/crypto";
 
 loadEnvConfig(process.cwd());

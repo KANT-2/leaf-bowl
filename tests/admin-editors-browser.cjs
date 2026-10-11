@@ -1,16 +1,18 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { chromium } = require("./playwright.cjs");
+const { signInAdmin } = require("./browser-helpers.cjs");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const base = process.env.FRONT5_BASE_URL || "http://localhost:3337";
-const shots = path.join(__dirname, "../docs/screenshots/code-quality");
+const shots = process.env.FRONT5_SCREENSHOT_DIR || path.join(__dirname, "../docs/screenshots/code-quality");
 fs.mkdirSync(shots, { recursive: true });
 (async () => {
   const browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
   try {
     const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: "reduce" });
-    const page = await context.newPage();
+    await signInAdmin(context, base);
+  const page = await context.newPage();
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
     const shot = (name) => page.screenshot({ path: path.join(shots, name + ".jpg"), type: "jpeg", quality: 80 });

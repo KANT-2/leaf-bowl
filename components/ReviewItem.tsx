@@ -3,7 +3,7 @@ import Link from "next/link";
 import FoodImage from "./FoodImage";
 import ReviewPhotos from "./ReviewPhotos";
 import {useCustomerCatalog} from "./CustomerCatalogProvider";
-import { reviewDisplayDate, type Review } from "@/lib/reviews";
+import { reviewDisplayDate, type Review } from "@/modules/reviews/model";
 
 /** 리뷰 목록의 한 줄. showMenu 가 true 면(전체 리뷰) 어떤 메뉴의 리뷰인지 사진과 이름을 붙인다. */
 export default function ReviewItem({ review: r, showMenu }: { review: Review; showMenu: boolean }) {

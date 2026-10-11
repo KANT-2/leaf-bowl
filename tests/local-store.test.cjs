@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { createLocalStore } = require("../lib/local-store.ts");
+const { createLocalStore } = require("../infrastructure/browser/local-store.ts");
 
 test("local store refreshes after unsubscribe and handles another tab clearing storage", () => {
   const previous = global.window;

@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { ordersStore } from "@/lib/orders";
-import { loadServerOrders, type ServerOrder } from "@/lib/order-client";
-import { money } from "@/lib/products";
-import { deliveryWindowKST } from "@/lib/delivery-time";
+import { ordersStore } from "@/infrastructure/browser/legacy-orders";
+import { loadServerOrders, type ServerOrder } from "@/features/orders/client";
+import { money } from "@/modules/shared/format";
+import { deliveryWindowKST } from "@/modules/delivery/time";
 const statusLabels: Record<string, string> = { received: "접수", confirmed: "확인", preparing: "준비 중", delivering: "배달 중", completed: "완료", canceled: "취소" };
 
 function formatDay(day: string) {

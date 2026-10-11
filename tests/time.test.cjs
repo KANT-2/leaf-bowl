@@ -6,12 +6,14 @@ const os = require("node:os");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 require("./register-typescript.cjs");
-const time = require("../lib/time.ts");
-const { normalizeReviewTime } = require("../lib/review-time.ts");
-const { customerSeed } = require("../lib/admin/customer-seed.ts");
-const { customerCatalog } = require("../lib/customer/catalog.ts");
-const { reviewSchema } = require("../lib/admin/catalog.ts");
-const { reviewDisplayDate } = require("../lib/reviews.ts");
+const time = require("../modules/shared/time.ts");
+const { normalizeReviewTime } = require("../modules/reviews/time.ts");
+const { customerSeed } = require("../seed/legacy/catalog.ts");
+const { customerCatalog: projectCustomerCatalog } = require("../modules/catalog/customer-view.ts");
+    const { withDefaults } = require("./fixtures/settings.cjs");
+    const customerCatalog = value => projectCustomerCatalog(withDefaults(value));
+const { reviewSchema } = require("../modules/catalog/schema.ts");
+const { reviewDisplayDate } = require("../modules/reviews/model.ts");
 
 const at = "2026-12-31T15:10:00.000Z"; // KST 2027-01-01 00:10
 const sample = () => ({ ...customerSeed().reviews[0], id: "utc-review", date: "2026.12.31", createdAt: at });
@@ -20,7 +22,7 @@ async function withCatalog(fn) {
   const previous = process.env.ADMIN_DATA_DIR;
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "front5-time-"));
   process.env.ADMIN_DATA_DIR = directory;
-  try { await fn(directory, require("../lib/admin/file-store.ts")); }
+  try { await fn(directory, require("../tests/fixtures/file-catalog.ts")); }
   finally {
     if (previous === undefined) delete process.env.ADMIN_DATA_DIR; else process.env.ADMIN_DATA_DIR = previous;
     fs.rmSync(directory, { recursive: true, force: true });
@@ -38,11 +40,13 @@ test("timestamps normalize explicit offsets and reject missing zones and rolled 
 
 test("all shared review/calendar conversions agree in three server zones across year and DST boundaries", () => {
   const script = `require('./tests/register-typescript.cjs');
-    const time = require('./lib/time.ts');
-    const { dateStr, reviewDisplayDate } = require('./lib/reviews.ts');
-    const { salesPeriodStart } = require('./lib/admin/sales.ts');
-    const { customerSeed } = require('./lib/admin/customer-seed.ts');
-    const { customerCatalog } = require('./lib/customer/catalog.ts');
+    const time = require('./modules/shared/time.ts');
+    const { dateStr, reviewDisplayDate } = require('./modules/reviews/model.ts');
+    const { salesPeriodStart } = require('./modules/reports/sales.ts');
+    const { customerSeed } = require('./seed/legacy/catalog.ts');
+    const { customerCatalog: projectCustomerCatalog } = require('./modules/catalog/customer-view.ts');
+    const { withDefaults } = require('./tests/fixtures/settings.cjs');
+    const customerCatalog = value => projectCustomerCatalog(withDefaults(value));
     const rows = ['2026-12-31T15:10:00Z','2026-03-08T15:10:00Z','2026-11-01T15:10:00Z'].map(createdAt => {
       const ms = Date.parse(createdAt);
       const catalog = customerSeed();
@@ -104,7 +108,7 @@ test("new reviews store server UTC instants and a KST calendar date at midnight"
 });
 
 test("sales payloads return canonical UTC and reject timezone-free or impossible timestamps", () => {
-  const { salesDataSchema, buildSalesReport } = require("../lib/admin/sales.ts");
+  const { salesDataSchema, buildSalesReport } = require("../modules/reports/sales.ts");
   const raw = { updatedAt: "2027-01-01T00:10:00+09:00", orders: [{ id: "paid", status: "paid", paidAt: "2027-01-01T00:00:00+09:00", items: [] }] };
   const data = salesDataSchema.parse(raw);
   assert.equal(data.updatedAt, at); assert.equal(data.orders[0].paidAt, "2026-12-31T15:00:00.000Z");
@@ -129,11 +133,11 @@ test("browser review caches display KST and saved recipes normalize offset times
   ]);
   global.localStorage = { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };
   try {
-    const { recipeStore } = require("../lib/match.ts");
+    const { recipeStore } = require("../infrastructure/browser/bowl-store.ts");
     assert.equal(recipeStore.getSnapshot().savedAt, at);
     recipeStore.set({ ...recipeStore.getSnapshot(), savedAt: "2027-01-01T00:10:00+09:00" });
     assert.equal(JSON.parse(values.get("bm-recipe")).savedAt, at);
-    const { loadUserReviews, saveUserReviews } = require("../lib/storage.ts");
+    const { loadUserReviews, saveUserReviews } = require("../infrastructure/browser/review-storage.ts");
     const reviews = loadUserReviews(); assert.equal(reviews[0].date, "2027.01.01");
     saveUserReviews(reviews); assert.equal(JSON.parse(values.get("bb-user-reviews"))[0].date, "2027.01.01");
   } finally { if (previous === undefined) delete global.localStorage; else global.localStorage = previous; }

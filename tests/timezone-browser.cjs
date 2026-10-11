@@ -4,10 +4,9 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 require("./register-typescript.cjs");
-const { customerTemplate } = require("../lib/admin/customer-template.ts");
-const { kstDate } = require("../lib/time.ts");
+const { kstDate } = require("../modules/shared/time.ts");
 const base = process.env.FRONT5_BASE_URL || "http://localhost:3337";
-const shots = path.join(__dirname, "../docs/screenshots/delivery-timezone");
+const shots = process.env.FRONT5_SCREENSHOT_DIR || path.join(__dirname, "../docs/screenshots/delivery-timezone");
 fs.mkdirSync(shots, { recursive: true });
 
 (async () => {
@@ -53,26 +52,13 @@ fs.mkdirSync(shots, { recursive: true });
       await page.getByRole("button", { name: "제품 판매 현황", exact: true }).click();
       await page.getByText("판매 데이터 갱신: 2026. 10. 13. 오전 12:10", { exact: true }).waitFor();
 
-      // Use the real preview template/scripts with isolated catalog data.
-      const catalogJSON = JSON.stringify(snapshot.catalog).replaceAll("<", "\\u003c");
-      await page.route("**/admin/preview", route => route.fulfill({ body: customerTemplate.replace("__CATALOG__", catalogJSON), contentType: "text/html" }));
+      // The historical preview route redirects to the DB-backed customer application.
+      const preview = await context.request.get(base + "/admin/preview", { maxRedirects: 0 });
+      assert.equal(preview.status(), 307);
+      assert.equal(preview.headers().location, "/");
       await page.goto(base + "/admin/preview");
-      await page.getByText("KST 검증 · 2026.10.13 00:10", { exact: true }).waitFor();
-      await page.evaluate(() => { cart = [{ id: 0, dressing: 0, drinks: [], qty: 1, optionSummary: "드레싱 없이", unitPrice: 10900 }]; save(); });
-      await page.getByRole("button", { name: "장바구니 열기", exact: true }).click();
-      const day = page.locator("#orderDate");
-      assert.equal(await day.getAttribute("min"), "2026-10-13");
-      assert.equal(await day.getAttribute("max"), "2026-10-27");
-      await day.fill("2026-10-13");
-      await day.dispatchEvent("change");
-      assert.equal(await page.locator("#orderTime option").first().getAttribute("value"), "10:00");
-      await page.clock.setFixedTime(new Date("2026-10-13T01:40:00Z")); // KST 10:40; first allowed slot 12:00.
-      await day.dispatchEvent("change");
-      assert.equal(await page.locator("#orderTime option").first().getAttribute("value"), "12:00");
-      if (timezoneId === "UTC") await page.screenshot({ path: path.join(shots, "preview-kst.jpg"), type: "jpeg", quality: 80 });
-      await page.locator("#allergyAck").check();
-      await page.getByRole("button", { name: "체험 주문 완료하기 →", exact: true }).click();
-      await page.locator("#successDialog").getByText(/2026-10-13 12:00–13:00/).waitFor();
+      await page.waitForURL(base + "/");
+      await page.getByRole("heading", { name: /좋은 하루는/ }).waitFor();
       assert.deepEqual(errors, []);
       console.log(timezoneId + ": UTC review API; KST customer/admin/sales/preview dates and slot cutoff passed; no page errors.");
       await context.close();

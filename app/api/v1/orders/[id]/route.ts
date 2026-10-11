@@ -1,9 +1,9 @@
 import { requireGuest } from "@/modules/identity/guard";
-import { services } from "@/modules/container";
+import { services } from "@/application/container";
 import { detailView } from "@/modules/orders/presenter";
 import { orderIdSchema } from "@/modules/orders/schema";
 import { AppError } from "@/modules/shared/errors";
-import { jsonResponse, run } from "@/modules/shared/http";
+import { jsonResponse, run } from "@/infrastructure/http/response";
 
 /** 본인 주문 조회. 다른 사람의 주문은 404 */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {

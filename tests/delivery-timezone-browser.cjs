@@ -2,10 +2,11 @@
 const { chromium } = require("./playwright.cjs");
 const assert = require("node:assert/strict");
 const path = require("node:path");
-const { kstDate } = require("../public/customer-preview/time.js");
+require("./register-typescript.cjs");
+const { kstDate } = require("../modules/shared/time.ts");
 const fs = require("node:fs");
 const base = process.env.FRONT5_BASE_URL || "http://localhost:3584";
-const shots = path.join(__dirname, "../docs/screenshots/delivery-timezone");
+const shots = process.env.FRONT5_SCREENSHOT_DIR || path.join(__dirname, "../docs/screenshots/delivery-timezone");
 fs.mkdirSync(shots, { recursive: true });
 
 (async () => {

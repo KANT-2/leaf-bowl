@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { sameOrigin } = require('../lib/admin/server.ts');
+const { sameOrigin } = require('../infrastructure/http/request.ts');
 
 function configured(origin, fn) {
   const before = process.env.APP_ORIGIN;

@@ -17,7 +17,9 @@ export const LOGIN_BUCKETS = 1024;
  * (존재 여부에 따라 칸을 나누면 모르는 아이디와 실제 계정의 429/401 응답이 달라져 계정 존재 여부가 드러난다.)
  */
 export function loginRateKey(loginId: string): string {
-  const digest = createHash("sha256").update(loginId.trim().toLowerCase()).digest();
+  const digest = createHash("sha256")
+    .update(loginId.trim().toLowerCase())
+    .digest();
   return `account:${digest.readUInt32BE(0) % LOGIN_BUCKETS}`;
 }
 
@@ -37,7 +39,10 @@ export async function hashPassword(password: string): Promise<string> {
   return `scrypt$${salt.toString("base64")}$${key.toString("base64")}`;
 }
 
-export async function verifyPassword(password: string, stored: string): Promise<boolean> {
+export async function verifyPassword(
+  password: string,
+  stored: string,
+): Promise<boolean> {
   const [scheme, saltB64, keyB64] = stored.split("$");
   if (scheme !== "scrypt" || !saltB64 || !keyB64) return false;
   const expected = Buffer.from(keyB64, "base64");

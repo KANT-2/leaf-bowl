@@ -28,11 +28,13 @@ Module._resolveFilename = function (request, ...args) {
   );
 };
 
-const { customerSeed } = require("../lib/admin/customer-seed.ts");
-const { customerCatalog } = require("../lib/customer/catalog.ts");
-const { loadCart, saveCart } = require("../lib/storage.ts");
-const { itemKey, withChoice } = require("../lib/cart.ts");
-const { checkoutIssue } = require("../lib/checkout-validation.ts");
+const { customerSeed } = require("../seed/legacy/catalog.ts");
+const { customerCatalog: projectCustomerCatalog } = require("../modules/catalog/customer-view.ts");
+    const { withDefaults } = require("./fixtures/settings.cjs");
+    const customerCatalog = value => projectCustomerCatalog(withDefaults(value));
+const { loadCart, saveCart } = require("../infrastructure/browser/cart-storage.ts");
+const { itemKey, withChoice } = require("../modules/cart/identity.ts");
+const { checkoutIssue } = require("../features/checkout/validation.ts");
 const cat = (catalog) => customerCatalog({ catalog, revision: 1, updatedAt: "" });
 
 test("legacy cart indices migrate to original IDs and permanent deletion never changes a product", () => {
@@ -86,14 +88,14 @@ test("checkout rejects stale stock, low totals, missing address, invalid dates a
 });
 
 test("browser JSON failures fall back and recipes retain newly added dressing IDs", () => {
-  const { readBrowserJSON, writeBrowserJSON } = require("../lib/browser-json.ts");
+  const { readBrowserJSON, writeBrowserJSON } = require("../infrastructure/browser/json.ts");
   const previous = global.localStorage;
   try {
     global.localStorage = { getItem: () => "{", setItem: () => { throw Error("quota"); } };
     assert.deepEqual(readBrowserJSON("broken", []), []);
     assert.doesNotThrow(() => writeBrowserJSON("blocked", []));
     global.localStorage.getItem = () => JSON.stringify({ name: "신규 조합", ingredients: ["romaine"], dressing: 8, dressingKey: "new-dressing", price: 8000, savedAt: "2026-10-10" });
-    const { recipeStore } = require("../lib/match.ts");
+    const { recipeStore } = require("../infrastructure/browser/bowl-store.ts");
     assert.equal(recipeStore.getSnapshot().dressingKey, "new-dressing");
   } finally { if (previous === undefined) delete global.localStorage; else global.localStorage = previous; }
 });
@@ -107,7 +109,7 @@ test("custom bowl keys use unordered ingredient IDs, separate legacy names and a
 });
 
 test("custom bowl availability, checkout and order serialization reject missing, empty or duplicate IDs", () => {
-  const { orderItems } = require("../lib/order-client.ts");
+  const { orderItems } = require("../features/orders/client.ts");
   const catalog = cat(customerSeed());
   const item = { kind: "custom", name: "나의 볼", ingredients: ["로메인"], allergens: [], dressing: 0, price: 7000, photo: 0, qty: 3 };
   for (const ingredientIds of [undefined, [], ["romaine", "romaine"]]) {

@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const base = process.env.FRONT5_BASE_URL || "http://localhost:3337";
-const shots = path.join(__dirname, "../docs/screenshots/code-quality");
+const shots = process.env.FRONT5_SCREENSHOT_DIR || path.join(__dirname, "../docs/screenshots/code-quality");
 fs.mkdirSync(shots, { recursive: true });
 (async () => {
   const browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });

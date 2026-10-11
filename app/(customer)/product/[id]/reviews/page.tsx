@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { readCustomerCatalog } from '@/lib/customer/server';
+import { readCustomerCatalog } from "@/application/customer-catalog";
 import CustomerProductReviewsPage from '@/components/CustomerProductReviewsPage';
 
 export const instant = false;

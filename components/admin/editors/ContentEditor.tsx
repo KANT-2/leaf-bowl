@@ -2,8 +2,8 @@
 import { Button } from "@/components/admin/button";
 import { Switch } from "@/components/admin/switch";
 import { Textarea } from "@/components/admin/textarea";
-import { type Catalog, type Content } from "@/lib/admin/catalog";
-import { uid } from "@/lib/admin/editor-helpers";
+import { type Catalog, type Content } from "@/modules/catalog/schema";
+import { uid } from "@/features/admin/editor-helpers";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import { Photo, Picker, Upload } from "./EditorFields";

@@ -27,10 +27,11 @@ Module._resolveFilename = function (request, ...args) {
     ...args,
   );
 };
-const { customerSeed } = require("../lib/admin/customer-seed.ts");
-const { setServicesForTests, createLimits } = require("../modules/container.ts");
+const { customerSeed } = require("../seed/legacy/catalog.ts");
+const { setServicesForTests, createLimits } = require("../application/container.ts");
+const { appDefaults } = require("./fixtures/settings.cjs");
 const { createOrdersService } = require("../modules/orders/service.ts");
-const { createMemoryOrdersRepository } = require("../modules/orders/memory-repository.ts");
+const { createMemoryOrdersRepository } = require("../tests/fixtures/memory-orders.ts");
 const { createIdentityService } = require("../modules/identity/service.ts");
 const { createMemoryIdentityRepository } = require("../modules/identity/repository.ts");
 const { hashToken, hashPassword, loginRateKey, LOGIN_BUCKETS } = require("../modules/identity/crypto.ts");
@@ -61,7 +62,7 @@ const withProxyHops = async (hops, fn) => {
 };
 const count = (codes, c) => codes.filter((x) => x === c).length;
 const createServices = () => ({
-  orders: createOrdersService({ repository: createMemoryOrdersRepository(), getCatalog: async () => customerSeed() }),
+  orders: createOrdersService({ repository: createMemoryOrdersRepository({ getCatalog: async () => customerSeed(), getPricingPolicy: async () => appDefaults().pricingPolicy, getDeliveryHours: async () => appDefaults().deliveryHours }) }),
   identity: createIdentityService({ repository: createMemoryIdentityRepository() }),
   limits: createLimits(),
 });
@@ -177,7 +178,7 @@ test("요청 제한기: 한도 초과는 429, 시간 구간이 지나면 다시 
 async function loginSetup(limits) {
   const now = () => new Date(T0);
   setServicesForTests({
-    orders: createOrdersService({ repository: createMemoryOrdersRepository(), getCatalog: async () => ({}) }),
+    orders: createOrdersService({ repository: createMemoryOrdersRepository({ getCatalog: async () => ({}), getPricingPolicy: async () => appDefaults().pricingPolicy, getDeliveryHours: async () => appDefaults().deliveryHours }) }),
     identity: createIdentityService({ repository: createMemoryIdentityRepository([{ id: "a1", loginId: "admin", passwordHash: await hashPassword("pw") }]), now }),
     limits,
   });
@@ -255,7 +256,7 @@ test("기존 주문 조회: 세션 정리와 새 방문자 발급이 있어도 �
   const catalog = customerSeed();
   const dressing = catalog.products.find((p) => p.type === "dressing").id;
   setServicesForTests({
-    orders: createOrdersService({ repository: createMemoryOrdersRepository(), getCatalog: async () => catalog, now: () => new Date(T0) }),
+    orders: createOrdersService({ repository: createMemoryOrdersRepository({ getCatalog: async () => catalog, getPricingPolicy: async () => appDefaults().pricingPolicy, getDeliveryHours: async () => appDefaults().deliveryHours }), now: () => new Date(T0) }),
     identity: createIdentityService({ repository: createMemoryIdentityRepository(), now: () => new Date(idClock) }),
     limits: createLimits({ globalSession: 1000, clientSession: 1000 }),
   });
