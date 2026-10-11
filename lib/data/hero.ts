@@ -14,7 +14,7 @@ export interface HeroSlide {
   bowl: [cx: number, cy: number, rx: number, ry: number];
 }
 
-// 지금은 코드 안의 고정 데이터. DB 로 옮길 때는 getHeroSlides() 안만 바꾸면 된다.
+// 이전 JSON 데이터의 변환 기준. 실제 앱의 배너는 db/seed.sql → app_settings에서 읽는다.
 export const HERO_SLIDES: HeroSlide[] = [
   {
     eyebrow: "FRESH BOWL, FRESH DAY",
@@ -65,8 +65,3 @@ export const HERO_SLIDES: HeroSlide[] = [
     bowl: [50, 49.5, 41.7, 41.7],
   },
 ];
-
-/** 홈 상단 배너 목록을 가져온다. */
-export async function getHeroSlides(): Promise<HeroSlide[]> {
-  return HERO_SLIDES;
-}

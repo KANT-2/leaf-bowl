@@ -44,7 +44,7 @@ export default function CustomerCatalogProvider({
         if (!next.catalog || !Number.isInteger(next.revision)) return;
         if (!disposed)
           setSnapshot((current) =>
-            next.revision > current.revision ? next : current,
+            next.revision > current.revision || next.defaults?.updatedAt !== current.defaults?.updatedAt ? next : current,
           );
       } catch {
       } finally {

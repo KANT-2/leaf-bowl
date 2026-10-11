@@ -1,7 +1,6 @@
 import { loadEnvConfig } from "@next/env";
-import { databaseTransaction, prisma } from "@/lib/prisma";
-import { customerSeed } from "@/lib/admin/customer-seed";
-import { saveCatalogState } from "@/lib/admin/postgres-catalog";
+import { prisma } from "@/lib/prisma";
+import { applyDefaultSql } from "@/lib/admin/sql-seed";
 import { hashPassword } from "@/modules/identity/crypto";
 
 loadEnvConfig(process.cwd());
@@ -9,13 +8,9 @@ loadEnvConfig(process.cwd());
 async function main() {
   const db = prisma();
   try {
-    const seeded = await databaseTransaction(db, async tx => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(910000)::text`;
-      if (await tx.catalogMeta.findUnique({ where: { id: 1 } })) return false;
-      await saveCatalogState(tx, { catalog: customerSeed(), revision: 1, updatedAt: new Date().toISOString(), nextCustomerId: 12, deletedReviewIds: [] });
-      return true;
-    });
-    console.log(seeded ? "기본 카탈로그를 저장했습니다." : "기존 카탈로그를 보존했습니다.");
+    if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL을 설정해주세요.");
+    await applyDefaultSql(process.env.DATABASE_URL);
+    console.log("SQL 기본 데이터를 준비했습니다. 기존 카탈로그와 설정은 보존했습니다.");
     const loginId = process.env.ADMIN_LOGIN_ID;
     const password = process.env.ADMIN_PASSWORD;
     if (loginId || password) {

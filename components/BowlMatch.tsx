@@ -15,9 +15,7 @@ import { useCart } from "./CartProvider";
 import { useToast } from "./ToastProvider";
 import type { Ingredient } from "@/lib/data/ingredients";
 import {
-  BASE_BOWL_PRICE,
   STAGES,
-  bowlPrice,
   decisionsStore,
   mainIngredient,
   matchProduct,
@@ -47,7 +45,7 @@ export default function BowlMatch() {
   return <BowlMatchBody ingredients={ingredients} />;
 }
 function BowlMatchBody({ ingredients }: { ingredients: Ingredient[] }) {
-  const { DRESSINGS, PRODUCTS, photoSrc } = useCustomerCatalog();
+  const { DRESSINGS, PRODUCTS, photoSrc, bowlPrice, pricingPolicy } = useCustomerCatalog();
   const { addCustom, open } = useCart();
   const toast = useToast();
   const total = ingredients.length;
@@ -492,7 +490,7 @@ function BowlMatchBody({ ingredients }: { ingredients: Ingredient[] }) {
           >
             내 샐러드 완성하기 ↗
           </button>
-          <p>기본 볼 {money(BASE_BOWL_PRICE)} + 선택 재료</p>
+          <p>기본 볼 {money(pricingPolicy.baseBowlPrice)} + 선택 재료</p>
           {savedRecipe && (
             <button
               type="button"

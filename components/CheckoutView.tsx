@@ -13,7 +13,7 @@ import { customerCatalog } from "@/lib/customer/catalog";
 import type { Snapshot } from "@/lib/admin/catalog";
 import { submitOrder, orderRequestKey, clearOrderRequestKey } from "@/lib/order-client";
 import { deliveryWindowKST, deliveryWindowUTC } from "@/lib/delivery-time";
-import { deliveryFee, money } from "@/lib/products";
+import { money } from "@/lib/products";
 import { CardIcon, KakaoPayMark, TossMark } from "./icons/BrandMarks";
 
 type PayMethod = "toss" | "kakaopay" | "card";
@@ -39,7 +39,7 @@ export default function CheckoutView({ hours }: { hours: DeliveryHours }) {
   const params = useSearchParams();
   const { items, clear, open } = useCart();
   const catalog = useCustomerCatalog();
-  const { itemName, itemOptions, itemUnitPrice } = catalog;
+  const { itemName, itemOptions, itemUnitPrice, deliveryFee } = catalog;
 
   const address = params.get("address") ?? "";
   const hasUTC = params.has("desiredStartAt") || params.has("desiredEndAt");
@@ -88,7 +88,7 @@ export default function CheckoutView({ hours }: { hours: DeliveryHours }) {
       const issue = checkoutIssue(items, latest, delivery);
       if (issue) { setError(issue); return; }
       const latestSubtotal = items.reduce((sum, item) => sum + latest.itemUnitPrice(item) * item.qty, 0);
-      const latestTotal = latestSubtotal + deliveryFee(latestSubtotal);
+      const latestTotal = latestSubtotal + latest.deliveryFee(latestSubtotal);
       if (latestTotal !== total) {
         setError("메뉴 금액이 변경되었어요. 장바구니에서 금액을 확인해주세요.");
         return;

@@ -1,5 +1,6 @@
 import type { ListQuery, NewOrder, OrderRecord, StatusUpdate } from "./types";
 import type { Catalog } from "@/lib/admin/catalog";
+import type { PricingPolicy } from "@/lib/data/defaults";
 
 /** 같은 (고객 세션, 재전송 식별키) 로 이미 주문이 있을 때. DB 에서는 유일 제약 위반(P2002) 에 해당한다. */
 export class DuplicateRequestError extends Error {
@@ -13,6 +14,7 @@ export interface OrdersTransaction {
   findByRequest(customerSessionId: string, requestKey: string): Promise<OrderRecord | null>;
   /** Catalog prices cannot change until this transaction commits. */
   getCatalog(): Promise<Catalog>;
+  getPricingPolicy(): Promise<PricingPolicy>;
   create(order: NewOrder): Promise<OrderRecord>;
 }
 

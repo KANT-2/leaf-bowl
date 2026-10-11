@@ -1,5 +1,6 @@
 import "server-only";
 import path from "node:path";
+import { readAppDefaults } from "@/lib/data/server";
 import { databaseTransaction, prisma } from "@/lib/prisma";
 import type { Catalog, Snapshot } from "./catalog";
 import { addReview, replaceCatalog, snapshot, type ReviewInput } from "./catalog-state";
@@ -11,7 +12,7 @@ export const dataDirectory = () => process.env.ADMIN_DATA_DIR || path.resolve(pr
 export function readCatalog(): Promise<Snapshot> {
   return databaseTransaction(prisma(), async tx => {
     await lockCatalog(tx, "read");
-    return snapshot(await readCatalogState(tx));
+    return { ...snapshot(await readCatalogState(tx)), defaults: await readAppDefaults(tx) };
   });
 }
 

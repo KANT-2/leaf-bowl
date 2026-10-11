@@ -11,7 +11,7 @@ import Header from "@/components/Header";
 import ReviewWriteProvider from "@/components/ReviewWrite";
 import ReviewsProvider from "@/components/ReviewsProvider";
 import ToastProvider from "@/components/ToastProvider";
-import { getDeliveryHours } from "@/lib/data/delivery";
+import { getDeliveryHours } from "@/lib/data/server";
 import "../globals.css";
 
 export const instant = false;

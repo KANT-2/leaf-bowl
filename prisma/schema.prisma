@@ -9,6 +9,14 @@ datasource db {
   provider = "postgresql"
 }
 
+model AppSetting {
+  key       String   @id @db.VarChar(80)
+  value     Json
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("app_settings")
+}
+
 model AdminUser {
   id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   loginId            String               @unique @map("login_id") @db.VarChar(50)

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { REFERENCE_PRICING_POLICY } from "@/lib/pricing-policy";
 import { DuplicateRequestError, type OrdersRepository } from "./repository";
 import type { OrderRecord } from "./types";
 
@@ -22,7 +23,7 @@ export function createMemoryOrdersRepository(now: () => Date = () => new Date())
       const savedOrders = structuredClone(orders);
       const savedRequests = structuredClone(requests);
       try {
-        return await work({ findByRequest: this.findByRequest.bind(this), create: this.create.bind(this), getCatalog });
+        return await work({ findByRequest: this.findByRequest.bind(this), create: this.create.bind(this), getCatalog, getPricingPolicy: async () => REFERENCE_PRICING_POLICY });
       } catch (error) {
         orders.clear();
         requests.clear();

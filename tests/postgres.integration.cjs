@@ -7,7 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { createPrismaClient, prisma, databaseTransaction } = require('../lib/prisma.ts');
 const { customerSeed } = require('../lib/admin/customer-seed.ts');
-const { lockCatalog, readCatalogState, saveCatalogState } = require('../lib/admin/postgres-catalog.ts');
+const { lockCatalog, readCatalogState } = require('../lib/admin/postgres-catalog.ts');
 const { readCatalog, writeCatalog, appendCustomerReview } = require('../lib/admin/store.ts');
 const { importCatalogFile } = require('../lib/admin/import-catalog.ts');
 const { createPostgresOrdersRepository } = require('../modules/orders/postgres-repository.ts');
@@ -20,6 +20,9 @@ const { readSalesData } = require('../lib/admin/sales-store.ts');
 const { buildSalesReport } = require('../lib/admin/sales.ts');
 const { updateProduct, findProductById } = require('../lib/products-repository.ts');
 const { createServices, setServicesForTests } = require('../modules/container.ts');
+const { applyDefaultSql } = require('../lib/admin/sql-seed.ts');
+const { customerCatalog } = require('../lib/customer/catalog.ts');
+const { getDeliveryHours } = require('../lib/data/server.ts');
 
 const url = process.env.DATABASE_URL;
 const name = decodeURIComponent(new URL(url).pathname.slice(1));
@@ -32,10 +35,10 @@ let directory;
 async function reset() {
   const [{ name: actualName }] = await db.$queryRaw`SELECT current_database() AS name`;
   assert.equal(actualName, name, 'Test connection must resolve to the guarded database');
-  await db.$executeRawUnsafe('TRUNCATE catalog_meta, catalog_imports, deleted_review_ids, products, ingredients, option_groups, allergens, categories, reviews, site_content, season_pages, store_location, orders, admin_users, sessions RESTART IDENTITY CASCADE');
+  await db.$executeRawUnsafe('TRUNCATE app_settings, catalog_meta, catalog_imports, deleted_review_ids, products, ingredients, option_groups, allergens, categories, reviews, site_content, season_pages, store_location, orders, admin_users, sessions RESTART IDENTITY CASCADE');
 }
 function orderService(database = db) {
-  return createOrdersService({ repository: createPostgresOrdersRepository(database), getCatalog: async () => (await readCatalog()).catalog, now });
+  return createOrdersService({ repository: createPostgresOrdersRepository(database), getCatalog: async () => (await readCatalog()).catalog, getHours: getDeliveryHours, now });
 }
 function input(extra = {}) {
   return createOrderSchema.parse({
@@ -47,10 +50,82 @@ function input(extra = {}) {
 before(async () => { directory = await fs.mkdtemp(path.join(os.tmpdir(), 'leaf-bowl-postgres-')); process.env.ADMIN_DATA_DIR = directory; await reset(); });
 beforeEach(async () => {
   await reset();
-  await databaseTransaction(db, tx => saveCatalogState(tx, { catalog: customerSeed(), revision: 1, updatedAt: now().toISOString(), nextCustomerId: 12, deletedReviewIds: [] }));
+  await applyDefaultSql(url);
   administrator = await db.adminUser.create({ data: { loginId: 'integration-admin', passwordHash: await hashPassword('integration-password') } });
 });
 after(async () => { await reset(); await db.$disconnect(); await fs.rm(directory, { recursive: true, force: true }); });
+
+test('standalone SQL initializes every current default field and application setting', async () => {
+  const state = await readCatalog();
+  const expected = customerSeed();
+  const json = value => JSON.parse(JSON.stringify(value));
+  assert.deepEqual(json(state.catalog.products), json(expected.products));
+  assert.deepEqual(json(state.catalog.ingredients), json(expected.ingredients));
+  assert.deepEqual(json(state.catalog.groups), json(expected.groups));
+  assert.deepEqual(json(state.catalog.content), json(expected.content));
+  assert.deepEqual(json(state.catalog.reviews), json(expected.reviews.map(review => ({ ...review, images: [], drinks: [] }))));
+  assert.equal(state.revision, 1);
+  assert.equal((await db.catalogMeta.findUnique({ where: { id: 1 } })).nextCustomerId, 12);
+  assert.deepEqual(state.defaults.heroSlides, require('../lib/data/hero.ts').HERO_SLIDES);
+  assert.deepEqual(Object.values(state.defaults.nutrition), require('../lib/products.ts').NUTRITION);
+  assert.deepEqual(state.defaults.pricingPolicy, require('../lib/pricing-policy.ts').REFERENCE_PRICING_POLICY);
+  assert.deepEqual(await getDeliveryHours(), { days: '매일', open: 10, close: 21 });
+  const customer = customerCatalog(state);
+  assert.equal(customer.heroSlides.length, 3);
+  assert.equal(customer.kcalOf(0, 0, [1]), customer.NUTRITION[0].kcal + 120 + 110);
+  assert.equal(await db.order.count(), 0);
+  assert.equal(await db.session.count(), 0);
+});
+
+test('SQL reruns preserve catalog edits, settings, orders and deletion history', async () => {
+  const session = await db.session.create({ data: { tokenHash: hashToken('sql-seed-guest'), kind: 'guest', expiresAt: new Date('2027-01-01T00:00:00Z') } });
+  const { order } = await orderService().createOrder(session.id, 'sql-seed-original-order', input());
+  const state = await readCatalog();
+  state.catalog.products[0].price += 1000;
+  state.catalog.reviews = state.catalog.reviews.slice(1);
+  await writeCatalog(state.catalog, state.revision);
+  await db.appSetting.update({ where: { key: 'delivery_hours' }, data: { value: { days: '평일', open: 9, close: 22 }, updatedAt: now() } });
+  const before = await readCatalog();
+  const removed = await db.deletedReviewId.findMany();
+  await Promise.all([applyDefaultSql(url), applyDefaultSql(url)]);
+  assert.deepEqual(await readCatalog(), before);
+  assert.deepEqual(await db.deletedReviewId.findMany(), removed);
+  assert.equal(await db.order.count(), 1);
+  assert.equal((await db.order.findUnique({ where: { id: order.id } })).total, order.total);
+  assert.equal(await db.adminUser.count(), 1);
+});
+
+test('failed SQL initialization rolls back settings and all inserted catalog rows', async () => {
+  await reset();
+  const filename = path.join(directory, 'failing-seed.sql');
+  const sql = await fs.readFile(path.join(__dirname, '../db/seed.sql'), 'utf8');
+  assert.match(sql, /INSERT INTO catalog_meta/);
+  await fs.writeFile(filename, sql.replace('INSERT INTO catalog_meta', "RAISE EXCEPTION 'forced-seed-failure';\n  INSERT INTO catalog_meta"));
+  await assert.rejects(applyDefaultSql(url, filename), /forced-seed-failure/);
+  for (const model of ['appSetting', 'product', 'ingredient', 'review', 'category', 'allergen', 'catalogMeta', 'siteContent']) assert.equal(await db[model].count(), 0);
+  // An incomplete pre-existing catalog is reported without modifying it.
+  const product = customerSeed().products[0];
+  await db.product.create({ data: { id: product.id, type: product.type, name: product.name, price: product.price, category: product.category, sortOrder: 0 } });
+  await assert.rejects(applyDefaultSql(url), /메타데이터 없는 기존 앱 데이터/);
+  assert.equal(await db.product.count(), 1);
+  assert.equal(await db.appSetting.count(), 0);
+});
+
+test('database policy and hours drive both customer totals and order validation', async () => {
+  const settings = { deliveryFee: 700, minDeliveryOrder: 1000, freeDeliveryFrom: 99999, baseBowlPrice: 9000 };
+  await db.appSetting.update({ where: { key: 'pricing_policy' }, data: { value: settings, updatedAt: now() } });
+  const state = await readCatalog();
+  const customer = customerCatalog(state);
+  const custom = { kind: 'custom', ingredientIds: ['romaine', 'chicken'], ingredients: [], name: 'SQL 볼', allergens: [], dressing: 0, dressingKey: 'dressing-0', price: 0, photo: 0, qty: 2 };
+  assert.equal(customer.itemUnitPrice(custom), 11000);
+  assert.equal(customer.deliveryFee(22000), 700);
+  const session = await db.session.create({ data: { tokenHash: hashToken('sql-policy-guest'), kind: 'guest', expiresAt: new Date('2027-01-01T00:00:00Z') } });
+  const { order } = await orderService().createOrder(session.id, 'sql-policy-order', input({ items: [{ ingredientKeys: ['romaine', 'chicken'], dressingKey: 'dressing-0', quantity: 2 }] }));
+  assert.equal(order.subtotal, 22000n); assert.equal(order.deliveryFee, 700n); assert.equal(order.total, 22700n);
+  await db.appSetting.update({ where: { key: 'delivery_hours' }, data: { value: { days: '매일', open: 14, close: 21 }, updatedAt: now() } });
+  await assert.rejects(orderService().createOrder(session.id, 'outside-db-hours', input()), error => error.status === 400);
+  assert.equal(await db.order.count(), 1);
+});
 
 test('catalog revisions, optional fields, stable IDs and review deletion survive a fresh client', async () => {
   let state = await readCatalog();
@@ -240,6 +315,7 @@ test('legacy import backs up original bytes, keeps revision/IDs/tombstones and r
   const result = await importCatalogFile(db, filename);
   assert.equal(result.imported, true); assert.deepEqual(await fs.readFile(result.backup), raw);
   assert.equal((await fs.stat(result.backup)).mode & 0o777, 0o600);
+  await applyDefaultSql(url);
   assert.equal((await readCatalog()).revision, 19);
   assert.ok(!(await readCatalog()).catalog.reviews.some(review => review.id === deleted));
   const state = await readCatalog(); state.catalog.products.push({ ...state.catalog.products[0], id: 'after-import', customerId: undefined });

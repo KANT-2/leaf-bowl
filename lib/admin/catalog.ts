@@ -1,4 +1,5 @@
 import { utcTimestampSchema } from "@/lib/utc-timestamp";
+import type { AppDefaults } from "@/lib/data/defaults";
 export { reviewDateTime } from "@/lib/time";
 import { exampleReviews } from './reviews';
 import { referenceIngredients } from './bowl-ingredients';
@@ -41,6 +42,7 @@ export type Snapshot = {
     catalog: Catalog;
     revision: number;
     updatedAt: string;
+    defaults?: AppDefaults;
 };
 const salads: [
     string,

@@ -5,13 +5,8 @@ export interface DeliveryHours {
   close: number;
 }
 
-// 지금은 코드 안의 고정 값. DB 로 옮길 때는 getDeliveryHours() 안만 바꾸면 된다.
-const DELIVERY_HOURS: DeliveryHours = { days: "매일", open: 10, close: 21 };
-
-/** 배달 운영 시간을 가져온다. */
-export async function getDeliveryHours(): Promise<DeliveryHours> {
-  return DELIVERY_HOURS;
-}
+/** 이전 형식·메모리 어댑터 테스트용 기준. 서버 실행은 lib/data/server의 DB 조회를 사용한다. */
+export const REFERENCE_DELIVERY_HOURS: DeliveryHours = { days: "매일", open: 10, close: 21 };
 
 const hh = (h: number) => `${String(h).padStart(2, "0")}:00`;
 

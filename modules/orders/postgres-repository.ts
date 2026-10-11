@@ -1,4 +1,5 @@
 import "server-only";
+import { readPricingPolicy } from "@/lib/data/server";
 import { Prisma, type PrismaClient } from "@/generated/prisma/client";
 import { databaseTransaction, type DatabaseTransaction } from "@/lib/prisma";
 import { lockCatalog, readCatalogState } from "@/lib/admin/postgres-catalog";
@@ -54,6 +55,7 @@ async function insert(tx: DatabaseTransaction, input: NewOrder): Promise<OrderRe
 export function createPostgresOrdersRepository(db: PrismaClient): OrdersRepository {
   return {
     transaction: work => databaseTransaction(db, async tx => work({
+      getPricingPolicy: () => readPricingPolicy(tx),
       findByRequest: (session, key) => findByRequest(tx, session, key),
       getCatalog: async () => {
         await lockCatalog(tx, "read");
