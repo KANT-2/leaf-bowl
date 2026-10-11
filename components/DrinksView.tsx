@@ -5,7 +5,7 @@ import { useCart } from "./CartProvider";
 import { useCustomerCatalog } from "./CustomerCatalogProvider";
 import PageHeading from "./PageHeading";
 import SoldOutCover from "./SoldOutCover";
-import { money } from "@/lib/products";
+import { money } from "@/modules/shared/format";
 
 /** 음료만 따로 고르는 페이지. + 를 누르면 장바구니에 음료 한 줄로 담기고 장바구니가 열린다. */
 export default function DrinksView() {
@@ -24,10 +24,7 @@ export default function DrinksView() {
       </div>
       <div className="product-grid">
         {list.map((d) => (
-          <div
-            key={d.id}
-            className={`product drink-card${d.available ? "" : " is-soldout"}`}
-          >
+          <div key={d.id} className={`product drink-card${d.available ? "" : " is-soldout"}`}>
             <div className="product-photo">
               {d.image && (
                 <Image
@@ -60,13 +57,9 @@ export default function DrinksView() {
               )}
             </div>
             <h3>{d.name}</h3>
-            {DRINK_KCAL[d.n] > 0 && (
-              <span className="card-nutri">약 {DRINK_KCAL[d.n]}kcal</span>
-            )}
+            {(DRINK_KCAL[d.n] ?? 0) > 0 && <span className="card-nutri">약 {DRINK_KCAL[d.n]}kcal</span>}
             <strong>{money(d.price)}</strong>
-            {!d.available && (
-              <span className="card-soldout">현재 주문할 수 없어요</span>
-            )}
+            {!d.available && <span className="card-soldout">현재 주문할 수 없어요</span>}
           </div>
         ))}
       </div>

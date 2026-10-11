@@ -17,7 +17,7 @@ npm run db:seed
 npm run dev
 ```
 
-`db:seed`는 `db/seed.sql`을 그대로 실행한다. 빈 카탈로그에는 상품 21개·재료 18개·리뷰 48개와 분류·옵션·알레르기·사이트 콘텐츠·메타데이터를 저장한다. `app_settings`에는 홈 배너·배송시간·가격 정책·영양정보·옵션 열량·재료 이모지 6개 설정을 넣는다. 기존 카탈로그와 설정은 재실행해도 덮어쓰지 않으며, 기존 DB에 없는 설정만 추가한다. 중간 오류는 전체 롤백한다.
+`db:seed`는 `db/seed.sql`을 그대로 실행한다. 빈 카탈로그에는 상품 21개·재료 18개·리뷰 48개와 분류·옵션·알레르기·사이트 콘텐츠·메타데이터를 저장한다. `app_settings`에는 홈 배너·배송시간·가격 정책·영양정보·옵션 열량·재료 이모지·카탈로그 추천/분류/편집 선택지 7개 설정을 넣는다. 기존 카탈로그와 설정은 재실행해도 덮어쓰지 않으며, 기존 DB에 없는 설정만 추가한다. 중간 오류는 전체 롤백한다.
 
 관리자 계정은 `ADMIN_LOGIN_ID`·`ADMIN_PASSWORD`를 모두 설정한 경우에만 만들고 기존 계정의 비밀번호는 덮어쓰지 않는다. 비밀번호는 scrypt 해시, 쿠키 토큰은 SHA-256 해시로만 DB에 저장한다. 기본 관리자 비밀번호는 없다. 기존 계정의 비밀번호를 바꾸려면 별도의 관리자 관리 작업이 필요하다.
 
@@ -36,7 +36,7 @@ psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f db/schema.sql
 psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f db/seed.sql
 ```
 
-직접 생성한 DB에는 Prisma의 적용 이력이 없다. 이후 Prisma로 관리하려면 스키마 일치를 확인한 뒤 `prisma migrate resolve --applied`로 `0001_baseline`부터 `0004_app_settings`까지 각각 등록한다. 처음부터 Prisma를 사용할 앱에는 `npm run db:migrate`를 권장한다.
+직접 생성한 DB에는 Prisma의 적용 이력이 없다. 이후 Prisma로 관리하려면 스키마 일치를 확인한 뒤 `prisma migrate resolve --applied`로 `0001_baseline`부터 `0005_catalog_config`까지 각각 등록한다. 처음부터 Prisma를 사용할 앱에는 `npm run db:migrate`를 권장한다.
 
 서버와 고객 화면은 DB 설정을 읽으며 주문 합계도 DB 가격 정책으로 계산한다. SQL로 설정을 바꿀 때는 `updated_at`도 갱신해야 열린 고객 화면이 새 설정을 감지한다.
 
@@ -47,12 +47,19 @@ SET value = jsonb_set(value, '{deliveryFee}', '3500'::jsonb),
 WHERE key = 'pricing_policy';
 ```
 
-현재 개발 MCP 컨테이너에서는 기본 Node 22.23.1로 Prisma CLI가 종료 코드 139를 반환했다. 같은 컨테이너의 Node 24.17.0에서는 generate·validate가 정상 동작하므로 leaf-bowl 개발 서버만 별도 Node 24 도구 경로를 사용한다. 해당 컨테이너의 터미널에서 Prisma 명령을 실행할 때도 먼저 다음 경로를 설정한다. 다른 프로젝트의 기본 Node 설정은 바꾸지 않는다. GitHub Actions의 Ubuntu·Node 22 검증은 통과했다.
+설정은 `modules/settings/schema.ts`로 검증한다. 누락·오류가 있으면 조회를 실패시키며 정적 기본값으로 복원하지 않는다. `0005_catalog_config`는 기존 DB에 없는 운영 설정을 한 번 추가하고 기존 값을 보존한다. 적용 전 앱에는 새로운 계약이 없으므로 마이그레이션을 먼저 실행한다.
 
-```sh
-export PATH=/workspace/.dev-mcp-home/leaf-bowl-toolchain/bin:$PATH
-export NODE_ENV=development
+`catalog_config`는 카테고리 API 분류, 알레르기 표시 순서/편집 선택지, 재료 분류, 원산지 선택지, 재료별 추천 상품 번호, 배송 요청 선택지를 저장한다. 현재 전용 설정 편집 UI는 없으며 SQL로 관리한다. 추천 번호는 상품의 영속 `customerId`이고 삭제·품절된 상품이면 현재 공개 상품에서 대안을 선택한다.
+
+```sql
+UPDATE app_settings
+SET value = jsonb_set(value, '{bowlRecommendations,chicken}', '5'::jsonb),
+    updated_at = CURRENT_TIMESTAMP
+WHERE key = 'catalog_config';
 ```
+
+설치 중 Prisma postinstall의 종료 코드 139가 발생한 개발 컨테이너에서는 Node 22.23.3으로 교체한 뒤 generate·검증이 정상 동작했다. 이 현상을 일반적인 Node 22 문제로 단정하지 않는다. 로컬 버전은 `node --version`으로 확인한다.
+
 
 컨테이너 기본 `NODE_ENV=production`은 개발 의존성을 설치하지 않으므로 개발 서버 준비에는 `NODE_ENV=development npm ci --include=dev`를 사용한다. 개발 서버 역시 `NODE_ENV=development`로 시작한다.
 

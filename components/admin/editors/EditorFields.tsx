@@ -2,14 +2,8 @@
 import Image from "next/image";
 import { Button } from "@/components/admin/button";
 import { Input } from "@/components/admin/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/admin/select";
-import { request } from "@/lib/admin/request";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/admin/select";
+import { request } from "@/features/admin/request";
 import { Image as ImageIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -25,10 +19,7 @@ export function Picker({
   label: string;
 }) {
   return (
-    <Select
-      value={value || "none"}
-      onValueChange={(v) => onChange(v === "none" ? "" : v)}
-    >
+    <Select value={value || "none"} onValueChange={(v) => onChange(v === "none" ? "" : v)}>
       <SelectTrigger aria-label={label} className="select-field">
         <SelectValue />
       </SelectTrigger>
@@ -42,24 +33,10 @@ export function Picker({
     </Select>
   );
 }
-export function Photo({
-  src,
-  name,
-  className = "",
-}: {
-  src: string;
-  name: string;
-  className?: string;
-}) {
+
+export function Photo({ src, name, className = "" }: { src: string; name: string; className?: string }) {
   return src ? (
-    <Image
-      unoptimized
-      width={1024}
-      height={1024}
-      className={"photo " + className}
-      src={src}
-      alt={name}
-    />
+    <Image unoptimized width={1024} height={1024} className={"photo " + className} src={src} alt={name} />
   ) : (
     <div className={"photo photo-empty " + className}>
       <ImageIcon aria-hidden="true" />
@@ -67,6 +44,7 @@ export function Photo({
     </div>
   );
 }
+
 export function Upload({
   value,
   onChange,
@@ -88,7 +66,9 @@ export function Upload({
         disabled={busy}
         onChange={async (e) => {
           const file = e.target.files?.[0];
-          if (!file) return;
+          if (!file) {
+            return;
+          }
           e.target.value = "";
           if (file.size > 5 * 1024 * 1024) {
             setError("5MB 이하의 이미지를 선택해주세요.");
@@ -114,17 +94,9 @@ export function Upload({
           }
         }}
       />
-      <div className="meta">
-        {busy ? "이미지를 올리는 중입니다…" : "PNG · JPEG · WebP / 최대 5MB"}
-      </div>
+      <div className="meta">{busy ? "이미지를 올리는 중입니다…" : "PNG · JPEG · WebP / 최대 5MB"}</div>
       {value && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          disabled={busy}
-          onClick={() => onChange("")}
-        >
+        <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => onChange("")}>
           이미지 제거
         </Button>
       )}

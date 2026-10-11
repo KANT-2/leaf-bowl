@@ -2,10 +2,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
-import type { Ingredient } from "@/lib/data/ingredients";
-import type { Product } from "@/types/product";
-import type { CustomerCatalog } from "@/lib/customer/catalog";
-import { money } from "@/lib/products";
+import { type Ingredient } from "@/modules/bowl/ingredient";
+import type { Product } from "@/modules/catalog/customer-product";
+import type { CustomerCatalog } from "@/modules/catalog/customer-view";
+import { money } from "@/modules/shared/format";
 
 interface Props {
   resultOpen: boolean;
@@ -44,27 +44,21 @@ export default function BowlResultDialog({
   const dialogRef = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = dialogRef.current;
-    if (!dialog || !resultOpen || !selected.length) return;
-    if (!dialog.open) dialog.showModal();
+    if (!dialog || !resultOpen || !selected.length) {
+      return;
+    }
+    if (!dialog.open) {
+      dialog.showModal();
+    }
     return () => dialog.close();
   }, [resultOpen, selected.length]);
   return (
-    <dialog
-      ref={dialogRef}
-      className="bm-result"
-      aria-labelledby="bmResultTitle"
-      onClose={() => onClosed()}
-    >
+    <dialog ref={dialogRef} className="bm-result" aria-labelledby="bmResultTitle" onClose={() => onClosed()}>
       {resultOpen && selected.length > 0 && (
         <>
           <div className="dialog-top">
             <span className="eyebrow">IT’S A BOWL MATCH!</span>
-            <button
-              type="button"
-              className="close"
-              aria-label="닫기"
-              onClick={() => dialogRef.current?.close()}
-            >
+            <button type="button" className="close" aria-label="닫기" onClick={() => dialogRef.current?.close()}>
               ×
             </button>
           </div>
@@ -78,9 +72,7 @@ export default function BowlResultDialog({
             height={1024}
             sizes="220px"
           />
-          <p className="result-note">
-            사진은 선택한 재료와 비슷한 조합의 참고 이미지입니다.
-          </p>
+          <p className="result-note">사진은 선택한 재료와 비슷한 조합의 참고 이미지입니다.</p>
           <div className="result-chips">
             {selected.map((i) => (
               <span key={i.id}>
@@ -99,10 +91,7 @@ export default function BowlResultDialog({
           </label>
           <label className="field">
             <span>마지막으로, 드레싱</span>
-            <select
-              value={dressing}
-              onChange={(e) => onDressing(e.target.value)}
-            >
+            <select value={dressing} onChange={(e) => onDressing(e.target.value)}>
               {dressings.map((d) =>
                 d.name ? (
                   <option key={d.id} value={d.id} disabled={!d.available}>
@@ -115,9 +104,8 @@ export default function BowlResultDialog({
             </select>
           </label>
           <div className="allergen-box">
-            주요 알레르기 재료: {resultAllergens.join(", ") || "표기 대상 없음"}
-            . 공용 조리 공간에서 우유, 대두, 밀, 계란, 견과류, 새우, 생선 등을
-            취급하며 교차 접촉이 발생할 수 있습니다.
+            주요 알레르기 재료: {resultAllergens.join(", ") || "표기 대상 없음"}. 공용 조리 공간에서 우유, 대두, 밀,
+            계란, 견과류, 새우, 생선 등을 취급하며 교차 접촉이 발생할 수 있습니다.
           </div>
           <div className="result-price">
             <span>내 볼 예상 금액</span>
@@ -130,19 +118,11 @@ export default function BowlResultDialog({
             <button type="button" className="secondary" onClick={onSave}>
               {savedNote ? "저장 완료 ✓" : "내 조합 저장하기 ♡"}
             </button>
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => dialogRef.current?.close()}
-            >
+            <button type="button" className="secondary" onClick={() => dialogRef.current?.close()}>
               재료 다시 고르기
             </button>
           </div>
-          <Link
-            className="similar-link"
-            href={`/product/${similar.id}`}
-            onClick={() => dialogRef.current?.close()}
-          >
+          <Link className="similar-link" href={`/product/${similar.id}`} onClick={() => dialogRef.current?.close()}>
             비슷한 메뉴 보기 · {similar.name} ↗
           </Link>
           {savedNote && <p className="result-note">{savedNote}</p>}

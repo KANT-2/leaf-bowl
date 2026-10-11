@@ -1,7 +1,7 @@
 // GET /api/products/0  → 상품 1개
 // 숫자가 아니거나 없는 번호면 404
 import type { NextRequest } from "next/server";
-import { findProductById } from "@/lib/products-repository";
+import { findProductById } from "@/application/products";
 import type { ApiError } from "@/types/api";
 
 export async function GET(_request: NextRequest, ctx: RouteContext<"/api/products/[id]">) {

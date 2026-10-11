@@ -4,7 +4,7 @@
 BEGIN;
 -- 0001_baseline
 -- leaf & bowl DB 스키마 (PostgreSQL)
--- 관리자 카탈로그(lib/admin/catalog.ts 의 catalogSchema)를 그대로 옮긴 구조.
+-- 관리자 카탈로그(modules/catalog/schema.ts 의 catalogSchema)를 그대로 옮긴 구조.
 -- 지금 .data/admin/catalog.json 한 파일에 저장하는 내용을 테이블로 나눈다.
 -- 실행 순서: schema.sql → seed.sql
 -- 재료와 재료 기준 자동 품절은 맨 아래 '재료' 절에 있다.

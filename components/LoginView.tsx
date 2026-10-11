@@ -15,12 +15,16 @@ export default function LoginView() {
   const [password, setPassword] = useState("");
 
   useEffect(() => {
-    if (isLoggedIn) router.replace("/mypage");
+    if (isLoggedIn) {
+      router.replace("/mypage");
+    }
   }, [isLoggedIn, router]);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password) return;
+    if (!email.trim() || !password) {
+      return;
+    }
     login({ name: email.split("@")[0] || "손님", email: email.trim(), provider: "email" });
     toast("체험용 임시 로그인입니다");
     router.push("/mypage");
@@ -32,16 +36,16 @@ export default function LoginView() {
     router.push("/mypage");
   };
 
-  if (isLoggedIn) return null;
+  if (isLoggedIn) {
+    return null;
+  }
 
   return (
     <main className="wrap auth-wrap">
       <div className="auth-card">
         <span className="eyebrow">YOUR DAILY BOWL</span>
         <PageHeading>로그인</PageHeading>
-        <p className="auth-note">
-          체험용 화면입니다. 실제 인증 없이 입력한 이메일로 바로 로그인됩니다.
-        </p>
+        <p className="auth-note">체험용 화면입니다. 실제 인증 없이 입력한 이메일로 바로 로그인됩니다.</p>
         <form onSubmit={submit}>
           <label className="field">
             <span>이메일</span>

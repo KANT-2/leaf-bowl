@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint && npm run format:check",
     "test": "node --require ./tests/register-typescript.cjs --test tests/*.test.cjs",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
@@ -14,7 +14,9 @@
     "db:migrate": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "db:import": "tsx --conditions=react-server scripts/import-catalog.ts",
-    "test:db": "node scripts/test-postgres.mjs"
+    "test:db": "node scripts/test-postgres.mjs",
+    "format": "prettier --write \"{app,application,components,features,infrastructure,modules,seed,scripts,tests,prisma}/**/*.{ts,tsx,js,cjs,mjs,css,json}\" \"*.{ts,js,cjs,mjs,json}\" \".prettierrc.json\"",
+    "format:check": "prettier --check \"{app,application,components,features,infrastructure,modules,seed,scripts,tests,prisma}/**/*.{ts,tsx,js,cjs,mjs,css,json}\" \"*.{ts,js,cjs,mjs,json}\" \".prettierrc.json\""
   },
   "dependencies": {
     "@next/env": "16.4.0",
@@ -35,6 +37,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@stylistic/eslint-plugin": "5.10.0",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^20",
     "@types/pg": "8.23.1",
@@ -42,6 +45,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.0",
+    "prettier": "3.6.2",
     "prisma": "7.10.0",
     "tailwindcss": "^4",
     "tsx": "4.23.15",

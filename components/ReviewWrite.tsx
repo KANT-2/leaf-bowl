@@ -4,10 +4,10 @@ import Image from "next/image";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useReviews } from "./ReviewsProvider";
 import { useToast } from "./ToastProvider";
-import {useCustomerCatalog} from "./CustomerCatalogProvider";
-import { createReviewSubmission } from "@/lib/review-submission";
-import { shrinkImage } from "@/lib/image";
-import { RATE_LABELS, REVIEW_PHOTO_MAX, type Review } from "@/lib/reviews";
+import { useCustomerCatalog } from "./CustomerCatalogProvider";
+import { createReviewSubmission } from "@/features/reviews/submission";
+import { shrinkImage } from "@/features/shared/image";
+import { RATE_LABELS, REVIEW_PHOTO_MAX, type Review } from "@/modules/reviews/model";
 
 const len = (s: string) => [...s].length;
 
@@ -25,7 +25,9 @@ const ReviewWriteContext = createContext<ReviewWriteContextValue | null>(null);
 
 export function useReviewWrite(): ReviewWriteContextValue {
   const ctx = useContext(ReviewWriteContext);
-  if (!ctx) throw new Error("useReviewWrite must be used inside <ReviewWriteProvider>");
+  if (!ctx) {
+    throw new Error("useReviewWrite must be used inside <ReviewWriteProvider>");
+  }
   return ctx;
 }
 
@@ -68,8 +70,8 @@ interface DialogProps {
  */
 function WriteDialog({ fixedPid, onAdded, onClosed }: DialogProps) {
   const { addReview } = useReviews();
-  const {visibleProducts: PRODUCTS, getProduct}=useCustomerCatalog();
-  const [saving,setSaving]=useState(false);
+  const { visibleProducts: PRODUCTS, getProduct } = useCustomerCatalog();
+  const [saving, setSaving] = useState(false);
   const submission = useRef<ReturnType<typeof createReviewSubmission> | null>(null);
   const pending = useRef(false);
   const [photos, setPhotos] = useState<string[]>([]);
@@ -97,23 +99,31 @@ function WriteDialog({ fixedPid, onAdded, onClosed }: DialogProps) {
 
   useEffect(() => {
     const d = dialog.current;
-    if (!d) return;
+    if (!d) {
+      return;
+    }
     d.showModal();
     (fixedPid === null ? menuRef.current : firstStar.current)?.focus();
     return () => d.close();
   }, [fixedPid]);
 
   useEffect(() => {
-    if (asking) keepRef.current?.focus();
+    if (asking) {
+      keepRef.current?.focus();
+    }
   }, [asking]);
 
   const close = () => dialog.current?.close();
 
   const addPhotos = async (files: FileList | null) => {
-    if (!files?.length) return;
+    if (!files?.length) {
+      return;
+    }
     const room = REVIEW_PHOTO_MAX - photos.length;
     const list = [...files].slice(0, room);
-    if (files.length > room) toast(`사진은 ${REVIEW_PHOTO_MAX}장까지 올릴 수 있어요`);
+    if (files.length > room) {
+      toast(`사진은 ${REVIEW_PHOTO_MAX}장까지 올릴 수 있어요`);
+    }
     setReading(true);
     const done: string[] = [];
     for (const f of list) {
@@ -125,17 +135,27 @@ function WriteDialog({ fixedPid, onAdded, onClosed }: DialogProps) {
     }
     setPhotos((cur) => [...cur, ...done].slice(0, REVIEW_PHOTO_MAX));
     setReading(false);
-    if (fileRef.current) fileRef.current.value = "";
+    if (fileRef.current) {
+      fileRef.current.value = "";
+    }
   };
+
   const requestClose = () => {
-    if (saving) return;
-    if (dirty) setAsking(true);
-    else close();
+    if (saving) {
+      return;
+    }
+    if (dirty) {
+      setAsking(true);
+    } else {
+      close();
+    }
   };
 
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if(pending.current)return;
+    if (pending.current) {
+      return;
+    }
     const tTitle = title.trim();
     const tText = text.trim();
     const tNick = nick.trim();
@@ -160,11 +180,17 @@ function WriteDialog({ fixedPid, onAdded, onClosed }: DialogProps) {
       return;
     }
     submission.current ??= createReviewSubmission();
-    const review = submission.current({
-      pid,
-      author: tNick ? [...tNick][0] + "**" : "익명",
-      stars, title: tTitle, text: tText, via: "delivery",
-    }, photos);
+    const review = submission.current(
+      {
+        pid,
+        author: tNick ? [...tNick][0] + "**" : "익명",
+        stars,
+        title: tTitle,
+        text: tText,
+        via: "delivery",
+      },
+      photos,
+    );
     pending.current = true;
     setSaving(true);
     try {
@@ -172,8 +198,12 @@ function WriteDialog({ fixedPid, onAdded, onClosed }: DialogProps) {
       toast("리뷰가 등록되었어요");
       close();
       onAdded(review);
-    } catch {setMsg("리뷰를 저장하지 못했습니다. 다시 시도해주세요.");}
-    finally {pending.current = false; setSaving(false);}
+    } catch {
+      setMsg("리뷰를 저장하지 못했습니다. 다시 시도해주세요.");
+    } finally {
+      pending.current = false;
+      setSaving(false);
+    }
   };
 
   const painted = hover || stars;
@@ -185,14 +215,18 @@ function WriteDialog({ fixedPid, onAdded, onClosed }: DialogProps) {
       aria-labelledby="rwTitle"
       // 개발 모드의 effect 재실행(닫았다 다시 열기)으로 늦게 오는 close 이벤트는 무시한다.
       onClose={() => {
-        if (!dialog.current?.open) onClosed();
+        if (!dialog.current?.open) {
+          onClosed();
+        }
       }}
       onCancel={(e) => {
         e.preventDefault();
         requestClose();
       }}
       onClick={(e) => {
-        if (e.target === e.currentTarget) requestClose();
+        if (e.target === e.currentTarget) {
+          requestClose();
+        }
       }}
     >
       <form className="rw-body" onSubmit={submit} noValidate>
@@ -302,13 +336,25 @@ function WriteDialog({ fixedPid, onAdded, onClosed }: DialogProps) {
               </div>
             ))}
             {photos.length < REVIEW_PHOTO_MAX && (
-              <button type="button" className="rw-photo-add" disabled={reading || saving} onClick={() => fileRef.current?.click()}>
+              <button
+                type="button"
+                className="rw-photo-add"
+                disabled={reading || saving}
+                onClick={() => fileRef.current?.click()}
+              >
                 <span aria-hidden="true">＋</span>
                 {reading ? "불러오는 중" : "사진 추가"}
               </button>
             )}
           </div>
-          <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => void addPhotos(e.target.files)} />
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+            onChange={(e) => void addPhotos(e.target.files)}
+          />
         </div>
 
         <div className="rw-foot">

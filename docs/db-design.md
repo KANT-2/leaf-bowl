@@ -9,7 +9,7 @@ PostgreSQL 18 · Prisma 7.10 · 기존 SQL 설계와 현재 앱 저장소 구현
 카탈로그·리뷰·주문·관리자 및 비회원 세션을 PostgreSQL에 저장한다.
 기존 카탈로그 API 계약과 고객 상품 번호를 유지하고, 서버 재시작 이후에도 데이터와 세션을 보존한다.
 
-기준: `lib/admin/catalog.ts` 의 `catalogSchema` (main, #23 반영). 알레르기는 연관 테이블과 원문 문구를 함께 저장하고 리뷰 via도 보존한다. 재료·재료 기준 자동 품절·메뉴별 드레싱은 아래 '재료와 재료 기준 자동 품절' 절에 추가.
+기준: `modules/catalog/schema.ts` 의 `catalogSchema` (main, #23 반영). 알레르기는 연관 테이블과 원문 문구를 함께 저장하고 리뷰 via도 보존한다. 재료·재료 기준 자동 품절·메뉴별 드레싱은 아래 '재료와 재료 기준 자동 품절' 절에 추가.
 
 ## ERD
 
@@ -363,7 +363,7 @@ erDiagram
 
 ### 적용된 Prisma 모델과 마이그레이션
 
-Prisma CLI·Client·PostgreSQL adapter는 7.10.0이다. 전체 카탈로그·주문·인증 모델을 `prisma/schema.prisma`에 정의했고 `@@map`·`@map`으로 기존 테이블·열 이름을 유지한다. `lib/prisma.ts`는 연결 풀(프로세스당 최대 5개)을 재사용한다. 생성 코드 `generated/prisma`는 `npm ci`의 postinstall에서 생성하고 Git에서 제외한다.
+Prisma CLI·Client·PostgreSQL adapter는 7.10.0이다. 전체 카탈로그·주문·인증 모델을 `prisma/schema.prisma`에 정의했고 `@@map`·`@map`으로 기존 테이블·열 이름을 유지한다. `infrastructure/database/prisma.ts`는 연결 풀(프로세스당 최대 5개)을 재사용한다. 생성 코드 `generated/prisma`는 `npm ci`의 postinstall에서 생성하고 Git에서 제외한다.
 
 | 마이그레이션 | 내용 |
 | --- | --- |

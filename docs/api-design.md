@@ -79,7 +79,7 @@
 | 묶음 | 오류 모양 | 비고 |
 | --- | --- | --- |
 | `/api/v1/*` 주문·인증 (구현됨) | `{ "status": 404, "message": "..." }` | 이 문서의 공통 포맷 (`modules/shared/errors.ts`) |
-| `GET /api/catalog`, `POST /api/reviews`, `/api/admin/catalog`, `/api/admin/images`, `/api/admin/sales`, 이 API 들의 `401`(관리자 로그인 필요) | `{ "error": "..." }` | 기존 화면이 `error` 필드를 읽으므로 **그대로 유지**한다 (`lib/admin/server.ts` 의 `jsonError`) |
+| `GET /api/catalog`, `POST /api/reviews`, `/api/admin/catalog`, `/api/admin/images`, `/api/admin/sales`, 이 API 들의 `401`(관리자 로그인 필요) | `{ "error": "..." }` | 기존 화면이 `error` 필드를 읽으므로 **그대로 유지**한다 (`modules/shared/request.ts` 의 `jsonError`) |
 | `/api/products*`, `/api/home`, `PATCH /api/admin/products/{id}` | `{ "message": "..." }` (`status` 필드 없음) | 상품 API 통합(#72)에서 정리될 예정 (`types/api.ts`) |
 
 기존 API 를 `{ status, message }` 로 바꾸려면 `jsonError` 와 화면의 `error` 읽는 곳을 함께 고쳐야 하므로 이 문서에서는 바꾸지 않는다. 화면이 두 형식을 모두 읽는 방법은 별도 합의가 필요하다.
@@ -130,7 +130,7 @@
 | 요청 메서드 | 요청 경로 | 요청 예시 | 응답 예시 | 구분 |
 | --- | --- | --- | --- | --- |
 | GET | `/api/v1/home` | (없음) | `{ "hero": { "title": "좋은 하루는, 좋은 한 그릇에서.", "description": "신선한 재료와 기분 좋은 조합." }, "seasonPages": [], "best": [], "latestReviews": [] }` (`best` 는 `ProductSummary[]`, 전체 예시는 §6) | 신규 |
-| GET | `/api/v1/products` | `{ category?: String }` (쿼리) | `{ "items": [{ "id": 3, "key": "salad-3", "name": "두부 퀴노아", "nameEn": "Tofu quinoa", "price": 9900, "category": "플랜트 베이스", "badge": "PLANT", "status": "active", "imageUrl": "/images/salad-03-cutout.png", "allergens": ["대두"] }], "categories": ["든든한 단백질", "플랜트 베이스", "새로운 조합", "기타"] }` | 이동 (기존 `GET /api/products` 는 `data/products.ts` 복사본을 읽으므로 이 경로로 대체하고 제거) |
+| GET | `/api/v1/products` | `{ category?: String }` (쿼리) | `{ "items": [{ "id": 3, "key": "salad-3", "name": "두부 퀴노아", "nameEn": "Tofu quinoa", "price": 9900, "category": "플랜트 베이스", "badge": "PLANT", "status": "active", "imageUrl": "/images/salad-03-cutout.png", "allergens": ["대두"] }], "categories": ["든든한 단백질", "플랜트 베이스", "새로운 조합", "기타"] }` | 이동 (기존 `GET /api/products`는 이미 공통 PostgreSQL 카탈로그를 읽는다. 이 v1 경로는 계획 중인 계약) |
 | GET | `/api/v1/drinks` | (없음) | `{ "items": [{ "id": null, "key": "drink-1", "name": "오렌지 주스", "nameEn": null, "price": 4000, "category": "음료", "badge": "", "status": "active", "imageUrl": "/admin-assets/drinks/orange-juice.png", "allergens": [] }] }` | 신규 |
 | GET | `/api/v1/products/{id}` | `{ id: Number }` (경로) | `{ "id": 0, "key": "salad-0", "name": "레몬 치킨 아보카도", "price": 10900, "status": "active", "allergens": ["닭고기", "토마토"], "optionGroups": [{ "id": "dressing", "name": "드레싱 선택", "required": true, "multiple": false, "choices": [{ "key": "dressing-0", "name": "레몬 올리브", "price": 0, "available": true, "allergens": [] }] }], "rating": { "average": 4.6, "count": 4 } }` (일부, 전체는 §6) | 이동 (기존 `GET /api/products/{id}` 대체) |
 | GET | `/api/v1/products/{id}/reviews` | `{ id: Number }` (경로), `{ page?: Number, size?: Number }` (쿼리) | `{ "items": [{ "id": "s0-0", "productId": 0, "rating": 5, "title": "점심이 기다려지는 조합이에요.", "body": "치킨과 아보카도가 잘 어울려요.", "author": "김**", "date": "2026.10.05", "images": [] }], "page": 1, "size": 10, "total": 4, "rating": { "average": 4.6, "count": 4 } }` | 신규 |
@@ -183,7 +183,7 @@
 | --- | --- | --- | --- | --- |
 | GET | `/api/admin/catalog` | (없음) | `{ "catalog": { "products": [{ "id": "salad-0", "customerId": 0, "type": "salad", "name": "레몬 치킨 아보카도", "price": 10900, "status": "active", "badge": "BEST" }], "groups": [], "reviews": [], "content": {} }, "revision": 7, "updatedAt": "2026-10-09T05:12:00.000Z" }` (일부) | 현재 |
 | PUT | `/api/admin/catalog` | `{ catalog: Object, revision: Number }` (본문) | `{ "catalog": {}, "revision": 8, "updatedAt": "2026-10-09T05:20:00.000Z" }` (`revision` 이 다르면 409) | 현재 |
-| PATCH | `/api/v1/admin/products/{key}` | `{ key: String }` (경로), `{ name?: String, description?: String, price?: Number, status?: String, badge?: String, category?: String, allergens?: String }` (본문, 보낸 항목만 수정) | `{ "id": "salad-0", "customerId": 0, "type": "salad", "name": "레몬 치킨 아보카도", "price": 11900, "status": "soldout", "badge": "BEST" }` (일부) | 이동 (기존 `PATCH /api/admin/products/{id}` 는 `data/products.ts` 복사본을 수정하므로 대체하고 제거) |
+| PATCH | `/api/v1/admin/products/{key}` | `{ key: String }` (경로), `{ name?: String, description?: String, price?: Number, status?: String, badge?: String, category?: String, allergens?: String }` (본문, 보낸 항목만 수정) | `{ "id": "salad-0", "customerId": 0, "type": "salad", "name": "레몬 치킨 아보카도", "price": 11900, "status": "soldout", "badge": "BEST" }` (일부) | 이동 (기존 `PATCH /api/admin/products/{id}`는 이미 공통 PostgreSQL 카탈로그를 수정한다. 이 v1 경로는 계획 중인 계약) |
 | POST | `/api/admin/images` | `multipart/form-data` `{ file: File }` (PNG·JPEG·WebP, 5MB 이하) | `{ "url": "/api/admin/images/3f1c9a52-8b1e-4c52-9d0f-2b6f5a7c1e90.png" }` | 현재 |
 | GET | `/api/admin/images/{key}` | `{ key: String }` (경로) | 이미지 파일 (`Content-Type: image/png`) | 현재 |
 

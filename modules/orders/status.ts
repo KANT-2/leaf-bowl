@@ -1,14 +1,7 @@
 import { AppError } from "../shared/errors";
 
 /** 접수 → 확인 → 준비 중 → 배달 중 → 완료. 취소는 접수·확인에서만. db/schema.sql 의 트리거와 같은 규칙이다. */
-export const ORDER_STATUSES = [
-  "received",
-  "confirmed",
-  "preparing",
-  "delivering",
-  "completed",
-  "canceled",
-] as const;
+export const ORDER_STATUSES = ["received", "confirmed", "preparing", "delivering", "completed", "canceled"] as const;
 
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
@@ -49,10 +42,7 @@ export function isCancelable(status: OrderStatus): boolean {
 
 export function assertTransition(from: OrderStatus, to: OrderStatus): void {
   if (!canTransition(from, to)) {
-    throw new AppError(
-      409,
-      `${STATUS_LABEL[from]} 상태의 주문은 ${STATUS_LABEL[to]}(으)로 바꿀 수 없습니다.`,
-    );
+    throw new AppError(409, `${STATUS_LABEL[from]} 상태의 주문은 ${STATUS_LABEL[to]}(으)로 바꿀 수 없습니다.`);
   }
 }
 
@@ -60,7 +50,9 @@ export type CancelOutcome = "cancel" | "already-canceled";
 
 /** 취소 요청 처리: 이미 취소된 주문은 현재 결과를 그대로 돌려주고, 취소할 수 없는 상태는 409. */
 export function resolveCancel(status: OrderStatus): CancelOutcome {
-  if (status === "canceled") return "already-canceled";
+  if (status === "canceled") {
+    return "already-canceled";
+  }
   if (!isCancelable(status)) {
     throw new AppError(409, "준비가 시작된 주문은 취소할 수 없습니다.");
   }

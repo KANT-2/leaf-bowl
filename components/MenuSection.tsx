@@ -6,12 +6,10 @@ import { useLayoutEffect, useState } from "react";
 import PageHeading from "./PageHeading";
 import ProductCard from "./ProductCard";
 import { useReviews } from "./ReviewsProvider";
-import { MATCH_URL, type Product } from "@/lib/products";
-import { ALLERGEN_ORDER } from "@/lib/allergens";
+import { MATCH_URL } from "@/features/customer/routes";
+import { type Product } from "@/modules/catalog/customer-product";
 
 type Filter = string;
-
-
 
 type SortKey = "default" | "priceLow" | "priceHigh" | "kcalLow" | "proteinHigh" | "rating";
 
@@ -28,9 +26,14 @@ const SORTS: { key: SortKey; label: string }[] = [
 
 export default function MenuSection() {
   const { NUTRITION } = useCustomerCatalog();
-  const { catalog, visibleProducts } = useCustomerCatalog();
-  const FILTERS = [{key:"all",label:"전체 메뉴"},...(catalog.categories??[]).map(label=>({key:label,label}))];
-  const ALLERGENS = [...new Set([...ALLERGEN_ORDER,...visibleProducts.flatMap(p=>p.allergens)])].filter(a=>visibleProducts.some(p=>p.allergens.includes(a)));
+  const { catalog, visibleProducts, catalogConfig } = useCustomerCatalog();
+  const FILTERS = [
+    { key: "all", label: "전체 메뉴" },
+    ...(catalog.categories ?? []).map((label) => ({ key: label, label })),
+  ];
+  const ALLERGENS = [
+    ...new Set([...catalogConfig.allergenOrder, ...visibleProducts.flatMap((p) => p.allergens)]),
+  ].filter((a) => visibleProducts.some((p) => p.allergens.includes(a)));
   const { statsFor } = useReviews();
   const [filter, setFilter] = useState<Filter>("all");
   const [term, setTerm] = useState("");
@@ -54,13 +57,16 @@ export default function MenuSection() {
     default: (a, b) => a.id - b.id,
     priceLow: (a, b) => a.price - b.price || a.id - b.id,
     priceHigh: (a, b) => b.price - a.price || a.id - b.id,
-    kcalLow: (a, b) => NUTRITION[a.id].kcal - NUTRITION[b.id].kcal || a.id - b.id,
-    proteinHigh: (a, b) => NUTRITION[b.id].protein - NUTRITION[a.id].protein || a.id - b.id,
+    kcalLow: (a, b) => (NUTRITION[a.id]?.kcal ?? Infinity) - (NUTRITION[b.id]?.kcal ?? Infinity) || a.id - b.id,
+    proteinHigh: (a, b) =>
+      (NUTRITION[b.id]?.protein ?? -Infinity) - (NUTRITION[a.id]?.protein ?? -Infinity) || a.id - b.id,
     rating: (a, b) => statsFor(b.id).avg - statsFor(a.id).avg || a.id - b.id,
   };
   const shown = [...found].sort(compare[sort]);
 
-  const toggleAllergen = (a: string) => setExcluded((list) => (list.includes(a) ? list.filter((x) => x !== a) : [...list, a]));
+  const toggleAllergen = (a: string) =>
+    setExcluded((list) => (list.includes(a) ? list.filter((x) => x !== a) : [...list, a]));
+
   const resetAll = () => {
     setFilter("all");
     setTerm("");
@@ -79,12 +85,24 @@ export default function MenuSection() {
             <circle cx="10" cy="10" r="6" />
             <path d="m15 15 5 5" />
           </svg>
-          <input type="search" placeholder="메뉴 검색" aria-label="메뉴 검색" value={term} onChange={(e) => setTerm(e.target.value)} />
+          <input
+            type="search"
+            placeholder="메뉴 검색"
+            aria-label="메뉴 검색"
+            value={term}
+            onChange={(e) => setTerm(e.target.value)}
+          />
         </label>
       </div>
       <div className="filters" role="group" aria-label="메뉴 분류">
         {FILTERS.map((f) => (
-          <button key={f.key} type="button" className={filter === f.key ? "active" : ""} aria-pressed={filter === f.key} onClick={() => setFilter(f.key)}>
+          <button
+            key={f.key}
+            type="button"
+            className={filter === f.key ? "active" : ""}
+            aria-pressed={filter === f.key}
+            onClick={() => setFilter(f.key)}
+          >
             {f.label}
             {false && <span>NEW</span>}
           </button>
@@ -98,7 +116,8 @@ export default function MenuSection() {
           aria-controls="allergyFilter"
           onClick={() => setShowAllergy((v) => !v)}
         >
-          알레르기 제외{excluded.length ? ` ${excluded.length}` : ""} <span aria-hidden="true">{showAllergy ? "▴" : "▾"}</span>
+          알레르기 제외{excluded.length ? ` ${excluded.length}` : ""}{" "}
+          <span aria-hidden="true">{showAllergy ? "▴" : "▾"}</span>
         </button>
         <span className="menu-count" aria-live="polite">
           {shown.length}개 메뉴
@@ -114,7 +133,13 @@ export default function MenuSection() {
           </select>
         </label>
       </div>
-      <div className="allergy-filter" id="allergyFilter" role="group" aria-label="제외할 알레르기 재료" hidden={!showAllergy}>
+      <div
+        className="allergy-filter"
+        id="allergyFilter"
+        role="group"
+        aria-label="제외할 알레르기 재료"
+        hidden={!showAllergy}
+      >
         <p>선택한 재료가 들어간 메뉴를 숨겨요. 드레싱 알레르기는 상세에서 따로 확인해주세요.</p>
         <div className="allergy-chips">
           {ALLERGENS.map((a) => (

@@ -1,18 +1,10 @@
 import Image from "next/image";
-import type { Ingredient } from "@/lib/data/ingredients";
-import { ingredientPhoto } from "@/lib/match";
-import { money } from "@/lib/products";
+import { type Ingredient } from "@/modules/bowl/ingredient";
+import { ingredientPhoto } from "@/modules/bowl/operations";
+import { money } from "@/modules/shared/format";
 const two = (n: number) => String(n).padStart(2, "0");
 
-export function CardFace({
-  item,
-  index,
-  front = false,
-}: {
-  item: Ingredient;
-  index: number;
-  front?: boolean;
-}) {
+export function CardFace({ item, index, front = false }: { item: Ingredient; index: number; front?: boolean }) {
   return (
     <>
       <div className="ingredient-visual" style={{ background: item.color }}>
@@ -33,14 +25,8 @@ export function CardFace({
         <h2>{item.name}</h2>
         <p>{item.desc}</p>
         <div className="ingredient-bottom">
-          <span>
-            {item.allergens.length
-              ? `알레르기: ${item.allergens.join(", ")}`
-              : "주요 알레르기 표기 없음"}
-          </span>
-          <strong>
-            {item.price ? `+ ${money(item.price)}` : "기본 볼에 포함"}
-          </strong>
+          <span>{item.allergens.length ? `알레르기: ${item.allergens.join(", ")}` : "주요 알레르기 표기 없음"}</span>
+          <strong>{item.price ? `+ ${money(item.price)}` : "기본 볼에 포함"}</strong>
         </div>
       </div>
       {front && (
@@ -77,11 +63,7 @@ export function DoneCard({
       </p>
       {onFinish && onRestart && (
         <>
-          <button
-            type="button"
-            className="primary"
-            onClick={count ? onFinish : onRestart}
-          >
+          <button type="button" className="primary" onClick={count ? onFinish : onRestart}>
             {count ? "내 샐러드 완성하기" : "다시 고르기"} ↗
           </button>
           <button type="button" className="secondary" onClick={onRestart}>

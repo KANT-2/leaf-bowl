@@ -1,7 +1,8 @@
 "use client";
 import { Button } from "@/components/admin/button";
 import { Input } from "@/components/admin/input";
-import { saladCategories, type Catalog } from "@/lib/admin/catalog";
+import { saladCategories } from "@/features/admin/catalog-presentation";
+import { type Catalog } from "@/modules/catalog/schema";
 import { useRef, useState } from "react";
 import { Picker } from "./EditorFields";
 
@@ -18,19 +19,20 @@ export default function CategoryManager({
   const [dragged, setDragged] = useState<string | null>(null),
     [over, setOver] = useState<string | null>(null);
   async function reorder(from: string, to: string) {
-    if (busy || from === to) return;
+    if (busy || from === to) {
+      return;
+    }
     const list = [...saladCategories(catalog)];
     const start = list.indexOf(from),
       end = list.indexOf(to);
-    if (start < 0 || end < 0) return;
+    if (start < 0 || end < 0) {
+      return;
+    }
     list.splice(start, 1);
     list.splice(end, 0, from);
     setError("");
     try {
-      await onSave(
-        { ...catalog, categories: list },
-        "카테고리 순서를 저장했습니다.",
-      );
+      await onSave({ ...catalog, categories: list }, "카테고리 순서를 저장했습니다.");
     } catch (e) {
       setError((e as Error).message);
     }
@@ -56,15 +58,9 @@ export default function CategoryManager({
     try {
       await onSave({
         ...catalog,
-        categories: editing
-          ? categories.map((x) => (x === editing ? value : x))
-          : [...categories, value],
+        categories: editing ? categories.map((x) => (x === editing ? value : x)) : [...categories, value],
         products: editing
-          ? catalog.products.map((p) =>
-              p.type === "salad" && p.category === editing
-                ? { ...p, category: value }
-                : p,
-            )
+          ? catalog.products.map((p) => (p.type === "salad" && p.category === editing ? { ...p, category: value } : p))
           : catalog.products,
       });
       setEditing(null);
@@ -93,16 +89,11 @@ export default function CategoryManager({
                 className={
                   "category-drag-row" +
                   (dragged === category ? " dragging" : "") +
-                  (over === category && dragged !== category
-                    ? " drag-over"
-                    : "")
+                  (over === category && dragged !== category ? " drag-over" : "")
                 }
                 draggable={!busy}
                 tabIndex={0}
-                aria-label={
-                  category +
-                  " 카테고리, 드래그하여 순서 변경. Alt와 위아래 방향키로도 이동 가능"
-                }
+                aria-label={category + " 카테고리, 드래그하여 순서 변경. Alt와 위아래 방향키로도 이동 가능"}
                 onDragStart={(e) => {
                   if (busy || (e.target as HTMLElement).closest("button")) {
                     e.preventDefault();
@@ -114,7 +105,9 @@ export default function CategoryManager({
                   e.dataTransfer.setData("text/plain", category);
                 }}
                 onDragOver={(e) => {
-                  if (busy || !dragging.current) return;
+                  if (busy || !dragging.current) {
+                    return;
+                  }
                   e.preventDefault();
                   e.dataTransfer.dropEffect = "move";
                   setOver(category);
@@ -125,7 +118,9 @@ export default function CategoryManager({
                   dragging.current = null;
                   setDragged(null);
                   setOver(null);
-                  if (from) void reorder(from, category);
+                  if (from) {
+                    void reorder(from, category);
+                  }
                 }}
                 onDragEnd={() => {
                   dragging.current = null;
@@ -133,13 +128,17 @@ export default function CategoryManager({
                   setOver(null);
                 }}
                 onKeyDown={(e) => {
-                  if (e.target !== e.currentTarget || !e.altKey || busy) return;
-                  const delta =
-                    e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
-                  if (!delta) return;
+                  if (e.target !== e.currentTarget || !e.altKey || busy) {
+                    return;
+                  }
+                  const delta = e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
+                  if (!delta) {
+                    return;
+                  }
                   e.preventDefault();
-                  if (categories[i + delta])
+                  if (categories[i + delta]) {
                     void reorder(category, categories[i + delta]);
+                  }
                 }}
               >
                 <span className="category-grip" aria-hidden="true">
@@ -147,15 +146,8 @@ export default function CategoryManager({
                 </span>
                 <strong>{category}</strong>
                 <span className="meta">
-                  {
-                    catalog.products.filter(
-                      (p) =>
-                        p.type === "salad" &&
-                        !p.deleted &&
-                        p.category === category,
-                    ).length
-                  }
-                  개 메뉴
+                  {catalog.products.filter((p) => p.type === "salad" && !p.deleted && p.category === category).length}개
+                  메뉴
                 </span>
                 <Button
                   size="sm"
@@ -193,11 +185,7 @@ export default function CategoryManager({
               onChange={(e) => setName(e.target.value)}
               placeholder="예: 가벼운 한 끼"
             />
-            <Button
-              type="button"
-              disabled={categories.length >= 30 && !editing}
-              onClick={saveName}
-            >
+            <Button type="button" disabled={categories.length >= 30 && !editing} onClick={saveName}>
               {editing ? "이름 저장" : "카테고리 추가"}
             </Button>
             {editing && (
@@ -216,23 +204,16 @@ export default function CategoryManager({
           {removing && (
             <div className="category-delete">
               <p>
-                <strong>{removing}</strong> 삭제 후 해당 메뉴를 옮길 카테고리를
-                선택해주세요.
+                <strong>{removing}</strong> 삭제 후 해당 메뉴를 옮길 카테고리를 선택해주세요.
               </p>
               <Picker
                 label="삭제 후 이동할 카테고리"
                 value={target}
                 onChange={setTarget}
-                options={categories
-                  .filter((x) => x !== removing)
-                  .map((x) => [x, x])}
+                options={categories.filter((x) => x !== removing).map((x) => [x, x])}
               />
               <div className="row-actions">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setRemoving(null)}
-                >
+                <Button type="button" variant="outline" onClick={() => setRemoving(null)}>
                   취소
                 </Button>
                 <Button
@@ -243,9 +224,7 @@ export default function CategoryManager({
                         ...catalog,
                         categories: categories.filter((x) => x !== removing),
                         products: catalog.products.map((p) =>
-                          p.type === "salad" && p.category === removing
-                            ? { ...p, category: target }
-                            : p,
+                          p.type === "salad" && p.category === removing ? { ...p, category: target } : p,
                         ),
                       });
                       setRemoving(null);

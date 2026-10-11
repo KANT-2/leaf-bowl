@@ -8,7 +8,7 @@
 
 ## 연결 계약
 
-화면 어댑터 `lib/admin/auth-client.ts`는 현재 identity API의 `loginId` 계약을 따른다.
+화면 어댑터 `features/admin/auth-client.ts`는 현재 identity API의 `loginId` 계약을 따른다.
 
 | 동작 | 요청 | 성공 후 |
 | --- | --- | --- |

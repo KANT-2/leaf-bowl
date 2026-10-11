@@ -1,13 +1,16 @@
 "use client";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { publicSnapshotSchema, type PublicSnapshot } from "@/lib/customer/snapshot";
-import { customerCatalog, type CustomerCatalog } from "@/lib/customer/catalog";
+import { publicSnapshotSchema, type PublicSnapshot } from "@/modules/catalog/public-schema";
+import { customerCatalog, type CustomerCatalog } from "@/modules/catalog/customer-view";
 const Context = createContext<CustomerCatalog | null>(null);
 export function useCustomerCatalog() {
   const context = useContext(Context);
-  if (!context) throw new Error("CustomerCatalogProvider is required");
+  if (!context) {
+    throw new Error("CustomerCatalogProvider is required");
+  }
   return context;
 }
+
 export function notifyCatalogSaved() {
   try {
     localStorage.setItem("catalog-updated", String(Date.now()));
@@ -19,6 +22,7 @@ export function notifyCatalogSaved() {
     channel.close();
   }
 }
+
 export default function CustomerCatalogProvider({
   initial,
   children,
@@ -32,31 +36,37 @@ export default function CustomerCatalogProvider({
       loading = false;
     const controller = new AbortController();
     async function refresh() {
-      if (loading || document.hidden) return;
+      if (loading || document.hidden) {
+        return;
+      }
       loading = true;
       try {
         const response = await fetch("/api/catalog", {
           cache: "no-store",
           signal: controller.signal,
         });
-        if (!response.ok) return;
+        if (!response.ok) {
+          return;
+        }
         const next = publicSnapshotSchema.parse(await response.json());
-        if (!disposed)
+        if (!disposed) {
           setSnapshot((current) =>
-            next.revision > current.revision || next.defaults?.updatedAt !== current.defaults?.updatedAt ? next : current,
+            next.revision > current.revision || next.defaults?.updatedAt !== current.defaults?.updatedAt
+              ? next
+              : current,
           );
+        }
       } catch {
       } finally {
         loading = false;
       }
     }
-    const channel =
-      "BroadcastChannel" in window
-        ? new BroadcastChannel("catalog-updated")
-        : null;
+    const channel = "BroadcastChannel" in window ? new BroadcastChannel("catalog-updated") : null;
     channel?.addEventListener("message", refresh);
     const storage = (event: StorageEvent) => {
-      if (event.key === "catalog-updated") void refresh();
+      if (event.key === "catalog-updated") {
+        void refresh();
+      }
     };
     window.addEventListener("catalog-saved", refresh);
     window.addEventListener("storage", storage);

@@ -2,8 +2,8 @@
 import { Button } from "@/components/admin/button";
 import { Switch } from "@/components/admin/switch";
 import { Textarea } from "@/components/admin/textarea";
-import { type Catalog, type Content } from "@/lib/admin/catalog";
-import { uid } from "@/lib/admin/editor-helpers";
+import { type Catalog, type Content } from "@/modules/catalog/schema";
+import { uid } from "@/features/admin/editor-helpers";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import { Photo, Picker, Upload } from "./EditorFields";
@@ -38,18 +38,17 @@ export default function ContentEditor({
   const pages = c.seasonPages || [];
   const current = pages[index];
   const featured = catalog.products.find((p) => p.id === current?.productId);
-  const update = (
-    value: Partial<NonNullable<Content["seasonPages"]>[number]>,
-  ) =>
+  const update = (value: Partial<NonNullable<Content["seasonPages"]>[number]>) =>
     setC((s) => ({
       ...s,
-      seasonPages: s.seasonPages?.map((p, i) =>
-        i === index ? { ...p, ...value } : p,
-      ),
+      seasonPages: s.seasonPages?.map((p, i) => (i === index ? { ...p, ...value } : p)),
     }));
+
   function move(delta: number) {
     const next = index + delta;
-    if (next < 0 || next >= pages.length) return;
+    if (next < 0 || next >= pages.length) {
+      return;
+    }
     const changed = [...pages];
     [changed[index], changed[next]] = [changed[next], changed[index]];
     setC({ ...c, seasonPages: changed });
@@ -95,9 +94,7 @@ export default function ContentEditor({
               <Textarea
                 maxLength={600}
                 value={c.heroDescription}
-                onChange={(e) =>
-                  setC({ ...c, heroDescription: e.target.value })
-                }
+                onChange={(e) => setC({ ...c, heroDescription: e.target.value })}
               />
             </label>
           </section>
@@ -153,12 +150,7 @@ export default function ContentEditor({
                 <div className="section-heading">
                   <h3>{index + 1}페이지 설정</h3>
                   <div className="row-actions">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={index === 0}
-                      onClick={() => move(-1)}
-                    >
+                    <Button type="button" variant="outline" disabled={index === 0} onClick={() => move(-1)}>
                       앞으로
                     </Button>
                     <Button
@@ -186,11 +178,7 @@ export default function ContentEditor({
                 </div>
                 <div className="toggle-row">
                   <label htmlFor="pageVisible">이 페이지 노출</label>
-                  <Switch
-                    id="pageVisible"
-                    checked={current.visible}
-                    onCheckedChange={(v) => update({ visible: v })}
-                  />
+                  <Switch id="pageVisible" checked={current.visible} onCheckedChange={(v) => update({ visible: v })} />
                 </div>
                 <label className="field">
                   제목
@@ -223,26 +211,18 @@ export default function ContentEditor({
                     onChange={(v) =>
                       update({
                         productId: v,
-                        image:
-                          catalog.products.find((p) => p.id === v)?.image ||
-                          current.image,
+                        image: catalog.products.find((p) => p.id === v)?.image || current.image,
                       })
                     }
                   />
                 </label>
                 <div className="field">
                   시즌 이미지
-                  <Upload
-                    value={current.image}
-                    onChange={(v) => update({ image: v })}
-                    onBusy={setUploading}
-                  />
+                  <Upload value={current.image} onChange={(v) => update({ image: v })} onBusy={setUploading} />
                 </div>
               </div>
             ) : (
-              <p className="muted">
-                페이지 추가 버튼으로 시즌 스페셜을 등록해주세요.
-              </p>
+              <p className="muted">페이지 추가 버튼으로 시즌 스페셜을 등록해주세요.</p>
             )}
           </section>
         </fieldset>
@@ -254,19 +234,12 @@ export default function ContentEditor({
             <p>{c.heroDescription}</p>
           </section>
           {c.seasonVisible && current?.visible ? (
-            <section
-              className="season-preview season-layout-preview"
-              aria-label="시즌 스페셜 고객 화면 미리보기"
-            >
+            <section className="season-preview season-layout-preview" aria-label="시즌 스페셜 고객 화면 미리보기">
               <div className="season-preview-copy">
                 <span className="season-preview-label">THIS MONTH’S PICK</span>
                 <h2>{current.title.replace(", ", ",\n")}</h2>
                 <p>{current.description.replace(". ", ".\n")}</p>
-                {featured && (
-                  <span className="season-preview-link">
-                    {featured.name} 만나보기 ↗
-                  </span>
-                )}
+                {featured && <span className="season-preview-link">{featured.name} 만나보기 ↗</span>}
               </div>
               <div className="season-preview-food">
                 <Photo
@@ -280,10 +253,7 @@ export default function ContentEditor({
                 <strong>{featured?.name || current.title}</strong>
                 <p>{current.description}</p>
               </div>
-              <nav
-                className="season-preview-arrows"
-                aria-label="시즌 미리보기 페이지"
-              >
+              <nav className="season-preview-arrows" aria-label="시즌 미리보기 페이지">
                 <button
                   type="button"
                   aria-label="이전 시즌 페이지"
@@ -306,9 +276,7 @@ export default function ContentEditor({
               </nav>
             </section>
           ) : (
-            <section className="surface muted">
-              시즌 스페셜 또는 선택한 페이지가 숨겨져 있습니다.
-            </section>
+            <section className="surface muted">시즌 스페셜 또는 선택한 페이지가 숨겨져 있습니다.</section>
           )}
         </div>
       </div>

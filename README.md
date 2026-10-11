@@ -117,7 +117,10 @@ npm run start
 | 명령 | 설명 |
 | --- | --- |
 | `npm run dev` | 개발 서버 실행 |
-| `npm run lint` | ESLint 검사 |
+| `npm run lint` | ESLint 규칙 및 Prettier 스타일 검사 |
+| `npm run format` | 코드 포맷 수정 |
+| `npm run format:check` | 코드 포맷 검사 |
+| `npx eslint --fix` | 중괄호·함수 간 빈 줄 등 린트 자동 수정 |
 | `npm run build` | 운영 빌드 생성 |
 | `npm run start` | 생성된 운영 빌드로 서버 실행 |
 | `npx --no-install tsc --noEmit` | TypeScript 검사 |
@@ -155,13 +158,12 @@ leaf-bowl/
 │   ├── api/              # 카탈로그·상품·리뷰·이미지 API
 │   └── styles/           # 고객 화면별 스타일
 ├── components/           # 고객 컴포넌트·Provider·관리자 UI
-├── lib/
-│   ├── admin/            # 카탈로그 스키마·초기값·PostgreSQL 저장소
-│   ├── customer/         # 고객용 카탈로그 변환·서버 조회
-│   └── …                 # 장바구니·리뷰·취향·모의 사용자/주문
-├── data/                 # 초기 상품 데이터
-├── types/                # 상품·API 타입
-├── public/               # 상품·재료 이미지와 미리보기 자산
+├── modules/              # 카탈로그·주문·프로필·장바구니의 계약과 업무 규칙
+├── application/          # 트랜잭션 조합·서비스 생성·서버 조회
+├── infrastructure/       # PostgreSQL·HTTP·브라우저 저장소 어댑터
+├── features/             # 화면별 표시·입력·클라이언트 요청 로직
+├── seed/                 # SQL 초기화·명시적 JSON 이관 전용
+├── public/               # 상품·재료 이미지
 ├── prisma/               # DB 모델·마이그레이션·seed
 ├── db/                   # 기존 PostgreSQL 설계 SQL
 ├── tests/                # 카탈로그·브라우저 검증
@@ -170,11 +172,20 @@ leaf-bowl/
 └── .github/workflows/    # Frontend CI
 ```
 
+코드 스타일은 들여쓰기 2칸, 쌍따옴표, 세미콜론, 줄 폭 120자, LF로 통일합니다. `if`·`else`·`for`·`while`·`do` 본문에는 중괄호를 반드시 사용합니다. 인접한 함수 선언(화살표 함수·export 함수 포함)과 클래스 메서드 사이에는 빈 줄을 한 줄 두고, 연속 빈 줄 두 개 이상은 허용하지 않습니다. 긴 문자열·URL처럼 나누기 어려운 값은 120자를 넘을 수 있습니다.
+
+`npx eslint --fix`로 중괄호·함수 간 간격을 수정한 다음 `npm run format`으로 포맷을 정리합니다. `npm run lint`는 두 검사 모두 수행하며 스타일 위반도 기존 CI에서 실패합니다. 생성 코드·빌드 결과·배포 상태·사진/정적 자산·문서는 자동 포맷 대상에서 제외합니다. SQL·Prisma 스키마·Python은 Prettier 포맷 대상이 아닙니다.
+
+[모듈 경계와 데이터 흐름](docs/architecture.md)에 책임·의존성 규칙과 변경 시 확인할 항목을 정리했습니다. `npm run lint`와 `npm test`가 경계 위반·순환 의존성·클라이언트의 서버 코드 참조를 검사합니다.
+
+Tailwind 색상·글꼴 토큰은 `app/styles/theme.css`에서 공유합니다. 기본 스타일은 `base`, 화면별 CSS는 `components` 레이어에 두어 Tailwind 유틸리티로 크기·여백을 조정할 수 있게 합니다. 고객의 기존 리셋과 관리자 Preflight는 각 루트 레이아웃에서 유지합니다. 공통 컴포넌트의 변형과 화면이 요구하는 크기는 컴포넌트 클래스에서 지정합니다.
+
 ### 데이터는 어디에 저장되나요?
 
 | 데이터 | 현재 저장 위치 | 특징 |
 | --- | --- | --- |
-| 고객·관리자 공통 카탈로그와 리뷰 | PostgreSQL | `lib/admin/store.ts`에서 조회·저장, 잠금·`revision`으로 저장 충돌 확인 |
+| 고객·관리자 공통 카탈로그와 리뷰 | PostgreSQL | `application/catalog.ts`에서 조회·저장, 잠금·`revision`으로 저장 충돌 확인 |
+| 배너·배송시간·가격·영양·추천·편집 선택지 | PostgreSQL `app_settings` | 런타임 정적 기본값 없이 검증된 DB 설정 사용 |
 | 서버 주문·주문 항목·상태 이력 | PostgreSQL | 비회원 세션별 조회, 재전송·상태 변경 충돌 방지 |
 | 관리자 계정·관리자/비회원 세션 | PostgreSQL | 비밀번호·토큰 해시와 만료 시각 보존 |
 | 관리자 업로드 이미지 | 서버의 `images/` 디렉터리 | `ADMIN_DATA_DIR` 아래 보관, PNG·JPEG·WebP 및 파일당 5MB 제한 |

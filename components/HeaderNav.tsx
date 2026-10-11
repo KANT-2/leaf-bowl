@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MATCH_URL } from "@/lib/products";
+import { MATCH_URL } from "@/features/customer/routes";
 
 const REVIEWS_PATH = /^\/(reviews|product\/\d+\/reviews)\/?$/;
 
