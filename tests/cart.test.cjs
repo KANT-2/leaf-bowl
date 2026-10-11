@@ -58,7 +58,7 @@ test("legacy cart indices migrate to original IDs and permanent deletion never c
     assert.equal(latest.itemName(items[0]), "판매 종료 음료");
     assert.equal(latest.itemAvailable(items[1]), false);
     const changed = withChoice(items[1], null, "dressing-2");
-    assert.ok(latest.itemAvailable(changed));
+    assert.equal(latest.itemAvailable(changed), false);
     assert.match(latest.itemOptions(changed), /참깨/);
     assert.notEqual(itemKey(changed), itemKey(items[1]));
     value = JSON.stringify([{ kind: "drink", drink: 0, drinkKey: "new-uuid-drink", qty: 1 }]);
@@ -96,4 +96,28 @@ test("browser JSON failures fall back and recipes retain newly added dressing ID
     const { recipeStore } = require("../lib/match.ts");
     assert.equal(recipeStore.getSnapshot().dressingKey, "new-dressing");
   } finally { if (previous === undefined) delete global.localStorage; else global.localStorage = previous; }
+});
+
+test("custom bowl keys use unordered ingredient IDs, separate legacy names and avoid delimiter collisions", () => {
+  const item = { kind: "custom", name: "나의 볼", ingredients: ["동일 이름", "동일 이름"], ingredientIds: ["romaine", "kale"], allergens: [], dressing: 0, price: 7000, photo: 0, qty: 1 };
+  assert.equal(itemKey(item), itemKey({ ...item, ingredients: ["바뀐 표시명"], ingredientIds: ["kale", "romaine"] }));
+  assert.notEqual(itemKey(item), itemKey({ ...item, ingredientIds: ["romaine", "tofu"] }));
+  assert.notEqual(itemKey(item), itemKey({ ...item, ingredientIds: undefined }));
+  assert.notEqual(itemKey({ ...item, ingredientIds: undefined, ingredients: ["a.b", "c"] }), itemKey({ ...item, ingredientIds: undefined, ingredients: ["a", "b.c"] }));
+});
+
+test("custom bowl availability, checkout and order serialization reject missing, empty or duplicate IDs", () => {
+  const { orderItems } = require("../lib/order-client.ts");
+  const catalog = cat(customerSeed());
+  const item = { kind: "custom", name: "나의 볼", ingredients: ["로메인"], allergens: [], dressing: 0, price: 7000, photo: 0, qty: 3 };
+  for (const ingredientIds of [undefined, [], ["romaine", "romaine"]]) {
+    const legacy = { ...item, ingredientIds };
+    assert.equal(catalog.itemAvailable(legacy), false);
+    assert.match(checkoutIssue([legacy], catalog, { address: "", day: "", timeLabel: "", hours: { days: "매일", open: 10, close: 21 } }), /재료를 다시 선택/);
+    assert.throws(() => orderItems([legacy]), /재료를 다시 선택/);
+  }
+  const current = { ...item, ingredientIds: ["romaine"] };
+  assert.equal(catalog.itemAvailable(current), true);
+  assert.deepEqual(orderItems([current])[0].ingredientKeys, ["romaine"]);
+  assert.equal(catalog.itemAvailable({ ...item, ingredientIds: ["removed-ingredient"] }), false);
 });

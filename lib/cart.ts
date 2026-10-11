@@ -5,11 +5,23 @@ export const isCustom = (i: CartItem): i is CustomItem => "kind" in i && i.kind 
 export const isDrink = (i: CartItem): i is DrinkItem => "kind" in i && i.kind === "drink";
 export const isMenu = (i: CartItem): i is MenuItem => !("kind" in i);
 
+/** 예전 이름 기반 저장 항목은 현재 재료를 다시 선택해야 주문할 수 있다. */
+export function hasCustomIngredientIds(item: CustomItem): item is CustomItem & { ingredientIds: string[] } {
+  const ids = item.ingredientIds;
+  return !!ids?.length && ids.every(id => id.length > 0) && new Set(ids).size === ids.length;
+}
+
 /** 같은 상품·옵션이면 같은 값 (목록 key, 수량 합치기에 사용) */
 export function itemKey(i: CartItem): string {
   if (isDrink(i)) return `d:${drinkKey(i)}`;
   if (!isCustom(i) && i.optionSelections) return `m:${i.id}:${selectionKey(i.optionSelections)}`;
-  return isCustom(i) ? `c:${i.name}:${dressingKey(i) ?? ""}:${i.ingredients.join(".")}` : `m:${i.id}:${dressingKey(i) ?? ""}:${[...drinkKeys(i)].sort().join(".")}:${selectionKey(i.optionSelections)}`;
+  if (isCustom(i)) {
+    const ingredients = i.ingredientIds?.length
+      ? ["ids", [...i.ingredientIds].sort()]
+      : ["legacy-names", i.ingredients];
+    return `c:${JSON.stringify([i.name, dressingKey(i) ?? "", ingredients])}`;
+  }
+  return `m:${i.id}:${dressingKey(i) ?? ""}:${[...drinkKeys(i)].sort().join(".")}:${selectionKey(i.optionSelections)}`;
 }
 
 export function selectionKey(selections?:Record<string,string[]>):string {

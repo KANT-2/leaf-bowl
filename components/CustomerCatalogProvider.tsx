@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import type { Snapshot } from "@/lib/admin/catalog";
+import { publicSnapshotSchema, type PublicSnapshot } from "@/lib/customer/snapshot";
 import { customerCatalog, type CustomerCatalog } from "@/lib/customer/catalog";
 const Context = createContext<CustomerCatalog | null>(null);
 export function useCustomerCatalog() {
@@ -23,7 +23,7 @@ export default function CustomerCatalogProvider({
   initial,
   children,
 }: {
-  initial: Snapshot;
+  initial: PublicSnapshot;
   children: React.ReactNode;
 }) {
   const [snapshot, setSnapshot] = useState(initial);
@@ -40,8 +40,7 @@ export default function CustomerCatalogProvider({
           signal: controller.signal,
         });
         if (!response.ok) return;
-        const next: Snapshot = await response.json();
-        if (!next.catalog || !Number.isInteger(next.revision)) return;
+        const next = publicSnapshotSchema.parse(await response.json());
         if (!disposed)
           setSnapshot((current) =>
             next.revision > current.revision || next.defaults?.updatedAt !== current.defaults?.updatedAt ? next : current,

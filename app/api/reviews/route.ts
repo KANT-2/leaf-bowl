@@ -2,11 +2,12 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { publicSnapshot } from "@/lib/customer/catalog";
 import { z } from "zod";
+import { unstable_rethrow } from "next/navigation";
+import { AppError } from "@/modules/shared/errors";
+import { readJsonBody } from "@/modules/shared/http";
 import { appendCustomerReview, dataDirectory } from "@/lib/admin/store";
 import {
   sameOrigin,
-  readLimited,
-  BodyTooLarge,
   jsonError,
 } from "@/lib/admin/server";
 const schema = z.object({
@@ -45,9 +46,7 @@ function decodePhoto(dataUrl: string): [Uint8Array, string] | null {
 export async function POST(request: Request) {
   if (!sameOrigin(request)) return jsonError("허용되지 않은 요청입니다.", 403);
   try {
-    const body = JSON.parse(
-      new TextDecoder().decode(await readLimited(request, 5 * 1024 * 1024)),
-    );
+    const body = await readJsonBody(request, 5 * 1024 * 1024);
     const parsed = schema.safeParse(body);
     if (!parsed.success) return jsonError("리뷰 내용을 확인해주세요.");
     const { photos = [], ...review } = parsed.data;
@@ -82,7 +81,9 @@ export async function POST(request: Request) {
       throw e;
     }
   } catch (e) {
-    if (e instanceof BodyTooLarge) return jsonError("리뷰가 너무 큽니다.", 413);
+    unstable_rethrow(e);
+    if (e instanceof AppError) return jsonError(e.status === 413 ? "리뷰가 너무 큽니다." : e.message, e.status);
+    console.error("[reviews] unexpected error:", e instanceof Error ? (e.stack ?? e.message) : String(e));
     return jsonError("리뷰를 저장하지 못했습니다. 다시 시도해주세요.", 503);
   }
 }

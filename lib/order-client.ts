@@ -1,5 +1,5 @@
 import type { CartItem } from "./storage";
-import { isCustom, isDrink } from "./cart";
+import { hasCustomIngredientIds, isCustom, isDrink } from "./cart";
 import { dressingKey, drinkKey, drinkKeys } from "./cart-identifiers";
 import { deliveryWindowKST } from "./delivery-time";
 import type { OrderRecord } from "./orders";
@@ -8,7 +8,7 @@ export function orderItems(items: CartItem[]) {
   return items.map(item => {
     if (isDrink(item)) return { drinkKeys: [drinkKey(item)], quantity: item.qty };
     if (isCustom(item)) {
-      if (!item.ingredientIds?.length) throw new Error("저장한 조합의 재료를 다시 선택해주세요.");
+      if (!hasCustomIngredientIds(item)) throw new Error("저장한 조합의 재료를 다시 선택해주세요.");
       return { ingredientKeys: item.ingredientIds, dressingKey: dressingKey(item), quantity: item.qty };
     }
     return {

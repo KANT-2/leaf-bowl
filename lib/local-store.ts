@@ -16,14 +16,18 @@ export function createLocalStore<T>(key: string, load: () => T, save: (v: T) => 
   const emit = () => listeners.forEach((l) => l());
 
   const onStorage = (e: StorageEvent) => {
-    if (e.key !== key) return;
+    if (e.key !== key && e.key !== null) return;
     value = load();
     emit();
   };
 
   return {
     subscribe(listener) {
-      if (listeners.size === 0) window.addEventListener("storage", onStorage);
+      if (listeners.size === 0) {
+        window.addEventListener("storage", onStorage);
+        // 구독자가 없던 동안 발생한 다른 탭의 변경도 반영한다.
+        value = load();
+      }
       listeners.add(listener);
       return () => {
         listeners.delete(listener);

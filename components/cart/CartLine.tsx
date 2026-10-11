@@ -1,5 +1,5 @@
 "use client";
-import { isCustom, isDrink } from "@/lib/cart";
+import { hasCustomIngredientIds, isCustom, isDrink } from "@/lib/cart";
 import { drinkKey } from "@/lib/cart-identifiers";
 import {
   choiceSlot,
@@ -140,7 +140,12 @@ export default function CartLine({
           )}
         </>
 
-        {!itemAvailable(item) && (
+        {isCustom(item) && !hasCustomIngredientIds(item) ? (
+          <p className="cart-soldout">
+            저장한 조합의 재료를 다시 선택해주세요.{" "}
+            <Link href="/match" onClick={() => close(false)}>재료 다시 선택</Link>
+          </p>
+        ) : !itemAvailable(item) && (
           <p className="cart-soldout">
             <b>품절</b> 지금은 주문할 수 없는 {isDrink(item) ? "음료" : "구성"}
             이에요
