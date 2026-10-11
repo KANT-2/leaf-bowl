@@ -5,6 +5,7 @@ import { BarChart3, RefreshCw, Trophy, ShoppingBag } from 'lucide-react';
 import { Button } from './button';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from './table';
 import type { SalesProductType, SalesPeriod, SalesReport, SalesRow } from '@/lib/admin/sales';
+import { redirectIfAdminUnauthorized } from "@/lib/admin/session-client";
 import styles from './SalesRanking.module.css';
 
 const periods: { value: SalesPeriod; label: string }[] = [
@@ -40,6 +41,8 @@ export default function SalesRanking() {
       setReport(null);
       try {
         const response = await fetch(`/api/admin/sales?period=${period}&type=${productType}`, { cache: 'no-store', signal: controller.signal });
+        if (controller.signal.aborted) return;
+        redirectIfAdminUnauthorized(response);
         if (!response.ok) throw Error('판매 내역을 불러오지 못했습니다. 다시 시도해주세요.');
         const result: SalesReport = await response.json();
         if (!controller.signal.aborted) setReport(result);

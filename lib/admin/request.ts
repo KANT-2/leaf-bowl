@@ -1,4 +1,5 @@
 import type { Snapshot } from "./catalog";
+import { redirectIfAdminUnauthorized } from "./session-client";
 export async function request<T = Snapshot>(url: string, init?: RequestInit) {
   let response: Response;
   try {
@@ -6,6 +7,7 @@ export async function request<T = Snapshot>(url: string, init?: RequestInit) {
   } catch {
     throw new Error("연결을 확인한 뒤 다시 시도해주세요.");
   }
+  if (!init?.signal?.aborted) redirectIfAdminUnauthorized(response);
   const data: T & { error?: string } = await response.json().catch(() => {
     throw new Error(
       response.status === 413
