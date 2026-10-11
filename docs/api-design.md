@@ -69,11 +69,18 @@
 | 404 | 없는 메뉴, 숨김·삭제된 메뉴, **다른 사람의 주문** (존재 여부도 알려주지 않는다) | `"상품을 찾을 수 없습니다."` |
 | 409 | 충돌: 관리자 저장 `revision` 이 다름, 주문 상태 `version` 이 다름, 같은 재전송 식별키로 다른 내용, 취소할 수 없는 상태 | `"다른 화면에서 데이터가 변경되었습니다. 최신 내용을 불러온 뒤 다시 저장해주세요."` |
 | 413 | 본문이 너무 큼 | `"저장할 데이터가 너무 큽니다."` |
-| 429 | 요청이 너무 많음 (로그인은 접속자·계정 단위, 주문은 세션 단위로 제한) | `"요청이 너무 많습니다. 잠시 후 다시 시도해주세요."` |
-| 503 | 저장소 오류 | `"잠시 후 다시 시도해주세요."` |
+| 429 | 요청이 너무 많음 (로그인은 계정 단위, 세션 발급은 전체 단위, 주문은 세션 단위. 요청자별 제한은 신뢰할 프록시를 설정한 경우에만 적용되며 환경변수 `TRUSTED_PROXY_HOPS` 로 알려 준다) | `"요청이 너무 많습니다. 잠시 후 다시 시도해주세요."` |
+| 503 | 저장소 오류, 또는 비회원 세션이 상한에 도달 | `"잠시 후 다시 시도해주세요."` |
 
-> **설계안이다.** 지금 코드는 에러를 `{ "error": "메시지" }` 로 내려준다 (`lib/admin/server.ts` 의 `jsonError`).
-> 이 포맷으로 정해지면 `jsonError` 한 곳을 `{ status, message }` 로 바꾸고, 화면에서 `error` 필드를 읽는 곳을 함께 고친다.
+**구현 현황**: 오류 모양은 API 묶음별로 다르다(현재 `main` 기준).
+
+| 묶음 | 오류 모양 | 비고 |
+| --- | --- | --- |
+| `/api/v1/*` 주문·인증 (구현됨) | `{ "status": 404, "message": "..." }` | 이 문서의 공통 포맷 (`modules/shared/errors.ts`) |
+| `GET /api/catalog`, `POST /api/reviews`, `/api/admin/catalog`, `/api/admin/images`, `/api/admin/sales`, 이 API 들의 `401`(관리자 로그인 필요) | `{ "error": "..." }` | 기존 화면이 `error` 필드를 읽으므로 **그대로 유지**한다 (`lib/admin/server.ts` 의 `jsonError`) |
+| `/api/products*`, `/api/home`, `PATCH /api/admin/products/{id}` | `{ "message": "..." }` (`status` 필드 없음) | 상품 API 통합(#72)에서 정리될 예정 (`types/api.ts`) |
+
+기존 API 를 `{ status, message }` 로 바꾸려면 `jsonError` 와 화면의 `error` 읽는 곳을 함께 고쳐야 하므로 이 문서에서는 바꾸지 않는다. 화면이 두 형식을 모두 읽는 방법은 별도 합의가 필요하다.
 
 ### 성공 상태 코드
 
@@ -182,7 +189,7 @@
 
 ## 5. API 별 에러 응답 예시
 
-아래는 §1 의 설계 포맷(`status`, `message`)으로 적은 예시다.
+`/api/v1` 의 **주문·인증 API** 예시는 실제 구현의 응답이다. 아직 만들지 않은 고객 조회 경로(`/api/v1/products*` 등)와 `/api/v1/admin/products/{key}` 는 §1 의 설계 포맷(`status`, `message`)으로 적은 예시이고, 기존 `/api/admin/*` 는 실제로 `{ "error": "..." }` 를 내려준다(표에 그대로 적었다).
 
 | 요청 메서드 | 요청 경로 | 요청 예시 | 응답 예시 |
 | --- | --- | --- | --- |
@@ -200,10 +207,13 @@
 | GET | `/api/v1/admin/orders` | `from` 이 `to` 보다 늦음 | `{ "status": 400, "message": "조회 기간을 확인해주세요." }` |
 | GET | `/api/v1/admin/orders/{id}` | 로그인하지 않음 | `{ "status": 401, "message": "로그인이 필요합니다." }` |
 | GET | `/api/v1/admin/orders` | 로그인하지 않음 | `{ "status": 401, "message": "로그인이 필요합니다." }` |
-| PUT | `/api/admin/catalog` | `revision` 이 오래된 값 | `{ "status": 409, "message": "다른 화면에서 데이터가 변경되었습니다. 최신 내용을 불러온 뒤 다시 저장해주세요." }` |
+| PUT | `/api/admin/catalog` | `revision` 이 오래된 값 | `{ "error": "다른 화면에서 데이터가 변경되었습니다. 최신 내용을 불러온 뒤 다시 저장해주세요." }` (`409`) |
 | PATCH | `/api/v1/admin/products/{key}` | `{ "price": -5 }` | `{ "status": 400, "message": "price 는 0 이상이어야 합니다." }` |
 | PATCH | `/api/v1/admin/products/{key}` | 다른 사이트에서 보낸 요청 | `{ "status": 403, "message": "허용되지 않은 요청입니다." }` |
-| POST | `/api/admin/images` | 6MB 파일 | `{ "status": 413, "message": "이미지는 5MB 이하로 올려주세요." }` |
+| POST | `/api/admin/images` | 6MB 파일 | `{ "error": "이미지는 5MB 이하로 올려주세요." }` (`413`) |
+| GET | `/api/admin/catalog` | 관리자 로그인 없음 | `{ "error": "로그인이 필요합니다." }` (`401`) |
+| POST | `/api/v1/session` | 같은 시간에 너무 많은 새 세션 요청 | `{ "status": 429, "message": "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." }` |
+| POST | `/api/v1/session` | 동시에 유효한 비회원 세션이 상한(10,000)에 도달 | `{ "status": 503, "message": "현재 접속이 많아 잠시 후 다시 시도해주세요." }` |
 
 ## 6. 요청 값 예시와 긴 응답 전체 예시
 
@@ -336,5 +346,5 @@
 
 - 2번은 화면(`ReviewsProvider`)의 호출 주소를 바꿔야 하고 리뷰 사진 PR(#28)이 같은 파일을 수정 중이라 **그 PR 머지 후에** 옮긴다.
 - 이 문서의 `ProductSummary` 에는 `type` 이 없다 (경로로 구분하므로). 구현 초안(#39)은 `type` 을 포함하고 `/api/v1` 이 아니므로 설계안 구조(`modules/`)로 다시 만든다.
-- 주문·인증 API(`/api/v1/session`, `auth`, `orders`, `admin/orders`)는 `feat/orders-core` 에서 **메모리 저장소로 먼저 구현**했다. 서버를 다시 시작하면 주문·세션이 사라지며, DB(Prisma)가 준비되면 저장소 계약(`modules/orders/repository.ts`)만 바꿔 끼운다.
+- 주문·인증 API(`/api/v1/session`, `auth`, `orders`, `admin/orders`)는 `feat/orders-core` 에서 **메모리 저장소로 먼저 구현**했다. 서버를 다시 시작하면 주문·세션이 사라진다. DB(Prisma)로 바꿀 때 route·service 의 업무 규칙은 그대로 두지만, 설계안의 트랜잭션(키 확인·가격 계산·저장을 한 트랜잭션에)을 표현하려면 저장소 계약을 바꿔야 한다. 제안은 `docs/db-design.md` 의 "저장소 트랜잭션 계약" 에 있다.
 - 관리자 주문 API 는 임시 계정(환경변수 `ADMIN_LOGIN_ID`, `ADMIN_PASSWORD`)으로 로그인한다. 설정하지 않으면 로그인할 수 없다.

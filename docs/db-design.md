@@ -342,6 +342,75 @@ erDiagram
 
 **한계**: 시험이 연결 1개라 "진짜 동시에 두 명"은 재현하지 못한다. `version` 조건이 0 건이 되어 덮어쓰기를 막는 논리까지만 확인했고, **읽기·쓰기 잠금(`FOR SHARE`/`FOR UPDATE`)은 실제 PostgreSQL 서버에서 따로 확인해야 한다.**
 
+### 세션 정리와 상한
+
+- 만료된 세션은 해당 토큰으로 다시 접근할 때만 지워지면 계속 쌓이므로, 세션을 발급할 때 1분에 한 번 `purgeExpired(now)` 로 쓸어낸다. DB 에서는 `DELETE FROM sessions WHERE expires_at <= $1` 이고 `idx_sessions_expires` 를 쓴다.
+- 비회원 세션은 동시에 유효한 개수에 상한(10,000)을 둔다. 상한에 이르면 새 세션 발급은 503, 이미 가진 세션은 계속 쓸 수 있다. DB 에서는 `SELECT count(*) FROM sessions WHERE kind = 'guest' AND expires_at > $1` 로 센다.
+- 요청 제한기(로그인·세션·주문)는 서버 메모리의 임시 장치다. 서버가 여러 대가 되면 DB 나 Redis 로 옮겨야 한다.
+
+### 저장소 트랜잭션 계약 (제안, 정민님과 합의 필요)
+
+"DB 가 준비되면 `container.ts` 에서 저장소만 바꾸면 된다"는 말은 **route 와 service 의 업무 규칙은 그대로 둔다**는 뜻에서만 맞다. 지금의 저장소 계약(`modules/orders/repository.ts`)은 설계안(`docs/backend-design.md` "주문 API와 트랜잭션 처리")이 요구하는 트랜잭션을 표현하지 못해서, DB 를 붙일 때 **계약 자체를 아래처럼 바꿔야** 한다.
+
+**설계안과 현재 구현의 차이**
+
+| 설계안 | 현재 구현 | 차이 |
+| --- | --- | --- |
+| 기존 키 확인 → 상품 검증·가격 계산 → 주문·항목·이력 저장을 `prisma.$transaction` 한 번에 | `findByRequest`, `getCatalog`, `create` 가 각각 따로 호출된다. `create` 안에서만 주문·항목·접수 이력을 한 번에 저장한다 | 키 확인과 카탈로그 읽기가 저장과 같은 트랜잭션에 묶이지 않는다 |
+| Service 가 연 `tx` 를 모든 Repository 호출에 전달 | `tx` 개념이 계약에 없다 | Repository 가 트랜잭션을 스스로 열면 service 가 앞선 읽기를 포함시킬 수 없다 |
+| 카탈로그 버전 행을 읽기 잠금(`FOR SHARE`), 관리자 저장은 쓰기 잠금(`FOR UPDATE`) | `getCatalog()` 는 파일 저장소를 읽고 잠금이 없다 | 가격 계산 중 관리자가 상품을 바꿔도 막지 못한다 |
+| 상태 변경: 조건부 갱신 + `version + 1` + 이력을 한 트랜잭션에 | `updateStatus` 한 메서드 안에서 처리한다는 주석뿐 | 계약에 "셋이 함께 성공하거나 함께 취소"가 명시되어 있지 않다 |
+
+**실제 PostgreSQL 엔진(PGlite)으로 확인한 동작** (`schema.sql` 의 `orders`, `order_status_history`)
+
+| 시도 | 결과 |
+| --- | --- |
+| 같은 트랜잭션 안에서 `(customer_session_id, request_key)` 중복 INSERT | `23505` 오류. 이 트랜잭션은 **중단 상태**가 되어 이어지는 SELECT 도 `current transaction is aborted` 로 실패한다 |
+| 롤백 후 새 트랜잭션에서 기존 주문 재조회 | 가능 |
+| `SAVEPOINT` 로 INSERT 를 감싸고 오류 시 `ROLLBACK TO SAVEPOINT` | 같은 트랜잭션에서 재조회 가능 |
+| `INSERT ... ON CONFLICT (customer_session_id, request_key) DO NOTHING RETURNING id` | 오류 없이 0행, 같은 트랜잭션에서 재조회 가능 |
+| 상태 `UPDATE` 후 이력 INSERT 가 실패 | 롤백하면 `status`, `version` 이 원래대로 돌아온다 (둘은 한 트랜잭션이어야 한다) |
+
+즉 **P2002 처리는 "트랜잭션을 끝낸 뒤 밖에서 기존 주문을 다시 읽는" 구조여야 한다.** 지금 service 의 `catch (DuplicateRequestError) → findByRequest` 는 이 구조라 그대로 쓸 수 있지만, 그 재조회는 반드시 실패한 트랜잭션 **밖**의 호출이어야 한다.
+
+**제안하는 최소 계약** (코드는 아직 바꾸지 않았다. 합의 후 DB 연결 때 함께 적용)
+
+```ts
+/** 하나의 DB 트랜잭션 안에서만 쓰는 연산. 콜백 밖으로 꺼내 쓰지 않는다 */
+interface OrdersTx {
+  readCatalog(): Promise<Catalog>;                 // 카탈로그 버전 행 FOR SHARE 후 같은 트랜잭션에서 읽기
+  findByRequest(sessionId: string, key: string): Promise<OrderRecord | null>;
+  insertOrder(order: NewOrder): Promise<OrderRecord>;   // 주문 + 항목 + 접수 이력. 키 중복이면 DuplicateRequestError
+  findById(id: string): Promise<OrderRecord | null>;
+  /** id + version + status 조건 갱신, version + 1, 취소 시각·사유, 상태 이력 INSERT 를 모두 이 트랜잭션에서. 조건이 안 맞으면 null */
+  updateStatus(update: StatusUpdate): Promise<OrderRecord | null>;
+}
+
+interface OrdersRepository {
+  /** fn 이 던지면 전체를 롤백하고 그 오류를 다시 던진다. 일시적 충돌(P2034)은 최대 3회 다시 실행한다 */
+  transaction<T>(fn: (tx: OrdersTx) => Promise<T>): Promise<T>;
+  // 트랜잭션이 필요 없는 읽기
+  findByRequest(sessionId: string, key: string): Promise<OrderRecord | null>;
+  findById(id: string): Promise<OrderRecord | null>;
+  list(query: ListQuery): Promise<OrderRecord[]>;
+}
+```
+
+규칙
+
+1. `transaction` 의 콜백은 **다시 실행되어도 안전**해야 한다(P2034 재시도). 콜백 안에서 파일 업로드 같은 외부 호출을 하지 않는다.
+2. 주문 생성은 한 콜백 안에서 `findByRequest → readCatalog → 가격 계산·검증 → insertOrder` 를 한다. `DuplicateRequestError` 는 콜백 밖에서 잡아 `repository.findByRequest` 로 다시 읽고 해시를 비교한다(같으면 기존 주문, 다르면 409).
+3. 상태 변경·취소는 `transaction(tx => tx.updateStatus(...))` 로 한다. 상태·`version`·이력이 한 번에 반영되거나 한 번에 취소된다. 취소가 관리자 변경과 겹쳐 `null` 이면 service 가 최신 상태를 다시 읽어 판단한다(현재 구현 그대로).
+4. 메모리 구현은 같은 계약으로 쓸 수 있다: `transaction` 이 변경을 임시 버퍼에 쓰고 콜백이 성공하면 반영, 실패하면 버린다.
+
+**정민님과 합의할 것**
+
+1. 위 계약의 방향(`transaction` + `OrdersTx`)이 설계안의 의도와 맞는지.
+2. 카탈로그 읽기 잠금을 `OrdersTx.readCatalog()` 로 둘지, `modules/catalog` 가 `tx` 를 받아 읽게 할지 (카탈로그 저장소 통합 담당과 맞춰야 한다).
+3. 격리 수준: 기본(READ COMMITTED) + 조건부 `UPDATE` + 카탈로그 `FOR SHARE` 로 충분한지.
+
+이 절은 **제안**이다. Prisma 저장소 구현이나 `docs/backend-design.md` 의 수정은 포함하지 않는다.
+
 ### 이번에 넣지 않은 것
 
 - 고객 계정(회원): 설계안은 "고객 세션"만 있다. 프론트의 로그인·마이페이지(#55, mock)와 맞추려면 고객 계정 테이블이 필요하며, 범위는 팀 결정을 기다린다.
