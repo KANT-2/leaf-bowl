@@ -1,8 +1,7 @@
 import { type Ingredient } from "@/modules/catalog/schema";
 
 export function matchesIngredient(token: string, ingredient: Ingredient) {
-  const normalize = (value: string) =>
-    value.trim().toLowerCase().replace(/\s+/g, "");
+  const normalize = (value: string) => value.trim().toLowerCase().replace(/\s+/g, "");
   return (
     !ingredient.deleted &&
     [ingredient.name, ingredient.name.trim().split(/\s+/).at(-1) ?? ""].some(
@@ -21,7 +20,9 @@ export function ingredientAllergens(text: string, ingredients: Ingredient[]) {
   const unknown: string[] = [];
   for (const token of tokens) {
     const matches = ingredients.filter((i) => matchesIngredient(token, i));
-    if (!matches.length) unknown.push(token);
+    if (!matches.length) {
+      unknown.push(token);
+    }
     for (const ingredient of matches) {
       ingredient.allergens
         .split(/[,·，、;\n]+/)

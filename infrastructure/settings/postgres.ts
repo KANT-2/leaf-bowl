@@ -1,17 +1,8 @@
 import "server-only";
-import {
-  prisma,
-  type DatabaseTransaction,
-} from "@/infrastructure/database/prisma";
-import {
-  appDefaultsSchema,
-  deliveryHoursSchema,
-  pricingPolicySchema,
-} from "@/modules/settings/schema";
+import { prisma, type DatabaseTransaction } from "@/infrastructure/database/prisma";
+import { appDefaultsSchema, deliveryHoursSchema, pricingPolicySchema } from "@/modules/settings/schema";
 
-export async function readAppDefaults(
-  database: Pick<DatabaseTransaction, "appSetting"> = prisma(),
-) {
+export async function readAppDefaults(database: Pick<DatabaseTransaction, "appSetting"> = prisma()) {
   const rows = await database.appSetting.findMany();
   const values = Object.fromEntries(rows.map((row) => [row.key, row.value]));
   if (
@@ -24,8 +15,9 @@ export async function readAppDefaults(
       "ingredient_emojis",
       "catalog_config",
     ].some((key) => values[key] === undefined)
-  )
+  ) {
     throw new Error("기본 앱 설정이 없습니다. db:seed를 실행해주세요.");
+  }
   return appDefaultsSchema.parse({
     catalogConfig: values.catalog_config,
     heroSlides: values.hero_slides,
@@ -34,9 +26,7 @@ export async function readAppDefaults(
     nutrition: values.nutrition,
     optionKcal: values.option_kcal,
     ingredientEmojis: values.ingredient_emojis,
-    updatedAt: new Date(
-      Math.max(...rows.map((row) => row.updatedAt.getTime())),
-    ).toISOString(),
+    updatedAt: new Date(Math.max(...rows.map((row) => row.updatedAt.getTime()))).toISOString(),
   });
 }
 

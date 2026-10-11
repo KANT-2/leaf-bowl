@@ -3,9 +3,10 @@ import type { DatabaseTransaction } from "@/infrastructure/database/prisma";
 import { catalogSchema, type Catalog } from "@/modules/catalog/schema";
 import type { CatalogState } from "@/modules/catalog/state";
 
-const equal = (a: unknown, b: unknown) =>
-  JSON.stringify(a) === JSON.stringify(b);
+const equal = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
 const byId = (row: { id: string }) => row.id;
+
 const allergens = (text: string) => [
   ...new Set(
     text
@@ -27,10 +28,16 @@ async function syncRows<T>(
 ) {
   const old = new Map(previous.map((row) => [key(row), row]));
   const retained = new Set(next.map(key));
-  for (const row of previous)
-    if (!retained.has(key(row))) await operations.remove?.(row);
-  for (const row of next)
-    if (!equal(old.get(key(row)), row)) await operations.put(row);
+  for (const row of previous) {
+    if (!retained.has(key(row))) {
+      await operations.remove?.(row);
+    }
+  }
+  for (const row of next) {
+    if (!equal(old.get(key(row)), row)) {
+      await operations.put(row);
+    }
+  }
 }
 
 const productRows = (catalog: Catalog) =>
@@ -52,6 +59,7 @@ const productRows = (catalog: Catalog) =>
     allergensText: p.allergens,
     isNew: p.isNew ?? null,
   }));
+
 const ingredientRows = (catalog: Catalog) =>
   (catalog.ingredients ?? []).map((i, sortOrder) => ({
     id: i.id,
@@ -71,6 +79,7 @@ const ingredientRows = (catalog: Catalog) =>
     origin: i.origin ?? null,
     originDetail: i.originDetail ?? null,
   }));
+
 const groupRows = (catalog: Catalog) =>
   catalog.groups.map((g, sortOrder) => ({
     id: g.id,
@@ -81,10 +90,10 @@ const groupRows = (catalog: Catalog) =>
     deleted: g.deleted,
     sortOrder,
   }));
+
 const choiceRows = (catalog: Catalog) =>
-  catalog.groups.flatMap((g) =>
-    g.choices.map((c, sortOrder) => ({ groupId: g.id, ...c, sortOrder })),
-  );
+  catalog.groups.flatMap((g) => g.choices.map((c, sortOrder) => ({ groupId: g.id, ...c, sortOrder })));
+
 const linkRows = (catalog: Catalog) =>
   catalog.products.flatMap((p) =>
     p.optionIds.map((groupId, sortOrder) => ({
@@ -93,12 +102,14 @@ const linkRows = (catalog: Catalog) =>
       sortOrder,
     })),
   );
+
 const pageRows = (catalog: Catalog) =>
   (catalog.content.seasonPages ?? []).map((p, sortOrder) => ({
     ...p,
     productId: p.productId || null,
     sortOrder,
   }));
+
 const contentRow = ({ content: c }: Catalog) => ({
   heroTitle: c.heroTitle,
   heroDescription: c.heroDescription,
@@ -110,11 +121,7 @@ const contentRow = ({ content: c }: Catalog) => ({
 });
 
 /** Requires the exclusive catalog lock; initialization remains in saveCatalogState. */
-export async function saveCatalogChanges(
-  tx: DatabaseTransaction,
-  previous: CatalogState,
-  state: CatalogState,
-) {
+export async function saveCatalogChanges(tx: DatabaseTransaction, previous: CatalogState, state: CatalogState) {
   const old = previous.catalog;
   const next = catalogSchema.parse(state.catalog);
   const at = new Date(state.updatedAt);
@@ -129,8 +136,7 @@ export async function saveCatalogChanges(
       }),
   });
   await syncRows(ingredientRows(old), ingredientRows(next), byId, {
-    put: (row) =>
-      tx.ingredient.upsert({ where: { id: row.id }, create: row, update: row }),
+    put: (row) => tx.ingredient.upsert({ where: { id: row.id }, create: row, update: row }),
   });
   await syncRows(groupRows(old), groupRows(next), byId, {
     put: (row) =>
@@ -140,76 +146,60 @@ export async function saveCatalogChanges(
         update: row,
       }),
   });
-  await syncRows(
-    choiceRows(old),
-    choiceRows(next),
-    (row) => JSON.stringify([row.groupId, row.id]),
-    {
-      remove: (row) =>
-        tx.optionChoice.delete({
-          where: { groupId_id: { groupId: row.groupId, id: row.id } },
-        }),
-      put: (row) =>
-        tx.optionChoice.upsert({
-          where: { groupId_id: { groupId: row.groupId, id: row.id } },
-          create: row,
-          update: row,
-        }),
-    },
-  );
-  await syncRows(
-    linkRows(old),
-    linkRows(next),
-    (row) => JSON.stringify([row.productId, row.groupId]),
-    {
-      remove: (row) =>
-        tx.productOptionGroup.delete({
-          where: {
-            productId_groupId: {
-              productId: row.productId,
-              groupId: row.groupId,
-            },
+  await syncRows(choiceRows(old), choiceRows(next), (row) => JSON.stringify([row.groupId, row.id]), {
+    remove: (row) =>
+      tx.optionChoice.delete({
+        where: { groupId_id: { groupId: row.groupId, id: row.id } },
+      }),
+    put: (row) =>
+      tx.optionChoice.upsert({
+        where: { groupId_id: { groupId: row.groupId, id: row.id } },
+        create: row,
+        update: row,
+      }),
+  });
+  await syncRows(linkRows(old), linkRows(next), (row) => JSON.stringify([row.productId, row.groupId]), {
+    remove: (row) =>
+      tx.productOptionGroup.delete({
+        where: {
+          productId_groupId: {
+            productId: row.productId,
+            groupId: row.groupId,
           },
-        }),
-      put: (row) =>
-        tx.productOptionGroup.upsert({
-          where: {
-            productId_groupId: {
-              productId: row.productId,
-              groupId: row.groupId,
-            },
+        },
+      }),
+    put: (row) =>
+      tx.productOptionGroup.upsert({
+        where: {
+          productId_groupId: {
+            productId: row.productId,
+            groupId: row.groupId,
           },
-          create: row,
-          update: row,
-        }),
-    },
-  );
+        },
+        create: row,
+        update: row,
+      }),
+  });
 
   // Allergen links change only when their source text changes (or an entity is added).
   const changedProducts = next.products.filter(
     (p) => old.products.find((o) => o.id === p.id)?.allergens !== p.allergens,
   );
   const changedIngredients = (next.ingredients ?? []).filter(
-    (i) =>
-      old.ingredients?.find((o) => o.id === i.id)?.allergens !== i.allergens,
+    (i) => old.ingredients?.find((o) => o.id === i.id)?.allergens !== i.allergens,
   );
-  const names = [
-    ...new Set(
-      [...changedProducts, ...changedIngredients].flatMap((row) =>
-        allergens(row.allergens),
-      ),
-    ),
-  ];
-  if (names.length)
+  const names = [...new Set([...changedProducts, ...changedIngredients].flatMap((row) => allergens(row.allergens)))];
+  if (names.length) {
     await tx.allergen.createMany({
       data: names.map((name) => ({ name })),
       skipDuplicates: true,
     });
+  }
   const ids = new Map(
-    (names.length
-      ? await tx.allergen.findMany({ where: { name: { in: names } } })
-      : []
-    ).map((row) => [row.name, row.id]),
+    (names.length ? await tx.allergen.findMany({ where: { name: { in: names } } }) : []).map((row) => [
+      row.name,
+      row.id,
+    ]),
   );
   for (const product of changedProducts) {
     await tx.productAllergen.deleteMany({ where: { productId: product.id } });
@@ -218,7 +208,9 @@ export async function saveCatalogChanges(
       allergenId: ids.get(name)!,
       position,
     }));
-    if (data.length) await tx.productAllergen.createMany({ data });
+    if (data.length) {
+      await tx.productAllergen.createMany({ data });
+    }
   }
   for (const ingredient of changedIngredients) {
     await tx.ingredientAllergen.deleteMany({
@@ -229,19 +221,20 @@ export async function saveCatalogChanges(
       allergenId: ids.get(name)!,
       position,
     }));
-    if (data.length) await tx.ingredientAllergen.createMany({ data });
+    if (data.length) {
+      await tx.ingredientAllergen.createMany({ data });
+    }
   }
 
   await syncReviews(tx, old, next);
   await syncRows(pageRows(old), pageRows(next), byId, {
     remove: (row) => tx.seasonPage.delete({ where: { id: row.id } }),
-    put: (row) =>
-      tx.seasonPage.upsert({ where: { id: row.id }, create: row, update: row }),
+    put: (row) => tx.seasonPage.upsert({ where: { id: row.id }, create: row, update: row }),
   });
-  if (!equal(contentRow(old), contentRow(next)))
+  if (!equal(contentRow(old), contentRow(next))) {
     await tx.siteContent.update({ where: { id: 1 }, data: contentRow(next) });
-  const categories = (catalog: Catalog) =>
-    (catalog.categories ?? []).map((name, sortOrder) => ({ name, sortOrder }));
+  }
+  const categories = (catalog: Catalog) => (catalog.categories ?? []).map((name, sortOrder) => ({ name, sortOrder }));
   await syncRows(categories(old), categories(next), (row) => row.name, {
     remove: (row) => tx.category.delete({ where: { name: row.name } }),
     put: (row) =>
@@ -252,39 +245,39 @@ export async function saveCatalogChanges(
       }),
   });
   if (!equal(old.location, next.location)) {
-    if (next.location)
+    if (next.location) {
       await tx.storeLocation.upsert({
         where: { id: 1 },
         create: { id: 1, ...next.location },
         update: next.location,
       });
-    else await tx.storeLocation.deleteMany({ where: { id: 1 } });
+    } else {
+      await tx.storeLocation.deleteMany({ where: { id: 1 } });
+    }
   }
-  const removedProducts = old.products
-    .filter((p) => !next.products.some((n) => n.id === p.id))
-    .map((p) => p.id);
+  const removedProducts = old.products.filter((p) => !next.products.some((n) => n.id === p.id)).map((p) => p.id);
   const removedIngredients = (old.ingredients ?? [])
     .filter((i) => !next.ingredients?.some((n) => n.id === i.id))
     .map((i) => i.id);
-  const removedGroups = old.groups
-    .filter((g) => !next.groups.some((n) => n.id === g.id))
-    .map((g) => g.id);
-  if (removedProducts.length)
+  const removedGroups = old.groups.filter((g) => !next.groups.some((n) => n.id === g.id)).map((g) => g.id);
+  if (removedProducts.length) {
     await tx.product.deleteMany({ where: { id: { in: removedProducts } } });
-  if (removedIngredients.length)
+  }
+  if (removedIngredients.length) {
     await tx.ingredient.deleteMany({
       where: { id: { in: removedIngredients } },
     });
-  if (removedGroups.length)
+  }
+  if (removedGroups.length) {
     await tx.optionGroup.deleteMany({ where: { id: { in: removedGroups } } });
-  const removedReviews = state.deletedReviewIds.filter(
-    (id) => !previous.deletedReviewIds.includes(id),
-  );
-  if (removedReviews.length)
+  }
+  const removedReviews = state.deletedReviewIds.filter((id) => !previous.deletedReviewIds.includes(id));
+  if (removedReviews.length) {
     await tx.deletedReviewId.createMany({
       data: removedReviews.map((id) => ({ id })),
       skipDuplicates: true,
     });
+  }
   await tx.catalogMeta.update({
     where: { id: 1 },
     data: {
@@ -296,22 +289,15 @@ export async function saveCatalogChanges(
   });
 }
 
-async function syncReviews(
-  tx: DatabaseTransaction,
-  old: Catalog,
-  next: Catalog,
-) {
+async function syncReviews(tx: DatabaseTransaction, old: Catalog, next: Catalog) {
   const previous = old.reviews ?? [];
   const incoming = next.reviews ?? [];
   const stored = new Map(
-    (await tx.review.findMany({ select: { id: true, sortOrder: true } })).map(
-      (row) => [row.id, row.sortOrder],
-    ),
+    (await tx.review.findMany({ select: { id: true, sortOrder: true } })).map((row) => [row.id, row.sortOrder]),
   );
   const added = incoming.length - previous.length;
   // Prepending customer reviews preserves every existing row's position and contents.
-  const prepended =
-    added >= 0 && previous.every((r, i) => incoming[i + added]?.id === r.id);
+  const prepended = added >= 0 && previous.every((r, i) => incoming[i + added]?.id === r.id);
   const first = Math.min(0, ...stored.values());
   const rows = (catalog: Catalog, current: boolean) => {
     const products = new Set(catalog.products.map((p) => p.id));
@@ -329,17 +315,12 @@ async function syncReviews(
       createdAt: r.createdAt ? new Date(r.createdAt) : null,
       deleted: r.deleted,
       via: r.via ?? null,
-      sortOrder: current
-        ? stored.get(r.id)!
-        : prepended
-          ? (stored.get(r.id) ?? first - added + i)
-          : i,
+      sortOrder: current ? stored.get(r.id)! : prepended ? (stored.get(r.id) ?? first - added + i) : i,
     }));
   };
   await syncRows(rows(old, true), rows(next, false), byId, {
     remove: (row) => tx.review.delete({ where: { id: row.id } }),
-    put: (row) =>
-      tx.review.upsert({ where: { id: row.id }, create: row, update: row }),
+    put: (row) => tx.review.upsert({ where: { id: row.id }, create: row, update: row }),
   });
   // Cascades already removed the children of deleted reviews.
   const retained = new Set(incoming.map((r) => r.id));
@@ -353,6 +334,7 @@ async function syncReviews(
           image,
         })),
       );
+
   const drinks = (catalog: Catalog) =>
     (catalog.reviews ?? [])
       .filter((r) => retained.has(r.id))
@@ -363,58 +345,48 @@ async function syncReviews(
           name,
         })),
       );
-  await syncRows(
-    images(old),
-    images(next),
-    (row) => JSON.stringify([row.reviewId, row.position]),
-    {
-      remove: (row) =>
-        tx.reviewImage.delete({
-          where: {
-            reviewId_position: {
-              reviewId: row.reviewId,
-              position: row.position,
-            },
+  await syncRows(images(old), images(next), (row) => JSON.stringify([row.reviewId, row.position]), {
+    remove: (row) =>
+      tx.reviewImage.delete({
+        where: {
+          reviewId_position: {
+            reviewId: row.reviewId,
+            position: row.position,
           },
-        }),
-      put: (row) =>
-        tx.reviewImage.upsert({
-          where: {
-            reviewId_position: {
-              reviewId: row.reviewId,
-              position: row.position,
-            },
+        },
+      }),
+    put: (row) =>
+      tx.reviewImage.upsert({
+        where: {
+          reviewId_position: {
+            reviewId: row.reviewId,
+            position: row.position,
           },
-          create: row,
-          update: row,
-        }),
-    },
-  );
-  await syncRows(
-    drinks(old),
-    drinks(next),
-    (row) => JSON.stringify([row.reviewId, row.position]),
-    {
-      remove: (row) =>
-        tx.reviewDrink.delete({
-          where: {
-            reviewId_position: {
-              reviewId: row.reviewId,
-              position: row.position,
-            },
+        },
+        create: row,
+        update: row,
+      }),
+  });
+  await syncRows(drinks(old), drinks(next), (row) => JSON.stringify([row.reviewId, row.position]), {
+    remove: (row) =>
+      tx.reviewDrink.delete({
+        where: {
+          reviewId_position: {
+            reviewId: row.reviewId,
+            position: row.position,
           },
-        }),
-      put: (row) =>
-        tx.reviewDrink.upsert({
-          where: {
-            reviewId_position: {
-              reviewId: row.reviewId,
-              position: row.position,
-            },
+        },
+      }),
+    put: (row) =>
+      tx.reviewDrink.upsert({
+        where: {
+          reviewId_position: {
+            reviewId: row.reviewId,
+            position: row.position,
           },
-          create: row,
-          update: row,
-        }),
-    },
-  );
+        },
+        create: row,
+        update: row,
+      }),
+  });
 }

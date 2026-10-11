@@ -12,7 +12,9 @@ export async function GET(request: Request) {
     const params = new URL(request.url).searchParams;
     const query = parseOrThrow(
       adminOrderListQuerySchema,
-      Object.fromEntries(["status", "from", "to", "limit", "cursor"].flatMap((k) => (params.has(k) ? [[k, params.get(k)]] : []))),
+      Object.fromEntries(
+        ["status", "from", "to", "limit", "cursor"].flatMap((k) => (params.has(k) ? [[k, params.get(k)]] : [])),
+      ),
       "조회 조건을 확인해주세요.",
     );
     const { items, nextCursor } = await orders.listOrders(query);

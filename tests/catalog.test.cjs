@@ -5,14 +5,11 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 require("./register-typescript.cjs");
-const {
-  customerSeed,
-  migrateCatalog,
-} = require("../seed/legacy/catalog.ts");
+const { customerSeed, migrateCatalog } = require("../seed/legacy/catalog.ts");
 const { catalogSchema } = require("../modules/catalog/schema.ts");
 const { customerCatalog: projectCustomerCatalog } = require("../modules/catalog/customer-view.ts");
-    const { withDefaults } = require("./fixtures/settings.cjs");
-    const customerCatalog = value => projectCustomerCatalog(withDefaults(value));
+const { withDefaults } = require("./fixtures/settings.cjs");
+const customerCatalog = (value) => projectCustomerCatalog(withDefaults(value));
 const { PRODUCTS } = require("../seed/legacy/products.ts");
 const snapshot = (catalog) => ({
   catalog,
@@ -33,7 +30,11 @@ test("public snapshot validates redacted slots separately from writable admin ca
   assert.equal(customerCatalog(data).getProduct(1), undefined);
   data.catalog.products[0].name = "";
   assert.equal(publicSnapshotSchema.safeParse(data).success, false);
-  assert.equal(publicSnapshotSchema.safeParse(snapshot(seed)).success, false, "hidden content cannot pass the public response contract");
+  assert.equal(
+    publicSnapshotSchema.safeParse(snapshot(seed)).success,
+    false,
+    "hidden content cannot pass the public response contract",
+  );
 });
 test("customer data seeds valid admin data without changing product URLs", () => {
   const seed = customerSeed();
@@ -73,10 +74,7 @@ test("edits, visibility, new stable IDs, options and cart prices share one snaps
   const next = migrated.products.at(-1);
   assert.equal(next.customerId, 12);
   assert.equal(migrateCatalog(migrated).products.at(-1).customerId, 12);
-  assert.equal(
-    data.itemAvailable({ id: 0, dressing: 0, drinks: [], qty: 1 }),
-    false,
-  );
+  assert.equal(data.itemAvailable({ id: 0, dressing: 0, drinks: [], qty: 1 }), false);
   migrated.products[0].status = "active";
   migrated.products.find((p) => p.id === "drink-0").price = 5000;
   let latest = customerCatalog(snapshot(migrated));
@@ -97,11 +95,7 @@ test("persistent edits survive restart; revision conflicts and review moderation
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "front5-catalog-"));
   process.env.ADMIN_DATA_DIR = directory;
   try {
-    const {
-      readCatalog,
-      writeCatalog,
-      appendCustomerReview,
-    } = require("../tests/fixtures/file-catalog.ts");
+    const { readCatalog, writeCatalog, appendCustomerReview } = require("../tests/fixtures/file-catalog.ts");
     const initial = await readCatalog();
     initial.catalog.products[0].price = 16000;
     const saved = await writeCatalog(initial.catalog, initial.revision);
@@ -117,17 +111,21 @@ test("persistent edits survive restart; revision conflicts and review moderation
       text: "고객과 관리자 화면에서 함께 확인할 리뷰입니다.",
       via: "delivery",
     });
-    assert.ok(
-      customerCatalog(reviewed).reviews.some((r) => r.id === "test-review"),
-    );
+    assert.ok(customerCatalog(reviewed).reviews.some((r) => r.id === "test-review"));
     reviewed.catalog.reviews.find((r) => r.id === "test-review").deleted = true;
     const moderated = await writeCatalog(reviewed.catalog, reviewed.revision);
-    assert.ok(
-      !customerCatalog(moderated).reviews.some((r) => r.id === "test-review"),
-    );
-    const replay=await appendCustomerReview({id:'test-review',pid:0,author:'고객',stars:5,title:'좋은 메뉴',text:'이관 과정에서 삭제한 리뷰가 다시 등록되지 않아야 합니다.',via:'delivery'});
-    assert.equal(replay.revision,moderated.revision);
-    assert.ok(!customerCatalog(replay).reviews.some(r=>r.id==='test-review'));
+    assert.ok(!customerCatalog(moderated).reviews.some((r) => r.id === "test-review"));
+    const replay = await appendCustomerReview({
+      id: "test-review",
+      pid: 0,
+      author: "고객",
+      stars: 5,
+      title: "좋은 메뉴",
+      text: "이관 과정에서 삭제한 리뷰가 다시 등록되지 않아야 합니다.",
+      via: "delivery",
+    });
+    assert.equal(replay.revision, moderated.revision);
+    assert.ok(!customerCatalog(replay).reviews.some((r) => r.id === "test-review"));
     const old = {
       catalog: customerSeed(),
       revision: 8,
@@ -178,9 +176,7 @@ test("custom options, new-item cart persistence and public visibility are consis
   const { publicSnapshot } = require("../modules/catalog/public-snapshot.ts");
   const publicData = publicSnapshot(snapshot(seed));
   assert.equal(publicData.catalog.products[1].name, "");
-  assert.ok(
-    !publicData.catalog.reviews.some((r) => r.id === seed.reviews[0].id),
-  );
+  assert.ok(!publicData.catalog.reviews.some((r) => r.id === seed.reviews[0].id));
   const storage = require("../infrastructure/browser/cart-storage.ts");
   const memory = new Map();
   global.localStorage = {
@@ -204,115 +200,204 @@ test("permanently removed product IDs are not reused after a review write", asyn
   try {
     const { readCatalog, writeCatalog, appendCustomerReview } = require("../tests/fixtures/file-catalog.ts");
     let state = await readCatalog();
-    const prototype = state.catalog.products.find(p=>p.type==="salad");
-    state = await writeCatalog({...state.catalog,products:[...state.catalog.products,{...prototype,id:"new-first"}]},state.revision);
-    const firstId = state.catalog.products.find(p=>p.id==="new-first").customerId;
-    state = await writeCatalog({...state.catalog,products:state.catalog.products.filter(p=>p.id!=="new-first")},state.revision);
-    state = await appendCustomerReview({id:"purge-regression",pid:0,author:"고객",stars:5,title:"저장 확인",text:"영구 삭제 이후 상품 번호가 유지되는지 확인합니다.",via:"delivery"});
+    const prototype = state.catalog.products.find((p) => p.type === "salad");
+    state = await writeCatalog(
+      { ...state.catalog, products: [...state.catalog.products, { ...prototype, id: "new-first" }] },
+      state.revision,
+    );
+    const firstId = state.catalog.products.find((p) => p.id === "new-first").customerId;
+    state = await writeCatalog(
+      { ...state.catalog, products: state.catalog.products.filter((p) => p.id !== "new-first") },
+      state.revision,
+    );
+    state = await appendCustomerReview({
+      id: "purge-regression",
+      pid: 0,
+      author: "고객",
+      stars: 5,
+      title: "저장 확인",
+      text: "영구 삭제 이후 상품 번호가 유지되는지 확인합니다.",
+      via: "delivery",
+    });
     state = await readCatalog();
-    state = await writeCatalog({...state.catalog,products:[...state.catalog.products,{...prototype,id:"new-second"}]},state.revision);
-    assert.ok(state.catalog.products.find(p=>p.id==="new-second").customerId > firstId);
+    state = await writeCatalog(
+      { ...state.catalog, products: [...state.catalog.products, { ...prototype, id: "new-second" }] },
+      state.revision,
+    );
+    assert.ok(state.catalog.products.find((p) => p.id === "new-second").customerId > firstId);
   } finally {
-    if(previous===undefined)delete process.env.ADMIN_DATA_DIR;else process.env.ADMIN_DATA_DIR=previous;
-    fs.rmSync(directory,{recursive:true,force:true});
+    if (previous === undefined) {
+      delete process.env.ADMIN_DATA_DIR;
+    } else {
+      process.env.ADMIN_DATA_DIR = previous;
+    }
+    fs.rmSync(directory, { recursive: true, force: true });
   }
 });
 
-test('allergen suggestions use registered ingredients and flag unknown names',()=>{
- const {ingredientAllergens}=require('../modules/catalog/allergens.ts');
- const ingredients=[{name:'탱글한 새우',allergens:'새우',deleted:false},{name:'방울토마토',allergens:'토마토, 새우',deleted:false},{name:'우유',allergens:'우유',deleted:true}];
- assert.deepEqual(ingredientAllergens('새우 · 방울토마토, 새우\n미등록 재료',ingredients),{allergens:'새우, 토마토',unknown:['미등록 재료']});
- assert.deepEqual(ingredientAllergens('우유',ingredients),{allergens:'',unknown:['우유']});
- assert.deepEqual(ingredientAllergens('',ingredients),{allergens:'',unknown:[]});
+test("allergen suggestions use registered ingredients and flag unknown names", () => {
+  const { ingredientAllergens } = require("../modules/catalog/allergens.ts");
+  const ingredients = [
+    { name: "탱글한 새우", allergens: "새우", deleted: false },
+    { name: "방울토마토", allergens: "토마토, 새우", deleted: false },
+    { name: "우유", allergens: "우유", deleted: true },
+  ];
+  assert.deepEqual(ingredientAllergens("새우 · 방울토마토, 새우\n미등록 재료", ingredients), {
+    allergens: "새우, 토마토",
+    unknown: ["미등록 재료"],
+  });
+  assert.deepEqual(ingredientAllergens("우유", ingredients), { allergens: "", unknown: ["우유"] });
+  assert.deepEqual(ingredientAllergens("", ingredients), { allergens: "", unknown: [] });
 });
 
-test('origin details survive catalog validation and persistent storage',async()=>{
- const directory=fs.mkdtempSync(path.join(os.tmpdir(),'front5-origins-'));
- const previous=process.env.ADMIN_DATA_DIR;process.env.ADMIN_DATA_DIR=directory;
- try{
-  const {catalogSchema}=require('../modules/catalog/schema.ts');
-  const {readCatalog,writeCatalog}=require('../tests/fixtures/file-catalog.ts');
-  let state=await readCatalog();
-  const ingredients=state.catalog.ingredients.map((i,index)=>index===0?{...i,origin:'국내산',originDetail:'충청남도',allergens:'대두, 우유'}:i);
-  const validated=catalogSchema.parse({...state.catalog,ingredients});
-  await writeCatalog(validated,state.revision);state=await readCatalog();
-  assert.equal(state.catalog.ingredients[0].origin,'국내산');
-  assert.equal(state.catalog.ingredients[0].originDetail,'충청남도');
-  assert.equal(state.catalog.ingredients[0].allergens,'대두, 우유');
- }finally{if(previous===undefined)delete process.env.ADMIN_DATA_DIR;else process.env.ADMIN_DATA_DIR=previous;fs.rmSync(directory,{recursive:true,force:true});}
-});
-
-test('permanently deleted reviews stay removed after reload and later saves', async () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'front5-review-purge-'));
+test("origin details survive catalog validation and persistent storage", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "front5-origins-"));
   const previous = process.env.ADMIN_DATA_DIR;
   process.env.ADMIN_DATA_DIR = directory;
   try {
-    const { readCatalog, writeCatalog } = require('../tests/fixtures/file-catalog.ts');
+    const { catalogSchema } = require("../modules/catalog/schema.ts");
+    const { readCatalog, writeCatalog } = require("../tests/fixtures/file-catalog.ts");
+    let state = await readCatalog();
+    const ingredients = state.catalog.ingredients.map((i, index) =>
+      index === 0 ? { ...i, origin: "국내산", originDetail: "충청남도", allergens: "대두, 우유" } : i,
+    );
+    const validated = catalogSchema.parse({ ...state.catalog, ingredients });
+    await writeCatalog(validated, state.revision);
+    state = await readCatalog();
+    assert.equal(state.catalog.ingredients[0].origin, "국내산");
+    assert.equal(state.catalog.ingredients[0].originDetail, "충청남도");
+    assert.equal(state.catalog.ingredients[0].allergens, "대두, 우유");
+  } finally {
+    if (previous === undefined) {
+      delete process.env.ADMIN_DATA_DIR;
+    } else {
+      process.env.ADMIN_DATA_DIR = previous;
+    }
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("permanently deleted reviews stay removed after reload and later saves", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "front5-review-purge-"));
+  const previous = process.env.ADMIN_DATA_DIR;
+  process.env.ADMIN_DATA_DIR = directory;
+  try {
+    const { readCatalog, writeCatalog } = require("../tests/fixtures/file-catalog.ts");
     let state = await readCatalog();
     const target = state.catalog.reviews[0];
-    const otherIds = state.catalog.reviews.slice(1).map(r => r.id);
-    state = await writeCatalog({ ...state.catalog, reviews: state.catalog.reviews.map(r => r.id === target.id ? { ...r, deleted: true } : r) }, state.revision);
-    state = await writeCatalog({ ...state.catalog, reviews: state.catalog.reviews.filter(r => r.id !== target.id) }, state.revision);
+    const otherIds = state.catalog.reviews.slice(1).map((r) => r.id);
+    state = await writeCatalog(
+      {
+        ...state.catalog,
+        reviews: state.catalog.reviews.map((r) => (r.id === target.id ? { ...r, deleted: true } : r)),
+      },
+      state.revision,
+    );
+    state = await writeCatalog(
+      { ...state.catalog, reviews: state.catalog.reviews.filter((r) => r.id !== target.id) },
+      state.revision,
+    );
     state = await readCatalog();
-    assert.ok(!state.catalog.reviews.some(r => r.id === target.id));
-    assert.deepEqual(state.catalog.reviews.map(r => r.id), otherIds);
+    assert.ok(!state.catalog.reviews.some((r) => r.id === target.id));
+    assert.deepEqual(
+      state.catalog.reviews.map((r) => r.id),
+      otherIds,
+    );
     state = await writeCatalog(state.catalog, state.revision);
-    assert.ok(!(await readCatalog()).catalog.reviews.some(r => r.id === target.id));
+    assert.ok(!(await readCatalog()).catalog.reviews.some((r) => r.id === target.id));
     state = await writeCatalog({ ...state.catalog, reviews: [] }, state.revision);
     assert.deepEqual((await readCatalog()).catalog.reviews, []);
   } finally {
-    if (previous === undefined) delete process.env.ADMIN_DATA_DIR;
-    else process.env.ADMIN_DATA_DIR = previous;
+    if (previous === undefined) {
+      delete process.env.ADMIN_DATA_DIR;
+    } else {
+      process.env.ADMIN_DATA_DIR = previous;
+    }
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
 
-test('purged review retries cannot restore content and deletion IDs remain internal', async () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'front5-review-retry-'));
+test("purged review retries cannot restore content and deletion IDs remain internal", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "front5-review-retry-"));
   const previous = process.env.ADMIN_DATA_DIR;
   process.env.ADMIN_DATA_DIR = directory;
   try {
-    const { readCatalog, writeCatalog, appendCustomerReview } = require('../tests/fixtures/file-catalog.ts');
-    const payload = { id: 'purged-retry', pid: 0, author: '검증', stars: 5, title: '삭제 대상', text: '삭제할 본문', via: 'delivery' };
+    const { readCatalog, writeCatalog, appendCustomerReview } = require("../tests/fixtures/file-catalog.ts");
+    const payload = {
+      id: "purged-retry",
+      pid: 0,
+      author: "검증",
+      stars: 5,
+      title: "삭제 대상",
+      text: "삭제할 본문",
+      via: "delivery",
+    };
     let state = await appendCustomerReview(payload);
-    const removedReview = state.catalog.reviews.find(r => r.id === payload.id);
-    state = await writeCatalog({ ...state.catalog, reviews: state.catalog.reviews.filter(r => r.id !== payload.id) }, state.revision);
+    const removedReview = state.catalog.reviews.find((r) => r.id === payload.id);
+    state = await writeCatalog(
+      { ...state.catalog, reviews: state.catalog.reviews.filter((r) => r.id !== payload.id) },
+      state.revision,
+    );
     const revision = state.revision;
     state = await appendCustomerReview(payload);
     assert.equal(state.revision, revision);
-    assert.ok(!state.catalog.reviews.some(r => r.id === payload.id));
-    assert.ok(!('deletedReviewIds' in state));
-    state = await appendCustomerReview({ ...payload, id: 'fresh-review' });
-    assert.ok(state.catalog.reviews.some(r => r.id === 'fresh-review'));
-    state = await writeCatalog({ ...state.catalog, reviews: [...state.catalog.reviews, removedReview] }, state.revision);
-    assert.ok(!state.catalog.reviews.some(r => r.id === payload.id));
+    assert.ok(!state.catalog.reviews.some((r) => r.id === payload.id));
+    assert.ok(!("deletedReviewIds" in state));
+    state = await appendCustomerReview({ ...payload, id: "fresh-review" });
+    assert.ok(state.catalog.reviews.some((r) => r.id === "fresh-review"));
+    state = await writeCatalog(
+      { ...state.catalog, reviews: [...state.catalog.reviews, removedReview] },
+      state.revision,
+    );
+    assert.ok(!state.catalog.reviews.some((r) => r.id === payload.id));
     const { reviews: omittedReviews, ...withoutReviews } = state.catalog;
     assert.ok(omittedReviews.length);
     state = await writeCatalog(withoutReviews, state.revision);
-    assert.ok(state.catalog.reviews.some(r => r.id === 'fresh-review'));
+    assert.ok(state.catalog.reviews.some((r) => r.id === "fresh-review"));
     state = await readCatalog();
-    assert.ok(!('deletedReviewIds' in state));
-    const disk = JSON.parse(fs.readFileSync(path.join(directory, 'catalog.json'), 'utf8'));
+    assert.ok(!("deletedReviewIds" in state));
+    const disk = JSON.parse(fs.readFileSync(path.join(directory, "catalog.json"), "utf8"));
     assert.ok(disk.deletedReviewIds.includes(payload.id));
-    assert.ok(!disk.catalog.reviews.some(r => r.id === payload.id));
+    assert.ok(!disk.catalog.reviews.some((r) => r.id === payload.id));
     state = await appendCustomerReview(payload);
-    assert.ok(!state.catalog.reviews.some(r => r.id === payload.id));
-    state = await writeCatalog({ ...state.catalog, reviews: state.catalog.reviews.map(r => r.id === 'fresh-review' ? { ...r, deleted: true } : r) }, state.revision);
-    state = await writeCatalog({ ...state.catalog, reviews: state.catalog.reviews.map(r => r.id === 'fresh-review' ? { ...r, deleted: false } : r) }, state.revision);
-    assert.equal(state.catalog.reviews.find(r => r.id === 'fresh-review').deleted, false);
+    assert.ok(!state.catalog.reviews.some((r) => r.id === payload.id));
+    state = await writeCatalog(
+      {
+        ...state.catalog,
+        reviews: state.catalog.reviews.map((r) => (r.id === "fresh-review" ? { ...r, deleted: true } : r)),
+      },
+      state.revision,
+    );
+    state = await writeCatalog(
+      {
+        ...state.catalog,
+        reviews: state.catalog.reviews.map((r) => (r.id === "fresh-review" ? { ...r, deleted: false } : r)),
+      },
+      state.revision,
+    );
+    assert.equal(state.catalog.reviews.find((r) => r.id === "fresh-review").deleted, false);
   } finally {
-    if (previous === undefined) delete process.env.ADMIN_DATA_DIR;
-    else process.env.ADMIN_DATA_DIR = previous;
+    if (previous === undefined) {
+      delete process.env.ADMIN_DATA_DIR;
+    } else {
+      process.env.ADMIN_DATA_DIR = previous;
+    }
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
-
 
 test("review retries keep an ID and duplicated/deleted requests leave no orphan photos", async () => {
   const { createReviewSubmission } = require("../features/reviews/submission.ts");
   const submit = createReviewSubmission();
-  const draft = { pid: 0, author: "익명", stars: 5, title: "맛있어요", text: "아주 신선하고 맛있어요.", via: "delivery" };
-  const photo = "data:image/png;base64," + Buffer.from([137,80,78,71,13,10,26,10,1]).toString("base64");
+  const draft = {
+    pid: 0,
+    author: "익명",
+    stars: 5,
+    title: "맛있어요",
+    text: "아주 신선하고 맛있어요.",
+    via: "delivery",
+  };
+  const photo = "data:image/png;base64," + Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 1]).toString("base64");
   const first = submit(draft, [photo]);
   assert.equal(submit(draft, [photo]).id, first.id);
   assert.notEqual(submit({ ...draft, text: "수정한 새로운 리뷰 내용입니다." }, [photo]).id, first.id);
@@ -324,14 +409,22 @@ test("review retries keep an ID and duplicated/deleted requests leave no orphan 
   const fileStore = require("./fixtures/file-catalog.ts");
   Object.assign(store, fileStore, {
     readCatalog: async () => withDefaults(await fileStore.readCatalog()),
-    appendCustomerReview: async input => withDefaults(await fileStore.appendCustomerReview(input)),
+    appendCustomerReview: async (input) => withDefaults(await fileStore.appendCustomerReview(input)),
   });
   try {
     const { POST } = require("../app/api/reviews/route.ts");
     const { readCatalog, writeCatalog } = require("../tests/fixtures/file-catalog.ts");
-    const request = () => new Request("http://localhost/api/reviews", { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost" }, body: JSON.stringify({ ...first, photos: [photo] }) });
+    const request = () =>
+      new Request("http://localhost/api/reviews", {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: "http://localhost" },
+        body: JSON.stringify({ ...first, photos: [photo] }),
+      });
     const results = await Promise.all([POST(request()), POST(request())]);
-    assert.deepEqual(results.map((r) => r.status), [200, 200]);
+    assert.deepEqual(
+      results.map((r) => r.status),
+      [200, 200],
+    );
     let state = await readCatalog();
     assert.equal(state.catalog.reviews.filter((r) => r.id === first.id).length, 1);
     assert.equal(fs.readdirSync(path.join(directory, "images")).length, 1);
@@ -342,8 +435,11 @@ test("review retries keep an ID and duplicated/deleted requests leave no orphan 
     assert.deepEqual(fs.readdirSync(path.join(directory, "images")), existingImages);
   } finally {
     Object.assign(store, originalStore);
-    if (oldDirectory === undefined) delete process.env.ADMIN_DATA_DIR;
-    else process.env.ADMIN_DATA_DIR = oldDirectory;
+    if (oldDirectory === undefined) {
+      delete process.env.ADMIN_DATA_DIR;
+    } else {
+      process.env.ADMIN_DATA_DIR = oldDirectory;
+    }
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
@@ -353,13 +449,25 @@ test("local review migration retries failures, acknowledges success and cancels 
   const migrated = new Set();
   let sends = 0;
   let refreshes = 0;
-  const cancel = startReviewMigration([{ id: "local" }], migrated, async () => ++sends > 1, () => refreshes++);
+  const cancel = startReviewMigration(
+    [{ id: "local" }],
+    migrated,
+    async () => ++sends > 1,
+    () => refreshes++,
+  );
   await new Promise((resolve) => setTimeout(resolve, 1200));
   cancel();
   assert.equal(sends, 2);
   assert.ok(migrated.has("local"));
   assert.equal(refreshes, 1);
-  const cancelFailure = startReviewMigration([{ id: "offline" }], migrated, async () => { throw Error("offline"); }, () => assert.fail("failed migration refreshed"));
+  const cancelFailure = startReviewMigration(
+    [{ id: "offline" }],
+    migrated,
+    async () => {
+      throw Error("offline");
+    },
+    () => assert.fail("failed migration refreshed"),
+  );
   await new Promise((resolve) => setImmediate(resolve));
   cancelFailure();
   assert.ok(!migrated.has("offline"));

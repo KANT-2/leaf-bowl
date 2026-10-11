@@ -1,27 +1,10 @@
 import "server-only";
-import {
-  readDeliveryHours,
-  readPricingPolicy,
-} from "@/infrastructure/settings/postgres";
+import { readDeliveryHours, readPricingPolicy } from "@/infrastructure/settings/postgres";
 import { Prisma, type PrismaClient } from "@/generated/prisma/client";
-import {
-  databaseTransaction,
-  type DatabaseTransaction,
-} from "@/infrastructure/database/prisma";
-import {
-  lockCatalog,
-  readCatalogState,
-} from "@/infrastructure/catalog/postgres";
-import {
-  DuplicateRequestError,
-  type OrdersRepository,
-} from "@/modules/orders/repository";
-import type {
-  ListQuery,
-  NewOrder,
-  OrderRecord,
-  StatusUpdate,
-} from "@/modules/orders/types";
+import { databaseTransaction, type DatabaseTransaction } from "@/infrastructure/database/prisma";
+import { lockCatalog, readCatalogState } from "@/infrastructure/catalog/postgres";
+import { DuplicateRequestError, type OrdersRepository } from "@/modules/orders/repository";
+import type { ListQuery, NewOrder, OrderRecord, StatusUpdate } from "@/modules/orders/types";
 
 const include = {
   items: { orderBy: [{ position: "asc" }, { id: "asc" }] },
@@ -35,11 +18,9 @@ function record(row: StoredOrder): OrderRecord {
     status: row.status as OrderRecord["status"],
     items: row.items.map((item) => ({
       productId: item.originalProductId ?? item.productId,
-      productType:
-        item.productType as OrderRecord["items"][number]["productType"],
+      productType: item.productType as OrderRecord["items"][number]["productType"],
       name: item.name,
-      options:
-        item.options as unknown as OrderRecord["items"][number]["options"],
+      options: item.options as unknown as OrderRecord["items"][number]["options"],
       unitPrice: item.unitPrice,
       quantity: item.quantity,
     })),
@@ -47,18 +28,13 @@ function record(row: StoredOrder): OrderRecord {
       ...history,
       fromStatus: history.fromStatus as OrderRecord["status"] | null,
       toStatus: history.toStatus as OrderRecord["status"],
-      changedBy:
-        history.changedBy as OrderRecord["history"][number]["changedBy"],
+      changedBy: history.changedBy as OrderRecord["history"][number]["changedBy"],
     })),
   };
 }
 
 type Reader = Pick<DatabaseTransaction, "order">;
-async function findByRequest(
-  db: Reader,
-  customerSessionId: string,
-  requestKey: string,
-) {
+async function findByRequest(db: Reader, customerSessionId: string, requestKey: string) {
   const row = await db.order.findUnique({
     where: { customerSessionId_requestKey: { customerSessionId, requestKey } },
     include,
@@ -66,10 +42,7 @@ async function findByRequest(
   return row ? record(row) : null;
 }
 
-async function insert(
-  tx: DatabaseTransaction,
-  input: NewOrder,
-): Promise<OrderRecord> {
+async function insert(tx: DatabaseTransaction, input: NewOrder): Promise<OrderRecord> {
   const { items, ...order } = input;
   try {
     return record(
@@ -80,8 +53,7 @@ async function insert(
             create: items.map((item, position) => ({
               ...item,
               position,
-              productType:
-                item.productType ?? (item.productId ? "salad" : "custom"),
+              productType: item.productType ?? (item.productId ? "salad" : "custom"),
               originalProductId: item.productId,
               options: item.options as unknown as Prisma.InputJsonValue,
             })),
@@ -92,18 +64,14 @@ async function insert(
       }),
     );
   } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    )
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       throw new DuplicateRequestError();
+    }
     throw error;
   }
 }
 
-export function createPostgresOrdersRepository(
-  db: PrismaClient,
-): OrdersRepository {
+export function createPostgresOrdersRepository(db: PrismaClient): OrdersRepository {
   return {
     transaction: (work) =>
       databaseTransaction(db, async (tx) =>
@@ -137,12 +105,12 @@ export function createPostgresOrdersRepository(
             status: update.to,
             version: { increment: 1 },
             updatedAt: at,
-            ...(update.to === "canceled"
-              ? { canceledAt: at, cancelReason: update.reason }
-              : {}),
+            ...(update.to === "canceled" ? { canceledAt: at, cancelReason: update.reason } : {}),
           },
         });
-        if (!changed.count) return null;
+        if (!changed.count) {
+          return null;
+        }
         await tx.orderStatusHistory.create({
           data: {
             orderId: update.id,

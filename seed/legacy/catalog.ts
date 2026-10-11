@@ -137,57 +137,34 @@ export function customerSeed(): Catalog {
 }
 
 /** Add customer-only fields without overwriting saved administrator edits. */
-export function migrateCatalog(
-  catalog: Catalog,
-  upgradeLegacy = false,
-): Catalog {
+export function migrateCatalog(catalog: Catalog, upgradeLegacy = false): Catalog {
   const seed = customerSeed();
   let nextId =
     Math.max(
       11,
-      ...catalog.products.map(
-        (p) =>
-          p.customerId ??
-          (/^salad-\d+$/.test(p.id) ? Number(p.id.slice(6)) : -1),
-      ),
+      ...catalog.products.map((p) => p.customerId ?? (/^salad-\d+$/.test(p.id) ? Number(p.id.slice(6)) : -1)),
     ) + 1;
   const products = catalog.products.map((p) => {
     const original = seed.products.find((s) => s.id === p.id);
     const legacy = legacyCatalog.products.find((s) => s.id === p.id);
     const updated = { ...original, ...p };
     if (upgradeLegacy && original && legacy) {
-      for (const key of [
-        "name",
-        "price",
-        "description",
-        "category",
-        "image",
-        "allergens",
-        "badge",
-      ] as const) {
-        if (JSON.stringify(p[key]) === JSON.stringify(legacy[key]))
+      for (const key of ["name", "price", "description", "category", "image", "allergens", "badge"] as const) {
+        if (JSON.stringify(p[key]) === JSON.stringify(legacy[key])) {
           Object.assign(updated, { [key]: original[key] });
+        }
       }
     }
     return {
       ...updated,
-      customerId:
-        p.type === "salad"
-          ? (p.customerId ?? original?.customerId ?? nextId++)
-          : undefined,
+      customerId: p.type === "salad" ? (p.customerId ?? original?.customerId ?? nextId++) : undefined,
     };
   });
   const reviews: NonNullable<Catalog["reviews"]> =
     catalog.reviews?.map((r) => ({
       ...r,
-      via:
-        r.via ??
-        (r.menu.includes("매장 픽업")
-          ? ("pickup" as const)
-          : ("delivery" as const)),
-      productId:
-        r.productId ??
-        catalog.products.find((p) => r.menu.split(" · ")[0] === p.name)?.id,
+      via: r.via ?? (r.menu.includes("매장 픽업") ? ("pickup" as const) : ("delivery" as const)),
+      productId: r.productId ?? catalog.products.find((p) => r.menu.split(" · ")[0] === p.name)?.id,
     })) ?? [];
   if (upgradeLegacy) {
     for (const review of seed.reviews ?? []) {
@@ -195,12 +172,13 @@ export function migrateCatalog(
         !reviews.some(
           (r) =>
             r.id === review.id ||
-            (r.productId === review.productId &&
-              r.author === review.author &&
-              r.title === review.title),
+            (r.productId === review.productId && r.author === review.author && r.title === review.title),
         )
-      )
-        if (reviews.length < 500) reviews.push(review);
+      ) {
+        if (reviews.length < 500) {
+          reviews.push(review);
+        }
+      }
     }
   }
   return {
@@ -209,9 +187,7 @@ export function migrateCatalog(
     categories: [
       ...new Set([
         ...(catalog.categories ?? seed.categories ?? []),
-        ...products
-          .filter((p) => p.type === "salad" && !p.deleted)
-          .map((p) => p.category),
+        ...products.filter((p) => p.type === "salad" && !p.deleted).map((p) => p.category),
       ]),
     ],
     ingredients:

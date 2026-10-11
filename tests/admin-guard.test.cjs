@@ -19,13 +19,7 @@ require.extensions[".ts"] = (module, filename) =>
   );
 const resolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
-  return resolve.call(
-    this,
-    request.startsWith("@/")
-      ? path.join(__dirname, "..", request.slice(2))
-      : request,
-    ...args,
-  );
+  return resolve.call(this, request.startsWith("@/") ? path.join(__dirname, "..", request.slice(2)) : request, ...args);
 };
 const { setServicesForTests, createLimits } = require("../application/container.ts");
 const { appDefaults } = require("./fixtures/settings.cjs");
@@ -45,15 +39,35 @@ const { NextRequest } = require("next/server");
 const B = "http://localhost:3000";
 async function setup() {
   setServicesForTests({
-    orders: createOrdersService({ repository: createMemoryOrdersRepository({ getCatalog: async () => ({}), getPricingPolicy: async () => appDefaults().pricingPolicy, getDeliveryHours: async () => appDefaults().deliveryHours }) }),
-    identity: createIdentityService({ repository: createMemoryIdentityRepository([{ id: "a1", loginId: "admin", passwordHash: await hashPassword("pw") }]) }),
+    orders: createOrdersService({
+      repository: createMemoryOrdersRepository({
+        getCatalog: async () => ({}),
+        getPricingPolicy: async () => appDefaults().pricingPolicy,
+        getDeliveryHours: async () => appDefaults().deliveryHours,
+      }),
+    }),
+    identity: createIdentityService({
+      repository: createMemoryIdentityRepository([
+        { id: "a1", loginId: "admin", passwordHash: await hashPassword("pw") },
+      ]),
+    }),
     limits: createLimits({ account: 50, clientLogin: 50, order: 50, clientSession: 50, globalSession: 500 }),
   });
 }
+
 const req = (path, { method = "GET", cookie, body } = {}) =>
-  new Request(B + path, { method, headers: { ...(cookie ? { cookie } : {}), ...(body ? { "content-type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  new Request(B + path, {
+    method,
+    headers: { ...(cookie ? { cookie } : {}), ...(body ? { "content-type": "application/json" } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
 const cookieOf = (r) => r.headers.getSetCookie()[0].split(";")[0];
-const adminLogin = async () => cookieOf(await loginRoute.POST(req("/api/v1/auth/login", { method: "POST", body: { loginId: "admin", password: "pw" } })));
+
+const adminLogin = async () =>
+  cookieOf(
+    await loginRoute.POST(req("/api/v1/auth/login", { method: "POST", body: { loginId: "admin", password: "pw" } })),
+  );
 
 test("adminGate: 로그인하지 않았거나 비회원 쿠키면 기존 오류 모양({ error })의 401, 관리자 세션이면 통과", async () => {
   await setup();

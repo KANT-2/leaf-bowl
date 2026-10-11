@@ -4,22 +4,13 @@ export { reviewDateTime } from "@/modules/shared/time";
 export function saladCategories(catalog: Catalog): string[] {
   return (
     catalog.categories ?? [
-      ...new Set(
-        catalog.products
-          .filter((p) => p.type === "salad" && !p.deleted)
-          .map((p) => p.category),
-      ),
+      ...new Set(catalog.products.filter((p) => p.type === "salad" && !p.deleted).map((p) => p.category)),
     ]
   );
 }
 
-export function reviewMenuLabel(
-  review: Pick<Review, "menu" | "drinks">,
-): string {
+export function reviewMenuLabel(review: Pick<Review, "menu" | "drinks">): string {
   const parts = review.menu.split(" · "),
     fulfillment = parts.length > 1 ? parts.pop() : undefined;
-  return (
-    [...parts, ...(review.drinks ?? [])].join(" · ") +
-    (fulfillment ? "   |   " + fulfillment : "")
-  );
+  return [...parts, ...(review.drinks ?? [])].join(" · ") + (fulfillment ? "   |   " + fulfillment : "");
 }

@@ -7,8 +7,12 @@ const LEGACY_GRACE_MS = 60_000;
 const pause = () => new Promise((resolve) => setTimeout(resolve, RETRY_MS));
 
 function alive(pid: number): boolean {
-  try { process.kill(pid, 0); return true; }
-  catch (error) { return (error as NodeJS.ErrnoException).code !== "ESRCH"; }
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== "ESRCH";
+  }
 }
 
 async function owner(lock: string): Promise<{ token: string; stale: boolean } | null> {
@@ -20,9 +24,14 @@ async function owner(lock: string): Promise<{ token: string; stale: boolean } | 
       return { token, stale: Number.isInteger(pid) && pid > 0 && !alive(pid) };
     }
     // 기존 버전의 비어 있는 디렉터리 잠금만 유예 시간 후 복구한다.
-    return { token: `legacy:${stat.ino}:${stat.mtimeMs}`, stale: stat.isDirectory() && Date.now() - stat.mtimeMs > LEGACY_GRACE_MS && !(await readdir(lock)).length };
+    return {
+      token: `legacy:${stat.ino}:${stat.mtimeMs}`,
+      stale: stat.isDirectory() && Date.now() - stat.mtimeMs > LEGACY_GRACE_MS && !(await readdir(lock)).length,
+    };
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return null;
+    }
     throw error;
   }
 }
@@ -34,10 +43,14 @@ async function acquire(lock: string): Promise<() => Promise<void>> {
     try {
       await symlink(token, lock);
       return async () => {
-        if ((await owner(lock))?.token === token) await rm(lock, { force: true });
+        if ((await owner(lock))?.token === token) {
+          await rm(lock, { force: true });
+        }
       };
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
+        throw error;
+      }
     }
     const previous = await owner(lock);
     if (previous?.stale) {
@@ -46,8 +59,12 @@ async function acquire(lock: string): Promise<() => Promise<void>> {
       const releaseRecovery = await acquire(lock + ".recovery");
       try {
         const current = await owner(lock);
-        if (current?.token === previous.token && current.stale) await rm(lock, { recursive: true, force: true });
-      } finally { await releaseRecovery(); }
+        if (current?.token === previous.token && current.stale) {
+          await rm(lock, { recursive: true, force: true });
+        }
+      } finally {
+        await releaseRecovery();
+      }
       continue;
     }
     await pause();
@@ -58,6 +75,9 @@ async function acquire(lock: string): Promise<() => Promise<void>> {
 export async function withFileLock<T>(directory: string, fn: () => Promise<T>): Promise<T> {
   await mkdir(directory, { recursive: true });
   const release = await acquire(path.join(directory, ".lock"));
-  try { return await fn(); }
-  finally { await release(); }
+  try {
+    return await fn();
+  } finally {
+    await release();
+  }
 }

@@ -23,19 +23,13 @@ export default function TrashPanel({
       <p className="muted">삭제한 메뉴와 옵션 그룹을 복원할 수 있습니다.</p>
       <section className="surface">
         {[
-          ...catalog.products
-            .filter((p) => p.deleted)
-            .map((p) => ({ ...p, kind: "product" })),
-          ...catalog.groups
-            .filter((g) => g.deleted)
-            .map((g) => ({ ...g, kind: "group" })),
+          ...catalog.products.filter((p) => p.deleted).map((p) => ({ ...p, kind: "product" })),
+          ...catalog.groups.filter((g) => g.deleted).map((g) => ({ ...g, kind: "group" })),
         ].map((i) => (
           <div className="trash-row" key={i.kind + i.id}>
             <div>
               <strong>{i.name}</strong>
-              <div className="meta">
-                {i.kind === "product" ? "메뉴" : "옵션 그룹"}
-              </div>
+              <div className="meta">{i.kind === "product" ? "메뉴" : "옵션 그룹"}</div>
             </div>
             <div className="row-actions">
               <Button
@@ -47,11 +41,10 @@ export default function TrashPanel({
                     if (i.kind === "product") {
                       const p = next.products.find((p) => p.id === i.id)!;
                       p.deleted = false;
-                      p.optionIds = p.optionIds.filter((id) =>
-                        next.groups.some((g) => g.id === id && !g.deleted),
-                      );
-                    } else
+                      p.optionIds = p.optionIds.filter((id) => next.groups.some((g) => g.id === id && !g.deleted));
+                    } else {
                       next.groups.find((g) => g.id === i.id)!.deleted = false;
+                    }
                     await save(
                       next,
                       i.kind === "product"
@@ -81,10 +74,9 @@ export default function TrashPanel({
             </div>
           </div>
         ))}
-        {!catalog.products.some((p) => p.deleted) &&
-          !catalog.groups.some((g) => g.deleted) && (
-            <div className="empty">휴지통이 비어 있습니다.</div>
-          )}
+        {!catalog.products.some((p) => p.deleted) && !catalog.groups.some((g) => g.deleted) && (
+          <div className="empty">휴지통이 비어 있습니다.</div>
+        )}
       </section>
     </>
   );

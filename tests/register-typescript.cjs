@@ -27,11 +27,5 @@ require.extensions[".ts"] = (module, filename) =>
   );
 const resolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
-  return resolve.call(
-    this,
-    request.startsWith("@/")
-      ? path.join(__dirname, "..", request.slice(2))
-      : request,
-    ...args,
-  );
+  return resolve.call(this, request.startsWith("@/") ? path.join(__dirname, "..", request.slice(2)) : request, ...args);
 };

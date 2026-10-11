@@ -11,21 +11,17 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function encodeCursor(cursor: OrderCursor): string {
   const createdAt = normalizeUTC(cursor.createdAt);
-  if (!createdAt) throw new AppError(400, "cursor 값이 올바르지 않습니다.");
-  return Buffer.from(JSON.stringify({ c: createdAt, i: cursor.id })).toString(
-    "base64url",
-  );
+  if (!createdAt) {
+    throw new AppError(400, "cursor 값이 올바르지 않습니다.");
+  }
+  return Buffer.from(JSON.stringify({ c: createdAt, i: cursor.id })).toString("base64url");
 }
 
 export function decodeCursor(raw: string): OrderCursor {
   try {
     const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf8"));
     const createdAt = normalizeUTC(parsed?.c);
-    if (
-      createdAt !== null &&
-      typeof parsed?.i === "string" &&
-      UUID.test(parsed.i)
-    ) {
+    if (createdAt !== null && typeof parsed?.i === "string" && UUID.test(parsed.i)) {
       return { createdAt, id: parsed.i };
     }
   } catch {

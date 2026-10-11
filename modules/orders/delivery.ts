@@ -18,16 +18,14 @@ export function seoulDate(now: Date, days = 0): string {
 /** 한국 시간 하루의 시작(UTC 시각). 목록의 기간 조회에서 쓴다 */
 export function seoulDayStart(day: string): Date {
   const instant = kstSlotStart(day, "00:00");
-  if (!instant) throw new AppError(400, "조회 기간을 확인해주세요.");
+  if (!instant) {
+    throw new AppError(400, "조회 기간을 확인해주세요.");
+  }
   return new Date(instant);
 }
 
 /** 화면과 같은 운영 시간·30분 이후 슬롯을 사용한다. */
-export function slotLabels(
-  day: string,
-  hours: DeliveryHours,
-  now: Date,
-): string[] {
+export function slotLabels(day: string, hours: DeliveryHours, now: Date): string[] {
   return timeOptions(day, now.getTime(), hours).map((slot) => slot.label);
 }
 
@@ -37,10 +35,7 @@ export function assertDeliverySlot(
   now: Date,
 ): void {
   const { desiredDate, desiredSlot } = slot;
-  if (
-    desiredDate < seoulDate(now, 0) ||
-    desiredDate > seoulDate(now, MAX_DAYS_AHEAD)
-  ) {
+  if (desiredDate < seoulDate(now, 0) || desiredDate > seoulDate(now, MAX_DAYS_AHEAD)) {
     throw new AppError(400, "받을 날짜를 다시 선택해주세요.");
   }
   if (!slotLabels(desiredDate, hours, now).includes(desiredSlot)) {

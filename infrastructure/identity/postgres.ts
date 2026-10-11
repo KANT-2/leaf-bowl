@@ -1,10 +1,7 @@
 import "server-only";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { databaseTransaction } from "@/infrastructure/database/prisma";
-import type {
-  IdentityRepository,
-  SessionRecord,
-} from "@/modules/identity/repository";
+import type { IdentityRepository, SessionRecord } from "@/modules/identity/repository";
 
 const record = (row: {
   id: string;
@@ -20,12 +17,9 @@ const record = (row: {
   expiresAt: row.expiresAt,
 });
 
-export function createPostgresIdentityRepository(
-  db: PrismaClient,
-): IdentityRepository {
+export function createPostgresIdentityRepository(db: PrismaClient): IdentityRepository {
   return {
-    findAdminByLoginId: (loginId) =>
-      db.adminUser.findFirst({ where: { loginId, disabled: false } }),
+    findAdminByLoginId: (loginId) => db.adminUser.findFirst({ where: { loginId, disabled: false } }),
     async createSession(session) {
       return record(await db.session.create({ data: session }));
     },
@@ -40,12 +34,9 @@ export function createPostgresIdentityRepository(
       await db.session.deleteMany({ where: { tokenHash } });
     },
     async purgeExpired(now) {
-      return (
-        await db.session.deleteMany({ where: { expiresAt: { lte: now } } })
-      ).count;
+      return (await db.session.deleteMany({ where: { expiresAt: { lte: now } } })).count;
     },
-    countSessions: (kind, now) =>
-      db.session.count({ where: { kind, expiresAt: { gt: now } } }),
+    countSessions: (kind, now) => db.session.count({ where: { kind, expiresAt: { gt: now } } }),
     createSessionWithinLimit: (session, { max, now }) =>
       databaseTransaction(db, async (tx) => {
         // Serialize the count and insertion across every application process.
@@ -54,9 +45,7 @@ export function createPostgresIdentityRepository(
         const count = await tx.session.count({
           where: { kind: session.kind, expiresAt: { gt: now } },
         });
-        return count >= max
-          ? null
-          : record(await tx.session.create({ data: session }));
+        return count >= max ? null : record(await tx.session.create({ data: session }));
       }),
   };
 }

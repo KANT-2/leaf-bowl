@@ -15,8 +15,9 @@ export function timeOptions(
   const list: { value: string; label: string }[] = [];
   for (let h = open; h < close; h++) {
     const start = `${pad(h)}:00`;
-    if (isAtLeast30MinAhead(day, start, now))
+    if (isAtLeast30MinAhead(day, start, now)) {
       list.push({ value: start, label: `${start}–${pad(h + 1)}:00` });
+    }
   }
   return list;
 }

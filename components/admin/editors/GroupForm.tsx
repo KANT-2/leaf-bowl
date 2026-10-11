@@ -62,19 +62,11 @@ export default function GroupForm({
         </label>
         <div className="toggle-row">
           <label htmlFor="required">필수 선택</label>
-          <Switch
-            id="required"
-            checked={g.required}
-            onCheckedChange={(v) => setG({ ...g, required: v })}
-          />
+          <Switch id="required" checked={g.required} onCheckedChange={(v) => setG({ ...g, required: v })} />
         </div>
         <div className="toggle-row">
           <label htmlFor="multiple">여러 개 선택 허용</label>
-          <Switch
-            id="multiple"
-            checked={g.multiple}
-            onCheckedChange={(v) => setG({ ...g, multiple: v })}
-          />
+          <Switch id="multiple" checked={g.multiple} onCheckedChange={(v) => setG({ ...g, multiple: v })} />
         </div>
         {g.source === "custom" ? (
           <>
@@ -90,9 +82,7 @@ export default function GroupForm({
                   onChange={(e) =>
                     setG({
                       ...g,
-                      choices: g.choices.map((x) =>
-                        x.id === c.id ? { ...x, name: e.target.value } : x,
-                      ),
+                      choices: g.choices.map((x) => (x.id === c.id ? { ...x, name: e.target.value } : x)),
                     })
                   }
                 />
@@ -106,11 +96,7 @@ export default function GroupForm({
                   onChange={(e) =>
                     setG({
                       ...g,
-                      choices: g.choices.map((x) =>
-                        x.id === c.id
-                          ? { ...x, price: e.target.valueAsNumber || 0 }
-                          : x,
-                      ),
+                      choices: g.choices.map((x) => (x.id === c.id ? { ...x, price: e.target.valueAsNumber || 0 } : x)),
                     })
                   }
                 />
@@ -146,16 +132,12 @@ export default function GroupForm({
             </Button>
           </>
         ) : (
-          <p className="helper">
-            메뉴 관리의 해당 탭에서 항목과 가격, 품절·숨김 상태를 관리합니다.
-          </p>
+          <p className="helper">메뉴 관리의 해당 탭에서 항목과 가격, 품절·숨김 상태를 관리합니다.</p>
         )}
         <div className="toggle-row">
           <div>
             <strong>메뉴 연결</strong>
-            <p className="meta">
-              옵션 저장 시 삭제되지 않은 모든 샐러드 메뉴에 연결합니다.
-            </p>
+            <p className="meta">옵션 저장 시 삭제되지 않은 모든 샐러드 메뉴에 연결합니다.</p>
           </div>
           <Button
             type="button"
@@ -170,25 +152,13 @@ export default function GroupForm({
       {error && (
         <div role="alert" className="error">
           {error}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="ml-3"
-            disabled={busy}
-            onClick={onRefresh}
-          >
+          <Button type="button" variant="outline" size="sm" className="ml-3" disabled={busy} onClick={onRefresh}>
             최신 내용 불러오기
           </Button>
         </div>
       )}
       <div className="form-footer">
-        <Button
-          type="button"
-          variant="outline"
-          disabled={busy}
-          onClick={onCancel}
-        >
+        <Button type="button" variant="outline" disabled={busy} onClick={onCancel}>
           취소
         </Button>
         <Button type="submit" disabled={busy}>

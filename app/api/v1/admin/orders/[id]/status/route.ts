@@ -12,8 +12,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const { identity, orders } = services();
     const admin = await requireAdmin(request, identity);
     const { id } = await params;
-    if (!orderIdSchema.safeParse(id).success) throw new AppError(404, "주문을 찾을 수 없습니다.");
-    const input = parseOrThrow(changeStatusSchema, await readJsonBody(request, 2_000), "상태 변경 내용을 확인해주세요.");
+    if (!orderIdSchema.safeParse(id).success) {
+      throw new AppError(404, "주문을 찾을 수 없습니다.");
+    }
+    const input = parseOrThrow(
+      changeStatusSchema,
+      await readJsonBody(request, 2_000),
+      "상태 변경 내용을 확인해주세요.",
+    );
     return jsonResponse(statusView(await orders.changeStatus(admin.adminUserId!, id, input)));
   });
 }

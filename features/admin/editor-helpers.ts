@@ -5,10 +5,8 @@ export const statusNames = {
   hidden: "숨김",
 };
 export const uid = () => crypto.randomUUID();
-export const blankProduct = (
-  type: "salad" | "drink" | "dressing",
-  category: string,
-): Product => ({
+
+export const blankProduct = (type: "salad" | "drink" | "dressing", category: string): Product => ({
   id: uid(),
   type,
   name: "",
@@ -22,20 +20,13 @@ export const blankProduct = (
   optionIds: [],
   deleted: false,
 });
+
 export const hasDressingOption = (p: Product, groups: OptionGroup[]) =>
-  groups.some(
-    (g) =>
-      !g.deleted &&
-      p.optionIds.includes(g.id) &&
-      (g.source === "dressings" || g.id === "dressing"),
-  );
+  groups.some((g) => !g.deleted && p.optionIds.includes(g.id) && (g.source === "dressings" || g.id === "dressing"));
+
 export const hasDrinkOption = (p: Product, groups: OptionGroup[]) =>
-  groups.some(
-    (g) =>
-      !g.deleted &&
-      p.optionIds.includes(g.id) &&
-      (g.source === "drinks" || g.id === "drinks"),
-  );
+  groups.some((g) => !g.deleted && p.optionIds.includes(g.id) && (g.source === "drinks" || g.id === "drinks"));
+
 export const blankGroup = (): OptionGroup => ({
   id: uid(),
   name: "",

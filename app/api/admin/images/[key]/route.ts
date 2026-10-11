@@ -1,4 +1,26 @@
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { dataDirectory } from "@/application/catalog";
-export async function GET(_request:Request,{params}:{params:Promise<{key:string}>}){const {key}=await params;if(!/^[a-zA-Z0-9_-]+\.(png|jpg|webp)$/.test(key))return new Response('Not found',{status:404});try{const bytes=await readFile(path.join(dataDirectory(),'images',key)).catch(async error=>{if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;return readFile(path.join(process.cwd(),'public/admin-assets/uploads',key))});return new Response(new Uint8Array(bytes),{headers:{'Content-Type':key.endsWith('.png')?'image/png':key.endsWith('.jpg')?'image/jpeg':'image/webp','Cache-Control':'private, max-age=86400','X-Content-Type-Options':'nosniff'}})}catch(e){return new Response('Image unavailable',{status:(e as NodeJS.ErrnoException).code==='ENOENT'?404:503})}}
+export async function GET(_request: Request, { params }: { params: Promise<{ key: string }> }) {
+  const { key } = await params;
+  if (!/^[a-zA-Z0-9_-]+\.(png|jpg|webp)$/.test(key)) {
+    return new Response("Not found", { status: 404 });
+  }
+  try {
+    const bytes = await readFile(path.join(dataDirectory(), "images", key)).catch(async (error) => {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw error;
+      }
+      return readFile(path.join(process.cwd(), "public/admin-assets/uploads", key));
+    });
+    return new Response(new Uint8Array(bytes), {
+      headers: {
+        "Content-Type": key.endsWith(".png") ? "image/png" : key.endsWith(".jpg") ? "image/jpeg" : "image/webp",
+        "Cache-Control": "private, max-age=86400",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+  } catch (e) {
+    return new Response("Image unavailable", { status: (e as NodeJS.ErrnoException).code === "ENOENT" ? 404 : 503 });
+  }
+}

@@ -9,44 +9,27 @@ import ProductDetail from "@/components/ProductDetail";
 import SoldOutCover from "@/components/SoldOutCover";
 import ProductRating from "@/components/ProductRating";
 import ProductReviewsPreview from "@/components/ProductReviewsPreview";
-import {
-  formatDeliveryHours,
-  type DeliveryHours,
-} from "@/modules/delivery/hours";
+import { formatDeliveryHours, type DeliveryHours } from "@/modules/delivery/hours";
 import { money } from "@/modules/shared/format";
 
-export default function CustomerProductPage({
-  id,
-  hours,
-}: {
-  id: number;
-  hours: DeliveryHours;
-}) {
-  const {
-    getProduct,
-    visibleProducts: PRODUCTS,
-    NUTRITION,
-    pricingPolicy,
-  } = useCustomerCatalog();
+export default function CustomerProductPage({ id, hours }: { id: number; hours: DeliveryHours }) {
+  const { getProduct, visibleProducts: PRODUCTS, NUTRITION, pricingPolicy } = useCustomerCatalog();
   const p = getProduct(id);
-  if (!p)
+  if (!p) {
     return (
       <main className="wrap">
         <p>이 메뉴는 현재 제공되지 않습니다.</p>
         <Link href="/menu">전체 메뉴 보기</Link>
       </main>
     );
+  }
   const others = PRODUCTS.filter((o) => o.id !== p.id).slice(0, 4);
   return (
     <main className="wrap pv-wrap">
       <Breadcrumb items={[["홈", "/"], ["메뉴", "/menu"], [p.name]]} />
       <div className="pv">
         <div className="pv-photo">
-          <FoodImage
-            id={p.id}
-            sizes="(max-width: 700px) 100vw, 590px"
-            preload
-          />
+          <FoodImage id={p.id} sizes="(max-width: 700px) 100vw, 590px" preload />
           {p.tag && <span className="product-tag">{p.tag}</span>}
           {p.status === "soldout" && <SoldOutCover />}
         </div>
@@ -71,8 +54,7 @@ export default function CustomerProductPage({
             </dd>
             <dt>배달</dt>
             <dd>
-              예약 배달 {money(pricingPolicy.deliveryFee)} (
-              {money(pricingPolicy.freeDeliveryFrom)} 이상 무료)
+              예약 배달 {money(pricingPolicy.deliveryFee)} ({money(pricingPolicy.freeDeliveryFrom)} 이상 무료)
               <small>{formatDeliveryHours(hours)}</small>
             </dd>
           </dl>

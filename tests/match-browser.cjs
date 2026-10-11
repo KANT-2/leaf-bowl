@@ -24,7 +24,17 @@ fs.mkdirSync(shots, { recursive: true });
       await page.getByRole("button", { name: "재료 추가하기", exact: true }).click();
       await page.waitForFunction((n) => document.querySelectorAll(".ingredient-chip").length === n, n);
     }
-    snapshot.catalog.reviews.unshift({ id: "quality-revision-review", productId: "salad-0", author: "검증", rating: 5, title: "새 리뷰", body: "선택 진행 중 들어온 리뷰입니다.", menu: "코드 품질 검증 메뉴", date: "2026.10.10", deleted: false });
+    snapshot.catalog.reviews.unshift({
+      id: "quality-revision-review",
+      productId: "salad-0",
+      author: "검증",
+      rating: 5,
+      title: "새 리뷰",
+      body: "선택 진행 중 들어온 리뷰입니다.",
+      menu: "코드 품질 검증 메뉴",
+      date: "2026.10.10",
+      deleted: false,
+    });
     snapshot.revision++;
     await page.evaluate(() => window.dispatchEvent(new Event("focus")));
     await page.waitForTimeout(700);
@@ -39,15 +49,23 @@ fs.mkdirSync(shots, { recursive: true });
     assert.equal(await result.getByLabel("내 샐러드 이름", { exact: true }).inputValue(), "진행 보존 볼");
     await result.getByRole("button", { name: /내 조합 저장하기/ }).click();
     const selectedDressing = await result.getByLabel("마지막으로, 드레싱").inputValue();
-    assert.ok(snapshot.catalog.products.some((product) => product.id === selectedDressing && product.type === "dressing"));
-    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("bm-recipe")).dressingKey), selectedDressing);
+    assert.ok(
+      snapshot.catalog.products.some((product) => product.id === selectedDressing && product.type === "dressing"),
+    );
+    assert.equal(
+      await page.evaluate(() => JSON.parse(localStorage.getItem("bm-recipe")).dressingKey),
+      selectedDressing,
+    );
     await shot("match-result");
     await result.getByRole("button", { name: "장바구니에 담기", exact: true }).click();
     const cart = page.getByRole("dialog", { name: "장바구니", exact: true });
     await cart.waitFor();
     await cart.getByText("진행 보존 볼", { exact: false }).first().waitFor();
     assert.equal(await cart.getByLabel("드레싱", { exact: true }).inputValue(), selectedDressing);
-    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("bb-cart"))[0].dressingKey), selectedDressing);
+    assert.equal(
+      await page.evaluate(() => JSON.parse(localStorage.getItem("bb-cart"))[0].dressingKey),
+      selectedDressing,
+    );
     await shot("cart");
     await page.keyboard.press("Escape");
     await page.goto(base + "/menu");
@@ -57,12 +75,18 @@ fs.mkdirSync(shots, { recursive: true });
     await result.waitFor();
     assert.equal(await page.locator(".ingredient-chip").count(), 2);
 
-    snapshot.catalog.ingredients.find((ingredient) => ingredient.status === "active" && !ingredient.deleted).status = "hidden";
+    snapshot.catalog.ingredients.find((ingredient) => ingredient.status === "active" && !ingredient.deleted).status =
+      "hidden";
     snapshot.revision++;
     await page.evaluate(() => window.dispatchEvent(new Event("focus")));
     await page.waitForFunction(() => document.querySelectorAll(".ingredient-chip").length === 0);
     await result.waitFor({ state: "hidden" });
     assert.deepEqual(errors, []);
     console.log("Browser scenario passed; no page errors.");
-  } finally { await browser.close(); }
-})().catch((error) => { console.error(error); process.exitCode = 1; });
+  } finally {
+    await browser.close();
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

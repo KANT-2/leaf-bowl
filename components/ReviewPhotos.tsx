@@ -8,9 +8,19 @@ import PhotoViewer from "./PhotoViewer";
  * 리뷰 사진: 대표 사진 1장만 작게 보여주고 여러 장이면 "+N", 마우스를 올리면 흐려지며 "사진 보기",
  * 누르면 크게 보기 창에서 모두 넘겨 본다. 사진이 커도 카드 높이가 늘어나지 않게 크기를 고정한다.
  */
-export default function ReviewPhotos({ photos, label, size = 96 }: { photos?: string[]; label: string; size?: number }) {
+export default function ReviewPhotos({
+  photos,
+  label,
+  size = 96,
+}: {
+  photos?: string[];
+  label: string;
+  size?: number;
+}) {
   const [open, setOpen] = useState(false);
-  if (!photos?.length) return null;
+  if (!photos?.length) {
+    return null;
+  }
   return (
     <>
       <button

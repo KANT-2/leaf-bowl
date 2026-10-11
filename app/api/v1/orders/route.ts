@@ -13,7 +13,9 @@ export async function POST(request: Request) {
     const session = await requireGuest(request, identity);
     limits.order.hit(session.id);
     const header = request.headers.get("idempotency-key");
-    if (!header) throw new AppError(400, "Idempotency-Key 헤더가 필요합니다.");
+    if (!header) {
+      throw new AppError(400, "Idempotency-Key 헤더가 필요합니다.");
+    }
     const key = parseOrThrow(idempotencyKeySchema, header, "Idempotency-Key 형식을 확인해주세요.");
     const input = parseOrThrow(createOrderSchema, await readJsonBody(request), "주문 내용을 확인해주세요.");
     const { order, created } = await orders.createOrder(session.id, key, input);

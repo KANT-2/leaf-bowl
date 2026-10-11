@@ -62,3 +62,19 @@ HTTP 래퍼는 Next.js의 `connection()`을 기다린 뒤 서비스를 생성한
 ## 변경 시 검증
 
 `npm run lint`, `npm test`, 전용 테스트 DB의 `npm run test:db`, `npm run build`, 빌드 후 `npx tsc --noEmit`을 수행한다. 모듈 경계 검사와 상태 변경 검증은 `npm test`에 포함된다. DB 테스트는 설정 변경 반영·누락·저장 롤백·빈 카탈로그 보존과 기존 주문 트랜잭션을 검증한다. 화면 변경은 별도 브라우저 검증·스크린샷으로 확인한다.
+
+## Tailwind와 화면 스타일
+
+고객·관리자는 별도 루트 레이아웃에서 각 전역 CSS를 가져온다. 고객은 기존 디자인의 리셋을 유지하기 위해 Tailwind의 theme·utilities만 사용하고, 관리자는 Preflight도 사용한다. 색상·글꼴 원본은 `app/styles/theme.css`의 `@theme static`으로 공유한다. 관리자 배경·전경·사이드바 같은 의미 토큰은 이 원본에 연결한다. 고객의 `muted`는 글자색, 관리자의 `muted`는 배경색이므로 각 루트에서 용도를 유지한다.
+
+CSS 우선순위는 `theme → base → components → utilities`다. 전역 리셋·요소 기본값은 `base`, 화면별 CSS와 관리자 CSS Modules는 `components`에 둔다. 화면별 스타일을 레이어 밖에 두면 Tailwind 유틸리티보다 우선하여 공통 컴포넌트의 크기·여백 옵션을 막으므로 새 규칙도 해당 레이어에 넣는다.
+
+관리자 공통 컴포넌트는 CVA 변형과 `cn`/`tailwind-merge`를 유지한다. 현재 작업 화면의 사이드바 높이·여백은 `AdminWorkspace`가 클래스 값으로 지정하며, 전역 `data-slot` 선택자가 공통 `SidebarMenuButton`의 크기를 강제하지 않는다. 버튼 기본·작게·크게 변형은 각각 32·28·48px이고 현재 화면의 메뉴는 기존 46px을 유지한다.
+
+레이어 변경은 개발 서버만으로 판단하지 않고 운영 빌드로 확인한다. `tests/tailwind-browser.cjs`가 고객·관리자 6개 경로를 1440·390px에서 확인하고, 이전 측정 파일을 전달하면 주요 요소의 크기·간격·색상도 비교한다. 실행 방법은 [회귀 검증 가이드](../tests/README.md)에 있다.
+
+## 코드 스타일
+
+Prettier 3.6.2로 JS/TS/TSX/CSS/JSON 소스·테스트를 정리한다. 기준은 2칸, 쌍따옴표, 세미콜론, 120자, LF다. 중괄호 생략은 `curly: all`로 차단한다. 인접한 함수 선언·화살표 함수·export 함수·클래스 메서드 사이 빈 줄을 요구하고 전체 연속 빈 줄은 최대 1개로 제한한다. 함수 간 간격과 빈 줄 규칙은 ESLint Stylistic을 사용한다.
+
+`npx eslint --fix` 다음 `npm run format`으로 수정한다. `npm run lint`가 ESLint와 `format:check`를 함께 수행하므로 기존 CI 단계에서 스타일 위반도 실패한다. 생성 코드·정적 자산·문서·SQL·Prisma 스키마·Python은 Prettier 대상이 아니다. 다른 비동기·접근성 규칙은 이번 합의에 포함하지 않았다.

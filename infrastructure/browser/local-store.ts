@@ -10,18 +10,15 @@ export interface LocalStore<T> {
   set: (next: T) => void;
 }
 
-export function createLocalStore<T>(
-  key: string,
-  load: () => T,
-  save: (v: T) => void,
-  empty: T,
-): LocalStore<T> {
+export function createLocalStore<T>(key: string, load: () => T, save: (v: T) => void, empty: T): LocalStore<T> {
   let value: T | undefined;
   const listeners = new Set<() => void>();
   const emit = () => listeners.forEach((l) => l());
 
   const onStorage = (e: StorageEvent) => {
-    if (e.key !== key && e.key !== null) return;
+    if (e.key !== key && e.key !== null) {
+      return;
+    }
     value = load();
     emit();
   };
@@ -36,12 +33,15 @@ export function createLocalStore<T>(
       listeners.add(listener);
       return () => {
         listeners.delete(listener);
-        if (listeners.size === 0)
+        if (listeners.size === 0) {
           window.removeEventListener("storage", onStorage);
+        }
       };
     },
     getSnapshot() {
-      if (value === undefined) value = load();
+      if (value === undefined) {
+        value = load();
+      }
       return value;
     },
     getServerSnapshot: () => empty,
@@ -58,12 +58,13 @@ const noop = () => () => {};
 /** prefers-reduced-motion 구독용 (서버에서는 false). */
 export const reducedMotionStore = {
   subscribe(listener: () => void) {
-    if (typeof window === "undefined" || !window.matchMedia) return noop();
+    if (typeof window === "undefined" || !window.matchMedia) {
+      return noop();
+    }
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     mq.addEventListener("change", listener);
     return () => mq.removeEventListener("change", listener);
   },
-  getSnapshot: () =>
-    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false,
+  getSnapshot: () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false,
   getServerSnapshot: () => false,
 };

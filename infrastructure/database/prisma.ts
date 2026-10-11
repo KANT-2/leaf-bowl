@@ -18,13 +18,10 @@ export function createPrismaClient(connectionString: string): PrismaClient {
 const state = globalThis as unknown as { leafBowlPrisma?: PrismaClient };
 
 export function prisma(): PrismaClient {
-  if (!process.env.DATABASE_URL)
-    throw new Error(
-      "DATABASE_URL을 설정하고 DB migration·seed를 실행해주세요.",
-    );
-  return (state.leafBowlPrisma ??= createPrismaClient(
-    process.env.DATABASE_URL,
-  ));
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL을 설정하고 DB migration·seed를 실행해주세요.");
+  }
+  return (state.leafBowlPrisma ??= createPrismaClient(process.env.DATABASE_URL));
 }
 
 /** Retry only transactions whose callbacks contain database work. */
@@ -39,12 +36,9 @@ export async function databaseTransaction<T>(
         timeout: 20_000,
       });
     } catch (error) {
-      if (
-        !(error instanceof Prisma.PrismaClientKnownRequestError) ||
-        error.code !== "P2034" ||
-        attempt >= 2
-      )
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2034" || attempt >= 2) {
         throw error;
+      }
     }
   }
 }

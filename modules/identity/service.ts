@@ -1,10 +1,5 @@
 import { AppError } from "../shared/errors";
-import {
-  hashPassword,
-  hashToken,
-  newSessionToken,
-  verifyPassword,
-} from "./crypto";
+import { hashPassword, hashToken, newSessionToken, verifyPassword } from "./crypto";
 import type { IdentityRepository, SessionRecord } from "./repository";
 
 export const GUEST_SESSION_MS = 30 * 24 * 3600_000;
@@ -40,18 +35,15 @@ export function createIdentityService({
   let lastPurgeAt = -Infinity;
   async function purgeIfDue(force = false): Promise<void> {
     const at = now();
-    if (!force && at.getTime() - lastPurgeAt < purgeIntervalMs) return;
+    if (!force && at.getTime() - lastPurgeAt < purgeIntervalMs) {
+      return;
+    }
     lastPurgeAt = at.getTime();
     await repository.purgeExpired(at);
   }
 
   /** maxActive 가 있으면 상한 확인과 저장을 한 번에 한다. 가득 차 저장하지 못하면 null */
-  async function issue(
-    kind: SessionRecord["kind"],
-    adminUserId: string | null,
-    ttlMs: number,
-    maxActive?: number,
-  ) {
+  async function issue(kind: SessionRecord["kind"], adminUserId: string | null, ttlMs: number, maxActive?: number) {
     const token = newSessionToken();
     const at = now();
     const expiresAt = new Date(at.getTime() + ttlMs);
@@ -74,42 +66,36 @@ export function createIdentityService({
   return {
     async issueGuestSession() {
       await purgeIfDue();
-      let issued = await issue(
-        "guest",
-        null,
-        GUEST_SESSION_MS,
-        maxGuestSessions,
-      );
+      let issued = await issue("guest", null, GUEST_SESSION_MS, maxGuestSessions);
       if (!issued) {
         await purgeIfDue(true); // 가득 찼으면 만료된 세션을 바로 정리하고 한 번 더 시도한다
         issued = await issue("guest", null, GUEST_SESSION_MS, maxGuestSessions);
       }
-      if (!issued)
+      if (!issued) {
         throw new AppError(503, "현재 접속이 많아 잠시 후 다시 시도해주세요.");
+      }
       return issued;
     },
 
     async login(loginId: string, password: string) {
       await purgeIfDue();
       const admin = await repository.findAdminByLoginId(loginId);
-      const ok = await verifyPassword(
-        password,
-        admin?.passwordHash ?? (await dummyHash),
-      );
-      if (!admin || !ok) throw new AppError(401, LOGIN_FAILED);
-      return issue("admin", admin.id, ADMIN_SESSION_MS) as Promise<
-        NonNullable<Awaited<ReturnType<typeof issue>>>
-      >;
+      const ok = await verifyPassword(password, admin?.passwordHash ?? (await dummyHash));
+      if (!admin || !ok) {
+        throw new AppError(401, LOGIN_FAILED);
+      }
+      return issue("admin", admin.id, ADMIN_SESSION_MS) as Promise<NonNullable<Awaited<ReturnType<typeof issue>>>>;
     },
 
     /** 쿠키의 원본 토큰으로 유효한 세션을 찾는다. 없거나 만료되었거나 종류가 다르면 null */
-    async resolve(
-      token: string | undefined,
-      kind: SessionRecord["kind"],
-    ): Promise<SessionRecord | null> {
-      if (!token) return null;
+    async resolve(token: string | undefined, kind: SessionRecord["kind"]): Promise<SessionRecord | null> {
+      if (!token) {
+        return null;
+      }
       const session = await repository.findSessionByTokenHash(hashToken(token));
-      if (!session || session.kind !== kind) return null;
+      if (!session || session.kind !== kind) {
+        return null;
+      }
       if (session.expiresAt.getTime() <= now().getTime()) {
         await repository.deleteSessionByTokenHash(session.tokenHash);
         return null;
@@ -118,7 +104,9 @@ export function createIdentityService({
     },
 
     async logout(token: string | undefined) {
-      if (token) await repository.deleteSessionByTokenHash(hashToken(token));
+      if (token) {
+        await repository.deleteSessionByTokenHash(hashToken(token));
+      }
     },
   };
 }

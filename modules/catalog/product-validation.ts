@@ -1,15 +1,10 @@
 // 관리자 상품 수정 요청(JSON)을 검사한다. 통과하면 수정할 항목만 담아 돌려준다.
-import type {
-  ProductTag,
-  ProductUpdate,
-} from "@/modules/catalog/customer-product";
+import type { ProductTag, ProductUpdate } from "@/modules/catalog/customer-product";
 
 const TAGS: readonly ProductTag[] = ["BEST", "PLANT", "PICK", "NEW"];
 const MAX_PRICE = 1_000_000;
 
-type Result =
-  | { ok: true; value: ProductUpdate }
-  | { ok: false; message: string };
+type Result = { ok: true; value: ProductUpdate } | { ok: false; message: string };
 
 export function parseProductUpdate(body: unknown): Result {
   if (typeof body !== "object" || body === null || Array.isArray(body)) {
@@ -36,13 +31,13 @@ export function parseProductUpdate(body: unknown): Result {
 
   if ("name" in input) {
     const name = typeof input.name === "string" ? input.name.trim() : "";
-    if (name.length < 1 || name.length > 50)
+    if (name.length < 1 || name.length > 50) {
       return { ok: false, message: "name 은 1~50자 문자열이어야 합니다" };
+    }
     value.name = name;
   }
   if ("description" in input) {
-    const description =
-      typeof input.description === "string" ? input.description.trim() : "";
+    const description = typeof input.description === "string" ? input.description.trim() : "";
     if (description.length < 1 || description.length > 200) {
       return {
         ok: false,
@@ -53,12 +48,7 @@ export function parseProductUpdate(body: unknown): Result {
   }
   if ("price" in input) {
     const price = input.price;
-    if (
-      typeof price !== "number" ||
-      !Number.isInteger(price) ||
-      price < 0 ||
-      price > MAX_PRICE
-    ) {
+    if (typeof price !== "number" || !Number.isInteger(price) || price < 0 || price > MAX_PRICE) {
       return {
         ok: false,
         message: `price 는 0~${MAX_PRICE.toLocaleString("ko-KR")} 사이의 정수(원)여야 합니다`,
@@ -68,23 +58,23 @@ export function parseProductUpdate(body: unknown): Result {
   }
   if ("tag" in input) {
     // null 을 보내면 뱃지를 없앤다
-    if (input.tag === null) value.tag = undefined;
-    else if (
-      typeof input.tag === "string" &&
-      (TAGS as readonly string[]).includes(input.tag)
-    )
+    if (input.tag === null) {
+      value.tag = undefined;
+    } else if (typeof input.tag === "string" && (TAGS as readonly string[]).includes(input.tag)) {
       value.tag = input.tag as ProductTag;
-    else
+    } else {
       return {
         ok: false,
         message: `tag 는 ${TAGS.join(", ")} 또는 null 이어야 합니다`,
       };
+    }
   }
   for (const key of ["isNew", "isOnSale"] as const) {
     if (key in input) {
       const flag = input[key];
-      if (typeof flag !== "boolean")
+      if (typeof flag !== "boolean") {
         return { ok: false, message: `${key} 는 true 또는 false 여야 합니다` };
+      }
       value[key] = flag;
     }
   }

@@ -47,11 +47,10 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
 
   useEffect(() => {
     const el = box.current;
-    if (!el || !("IntersectionObserver" in window)) return;
-    const io = new IntersectionObserver(
-      (en) => setVisible(en[0].isIntersecting),
-      { threshold: 0.15 },
-    );
+    if (!el || !("IntersectionObserver" in window)) {
+      return;
+    }
+    const io = new IntersectionObserver((en) => setVisible(en[0].isIntersecting), { threshold: 0.15 });
     io.observe(el);
     return () => io.disconnect();
   }, []);
@@ -65,13 +64,17 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
   const paused = hover || focus || stopped || reduced || !visible || pageHidden;
 
   useEffect(() => {
-    if (paused || total < 2) return;
+    if (paused || total < 2) {
+      return;
+    }
     const t = setTimeout(() => setIndex((i) => (i + 1) % total), HERO_MS);
     return () => clearTimeout(t);
   }, [paused, index, cycle, total]);
 
   // 데이터에서 배너를 하나도 받지 못하면 영역을 그리지 않는다.
-  if (!total) return null;
+  if (!total) {
+    return null;
+  }
 
   const go = (n: number) => {
     setIndex((n + total) % total);
@@ -88,7 +91,9 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
       onMouseLeave={() => setHover(false)}
       onFocus={(e) => setFocus(e.target.matches(":focus-visible"))}
       onBlur={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget)) setFocus(false);
+        if (!e.currentTarget.contains(e.relatedTarget)) {
+          setFocus(false);
+        }
       }}
     >
       <div className="hero-slides">
@@ -132,16 +137,8 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
                     loading="eager"
                     alt={s.alt}
                   />
-                  <svg
-                    className="hero-ring"
-                    viewBox="0 0 100 100"
-                    aria-hidden="true"
-                  >
-                    <path
-                      id={`hero-ring-${i}`}
-                      d={arcPath(s.bowl)}
-                      fill="none"
-                    />
+                  <svg className="hero-ring" viewBox="0 0 100 100" aria-hidden="true">
+                    <path id={`hero-ring-${i}`} d={arcPath(s.bowl)} fill="none" />
                     <text>
                       <textPath href={`#hero-ring-${i}`}>
                         {s.noteEn} · {s.noteKo}
@@ -166,11 +163,7 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
       <div className="hero-bottom wrap">
         <span>MAKE EVERY DAY A FRESH DAY</span>
         <div className="hero-ctrl">
-          <span
-            className="hero-count"
-            aria-live={paused ? "polite" : "off"}
-            aria-atomic="true"
-          >
+          <span className="hero-count" aria-live={paused ? "polite" : "off"} aria-atomic="true">
             <span className="sr-only">현재 배너 </span>
             {two(index + 1)}
           </span>
@@ -197,9 +190,7 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
             <button
               type="button"
               className="hero-pause"
-              aria-label={
-                stopped ? "배너 자동 넘김 재생" : "배너 자동 넘김 정지"
-              }
+              aria-label={stopped ? "배너 자동 넘김 재생" : "배너 자동 넘김 정지"}
               onClick={() => setStopped((v) => !v)}
             >
               <span aria-hidden="true">{stopped ? "▶" : "❚❚"}</span>

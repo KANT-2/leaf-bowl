@@ -16,12 +16,10 @@ export function loginProfile(
       };
 }
 
-export function addProfileAddress(
-  profile: UserProfile,
-  address: Address,
-): UserProfile {
-  if (profile.addresses.some((current) => current.id === address.id))
+export function addProfileAddress(profile: UserProfile, address: Address): UserProfile {
+  if (profile.addresses.some((current) => current.id === address.id)) {
     return profile;
+  }
   const addresses = address.isDefault
     ? profile.addresses.map((current) => ({ ...current, isDefault: false }))
     : profile.addresses;
@@ -33,7 +31,9 @@ export function updateProfileAddress(
   id: string,
   patch: Partial<Omit<Address, "id">>,
 ): UserProfile {
-  if (!profile.addresses.some((address) => address.id === id)) return profile;
+  if (!profile.addresses.some((address) => address.id === id)) {
+    return profile;
+  }
   return {
     ...profile,
     addresses: profile.addresses.map((address) =>
@@ -46,21 +46,17 @@ export function updateProfileAddress(
   };
 }
 
-export function removeProfileAddress(
-  profile: UserProfile,
-  id: string,
-): UserProfile {
+export function removeProfileAddress(profile: UserProfile, id: string): UserProfile {
   return {
     ...profile,
     addresses: profile.addresses.filter((address) => address.id !== id),
   };
 }
 
-export function setDefaultProfileAddress(
-  profile: UserProfile,
-  id: string,
-): UserProfile {
-  if (!profile.addresses.some((address) => address.id === id)) return profile;
+export function setDefaultProfileAddress(profile: UserProfile, id: string): UserProfile {
+  if (!profile.addresses.some((address) => address.id === id)) {
+    return profile;
+  }
   return {
     ...profile,
     addresses: profile.addresses.map((address) => ({

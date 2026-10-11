@@ -8,7 +8,9 @@ export default function PreferencesTab() {
   const { catalog, catalogConfig } = useCustomerCatalog();
   const categories = catalog.categories ?? [];
 
-  if (!user) return null;
+  if (!user) {
+    return null;
+  }
 
   const toggleCategory = (c: string) =>
     setPreferences({
@@ -31,7 +33,12 @@ export default function PreferencesTab() {
         <h3>선호하는 메뉴 분류</h3>
         <div className="allergy-chips">
           {categories.map((c) => (
-            <button key={c} type="button" aria-pressed={user.preferredCategories.includes(c)} onClick={() => toggleCategory(c)}>
+            <button
+              key={c}
+              type="button"
+              aria-pressed={user.preferredCategories.includes(c)}
+              onClick={() => toggleCategory(c)}
+            >
               {c}
             </button>
           ))}
@@ -42,7 +49,12 @@ export default function PreferencesTab() {
         <p className="meta">메뉴 목록에서 이 재료가 들어간 메뉴를 자동으로 숨겨드려요.</p>
         <div className="allergy-chips">
           {catalogConfig.allergenOrder.map((a) => (
-            <button key={a} type="button" aria-pressed={user.excludedAllergens.includes(a)} onClick={() => toggleAllergen(a)}>
+            <button
+              key={a}
+              type="button"
+              aria-pressed={user.excludedAllergens.includes(a)}
+              onClick={() => toggleAllergen(a)}
+            >
               {user.excludedAllergens.includes(a) ? "✕ " : ""}
               {a}
             </button>

@@ -9,9 +9,7 @@
       "id": "review-example-0",
       "title": "점심이 기다려지는 조합이에요.",
       "body": "치킨과 아보카도가 잘 어울려요. 드레싱을 따로 골라 제 입맛에 맞출 수 있어서 좋았어요.",
-      "images": [
-        "/admin-assets/reviews/chicken-avocado-review.png"
-      ],
+      "images": ["/admin-assets/reviews/chicken-avocado-review.png"],
       "rating": 5,
       "menu": "레몬 치킨 아보카도 · 매장 픽업",
       "author": "김**",
@@ -47,9 +45,7 @@
       "body": "레몬 치킨 아보카도에 케일 그린 주스를 같이 주문했어요. 치킨과 아보카도로 든든하게 먹고, 주스로 산뜻하게 마무리할 수 있어서 좋았어요.",
       "rating": 5,
       "menu": "레몬 치킨 아보카도 · 매장 픽업",
-      "drinks": [
-        "케일 그린 주스"
-      ],
+      "drinks": ["케일 그린 주스"],
       "author": "최**",
       "date": "2026.10.08",
       "createdAt": "2026-10-08T00:56:11.530Z",
@@ -66,9 +62,7 @@
       ],
       "rating": 5,
       "menu": "레몬 치킨 아보카도 · 매장 픽업",
-      "drinks": [
-        "케일 그린 주스"
-      ],
+      "drinks": ["케일 그린 주스"],
       "author": "정**",
       "date": "2026.10.08",
       "createdAt": "2026-10-08T01:12:25.933Z",
@@ -269,10 +263,7 @@
       "badge": "BEST",
       "image": "/api/admin/images/8b0f9d30-e90a-4d3d-aa82-cf583e4d7a51.png",
       "allergens": "",
-      "optionIds": [
-        "dressing",
-        "drinks"
-      ],
+      "optionIds": ["dressing", "drinks"],
       "deleted": false
     },
     {
@@ -286,10 +277,7 @@
       "badge": "BEST",
       "image": "/admin-assets/reference/salad-01-cutout.png",
       "allergens": "",
-      "optionIds": [
-        "dressing",
-        "drinks"
-      ],
+      "optionIds": ["dressing", "drinks"],
       "deleted": false
     },
     {
@@ -303,10 +291,7 @@
       "badge": "BEST",
       "image": "/admin-assets/reference/salad-02-cutout.png",
       "allergens": "",
-      "optionIds": [
-        "dressing",
-        "drinks"
-      ],
+      "optionIds": ["dressing", "drinks"],
       "deleted": false
     },
     {
@@ -320,9 +305,7 @@
       "badge": "PLANT",
       "image": "/admin-assets/reference/salad-03-cutout.png",
       "allergens": "",
-      "optionIds": [
-        "drinks"
-      ],
+      "optionIds": ["drinks"],
       "deleted": false
     },
     {
@@ -336,10 +319,7 @@
       "badge": "",
       "image": "/admin-assets/reference/salad-04-cutout.png",
       "allergens": "",
-      "optionIds": [
-        "dressing",
-        "drinks"
-      ],
+      "optionIds": ["dressing", "drinks"],
       "deleted": false
     },
     {
@@ -353,10 +333,7 @@
       "badge": "",
       "image": "/admin-assets/reference/salad-05-cutout.png",
       "allergens": "",
-      "optionIds": [
-        "dressing",
-        "drinks"
-      ],
+      "optionIds": ["dressing", "drinks"],
       "deleted": false
     },
     {
@@ -370,10 +347,7 @@
       "badge": "",
       "image": "/admin-assets/reference/salad-06-cutout.png",
       "allergens": "",
-      "optionIds": [
-        "dressing",
-        "drinks"
-      ],
+      "optionIds": ["dressing", "drinks"],
       "deleted": false
     },
     {
@@ -387,10 +361,7 @@
       "badge": "",
       "image": "/admin-assets/reference/salad-07-cutout.png",
       "allergens": "",
-      "optionIds": [
-        "dressing",
-        "drinks"
-      ],
+      "optionIds": ["dressing", "drinks"],
       "deleted": false
     },
     {
@@ -404,10 +375,7 @@
       "badge": "",
       "image": "/admin-assets/reference/salad-08-cutout.png",
       "allergens": "",
-      "optionIds": [
-        "dressing",
-        "drinks"
-      ],
+      "optionIds": ["dressing", "drinks"],
       "deleted": false
     },
     {
@@ -421,10 +389,7 @@
       "badge": "PICK",
       "image": "/admin-assets/reference/salad-09-cutout.png",
       "allergens": "",
-      "optionIds": [
-        "dressing",
-        "drinks"
-      ],
+      "optionIds": ["dressing", "drinks"],
       "deleted": false
     },
     {
@@ -438,10 +403,7 @@
       "badge": "NEW",
       "image": "/admin-assets/reference/salad-10-cutout.png",
       "allergens": "",
-      "optionIds": [
-        "dressing",
-        "drinks"
-      ],
+      "optionIds": ["dressing", "drinks"],
       "deleted": false
     },
     {
@@ -455,10 +417,7 @@
       "badge": "NEW",
       "image": "/admin-assets/reference/salad-11-cutout.png",
       "allergens": "",
-      "optionIds": [
-        "dressing",
-        "drinks"
-      ],
+      "optionIds": ["dressing", "drinks"],
       "deleted": false
     },
     {
@@ -588,11 +547,7 @@
       "deleted": false
     }
   ],
-  "categories": [
-    "든든한 단백질",
-    "플랜트 베이스",
-    "새로운 조합"
-  ],
+  "categories": ["든든한 단백질", "플랜트 베이스", "새로운 조합"],
   "groups": [
     {
       "id": "dressing",

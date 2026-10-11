@@ -1,13 +1,7 @@
 import { normalizeUTC, legacyKSTUTC } from "@/modules/shared/time";
-import {
-  readBrowserJSON as read,
-  writeBrowserJSON as write,
-} from "@/infrastructure/browser/json";
+import { readBrowserJSON as read, writeBrowserJSON as write } from "@/infrastructure/browser/json";
 import type { Decision, SavedRecipe } from "@/modules/bowl/model";
-import {
-  createLocalStore,
-  type LocalStore,
-} from "@/infrastructure/browser/local-store";
+import { createLocalStore, type LocalStore } from "@/infrastructure/browser/local-store";
 import { dressingKey as recipeDressingKey } from "@/modules/cart/identifiers";
 
 /* ---- 브라우저 저장 ("내 조합 저장하기" 결과만 예전과 같은 localStorage 키를 그대로 쓴다) ---- */
@@ -16,11 +10,10 @@ const RECIPE_KEY = "bm-recipe";
 
 function loadRecipe(): SavedRecipe | null {
   const r = read(RECIPE_KEY);
-  if (typeof r !== "object" || r === null) return null;
-  const { name, ingredients, dressing, price, savedAt } = r as Record<
-    string,
-    unknown
-  >;
+  if (typeof r !== "object" || r === null) {
+    return null;
+  }
+  const { name, ingredients, dressing, price, savedAt } = r as Record<string, unknown>;
   if (
     typeof name !== "string" ||
     !Array.isArray(ingredients) ||
@@ -28,11 +21,13 @@ function loadRecipe(): SavedRecipe | null {
     typeof dressing !== "number" ||
     dressing < -1 ||
     !Number.isInteger(dressing)
-  )
+  ) {
     return null;
+  }
   const key = (r as SavedRecipe).dressingKey;
-  if (key !== undefined && (typeof key !== "string" || !key || key.length > 80))
+  if (key !== undefined && (typeof key !== "string" || !key || key.length > 80)) {
     return null;
+  }
   return {
     name: name.slice(0, 30),
     ingredients,

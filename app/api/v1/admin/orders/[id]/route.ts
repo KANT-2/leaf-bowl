@@ -11,7 +11,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const { identity, orders } = services();
     await requireAdmin(request, identity);
     const { id } = await params;
-    if (!orderIdSchema.safeParse(id).success) throw new AppError(404, "주문을 찾을 수 없습니다.");
+    if (!orderIdSchema.safeParse(id).success) {
+      throw new AppError(404, "주문을 찾을 수 없습니다.");
+    }
     return jsonResponse(adminDetailView(await orders.getOrderForAdmin(id)));
   });
 }

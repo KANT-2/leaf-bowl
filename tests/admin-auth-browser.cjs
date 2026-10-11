@@ -19,11 +19,19 @@ fs.mkdirSync(shots, { recursive: true });
     await page.getByLabel("아이디", { exact: true }).fill("quality-admin");
     await page.getByLabel("비밀번호", { exact: true }).fill("wrong-password");
     await page.getByRole("button", { name: "로그인", exact: true }).click();
-    await page.getByRole("alert").getByText(/아이디 또는 비밀번호/).waitFor();
+    await page
+      .getByRole("alert")
+      .getByText(/아이디 또는 비밀번호/)
+      .waitFor();
     await page.getByLabel("비밀번호", { exact: true }).fill("quality-password");
     await page.getByRole("button", { name: "로그인", exact: true }).click();
     await page.waitForURL(/\/admin(?:\?|#|$)/);
     assert.deepEqual(errors, []);
     console.log("Browser scenario passed; no page errors.");
-  } finally { await browser.close(); }
-})().catch((error) => { console.error(error); process.exitCode = 1; });
+  } finally {
+    await browser.close();
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

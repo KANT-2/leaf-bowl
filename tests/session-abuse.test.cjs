@@ -19,13 +19,7 @@ require.extensions[".ts"] = (module, filename) =>
   );
 const resolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
-  return resolve.call(
-    this,
-    request.startsWith("@/")
-      ? path.join(__dirname, "..", request.slice(2))
-      : request,
-    ...args,
-  );
+  return resolve.call(this, request.startsWith("@/") ? path.join(__dirname, "..", request.slice(2)) : request, ...args);
 };
 const { customerSeed } = require("../seed/legacy/catalog.ts");
 const { setServicesForTests, createLimits } = require("../application/container.ts");
@@ -46,23 +40,44 @@ const B = "http://localhost:3000";
 const DAY = 24 * 3600_000;
 const T0 = Date.parse("2026-10-10T03:00:00Z"); // 한국 시간 2026-10-10 12:00
 const req = (path, { method = "POST", headers = {}, cookie, body } = {}) =>
-  new Request(B + path, { method, headers: { ...(cookie ? { cookie } : {}), ...(body ? { "content-type": "application/json" } : {}), ...headers }, body: body ? JSON.stringify(body) : undefined });
+  new Request(B + path, {
+    method,
+    headers: { ...(cookie ? { cookie } : {}), ...(body ? { "content-type": "application/json" } : {}), ...headers },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
 const issue = (headers) => sessionRoute.POST(req("/api/v1/session", { headers }));
+
 const cookieOf = (r) => r.headers.getSetCookie()[0].split(";")[0];
+
 const withProxyHops = async (hops, fn) => {
   const before = process.env.TRUSTED_PROXY_HOPS;
-  if (hops === undefined) delete process.env.TRUSTED_PROXY_HOPS;
-  else process.env.TRUSTED_PROXY_HOPS = String(hops);
+  if (hops === undefined) {
+    delete process.env.TRUSTED_PROXY_HOPS;
+  } else {
+    process.env.TRUSTED_PROXY_HOPS = String(hops);
+  }
   try {
     return await fn();
   } finally {
-    if (before === undefined) delete process.env.TRUSTED_PROXY_HOPS;
-    else process.env.TRUSTED_PROXY_HOPS = before;
+    if (before === undefined) {
+      delete process.env.TRUSTED_PROXY_HOPS;
+    } else {
+      process.env.TRUSTED_PROXY_HOPS = before;
+    }
   }
 };
+
 const count = (codes, c) => codes.filter((x) => x === c).length;
+
 const createServices = () => ({
-  orders: createOrdersService({ repository: createMemoryOrdersRepository({ getCatalog: async () => customerSeed(), getPricingPolicy: async () => appDefaults().pricingPolicy, getDeliveryHours: async () => appDefaults().deliveryHours }) }),
+  orders: createOrdersService({
+    repository: createMemoryOrdersRepository({
+      getCatalog: async () => customerSeed(),
+      getPricingPolicy: async () => appDefaults().pricingPolicy,
+      getDeliveryHours: async () => appDefaults().deliveryHours,
+    }),
+  }),
   identity: createIdentityService({ repository: createMemoryIdentityRepository() }),
   limits: createLimits(),
 });
@@ -85,7 +100,9 @@ test("clientKey: 신뢰할 프록시를 설정하지 않으면 X-Forwarded-For �
 test("세션 발급: 헤더를 매번 바꿔도 전체 발급 속도는 한도를 넘지 못한다", async () => {
   setServicesForTests(createServices());
   const codes = [];
-  for (let i = 0; i < 150; i++) codes.push((await issue({ "x-forwarded-for": `10.0.0.${i}` })).status);
+  for (let i = 0; i < 150; i++) {
+    codes.push((await issue({ "x-forwarded-for": `10.0.0.${i}` })).status);
+  }
   assert.equal(count(codes, 201), 120);
   assert.equal(count(codes, 429), 30);
 });
@@ -94,7 +111,9 @@ test("세션 발급: 신뢰할 프록시가 있으면 요청자별 한도도 적
   await withProxyHops(1, async () => {
     setServicesForTests(createServices());
     const codes = [];
-    for (let i = 0; i < 31; i++) codes.push((await issue({ "x-forwarded-for": `spoof-${i}, 9.9.9.9` })).status);
+    for (let i = 0; i < 31; i++) {
+      codes.push((await issue({ "x-forwarded-for": `spoof-${i}, 9.9.9.9` })).status);
+    }
     assert.equal(count(codes, 201), 30);
     assert.equal(codes[30], 429); // 같은 실제 주소(오른쪽 끝)는 31번째가 막힌다
     assert.equal((await issue({ "x-forwarded-for": "spoof, 8.8.8.8" })).status, 201); // 다른 주소는 영향 없음
@@ -106,7 +125,9 @@ test("세션 발급: 이미 유효한 세션이 있는 재방문은 발급 한�
   const first = await issue();
   assert.equal(first.status, 201);
   const cookie = cookieOf(first);
-  for (let i = 0; i < 5; i++) assert.equal((await sessionRoute.POST(req("/api/v1/session", { cookie }))).status, 200);
+  for (let i = 0; i < 5; i++) {
+    assert.equal((await sessionRoute.POST(req("/api/v1/session", { cookie }))).status, 200);
+  }
   assert.equal((await issue()).status, 429); // 새 세션은 한도에 걸린다
 });
 
@@ -115,13 +136,19 @@ test("만료된 세션은 새 세션을 발급할 때 정리되고, 유효한 �
   const repo = createMemoryIdentityRepository();
   const svc = createIdentityService({ repository: repo, now: () => new Date(t) });
   const old = [];
-  for (let i = 0; i < 10; i++) old.push((await svc.issueGuestSession()).token);
+  for (let i = 0; i < 10; i++) {
+    old.push((await svc.issueGuestSession()).token);
+  }
   t += 29 * DAY; // 아직 만료 전 (30일)
   const alive = (await svc.issueGuestSession()).token;
-  for (const tk of old) assert.ok(await repo.findSessionByTokenHash(hashToken(tk)), "유효한 세션은 지워지지 않는다");
+  for (const tk of old) {
+    assert.ok(await repo.findSessionByTokenHash(hashToken(tk)), "유효한 세션은 지워지지 않는다");
+  }
   t += 2 * DAY; // 처음 10개는 만료, alive 는 아직 유효
   await svc.issueGuestSession();
-  for (const tk of old) assert.equal(await repo.findSessionByTokenHash(hashToken(tk)), null);
+  for (const tk of old) {
+    assert.equal(await repo.findSessionByTokenHash(hashToken(tk)), null);
+  }
   assert.ok(await repo.findSessionByTokenHash(hashToken(alive)));
   assert.equal(await repo.countSessions("guest", new Date(t)), 2);
 });
@@ -131,8 +158,13 @@ test("비회원 세션 상한: 가득 차면 503, 만료되면 다시 발급, �
   const repo = createMemoryIdentityRepository();
   const svc = createIdentityService({ repository: repo, now: () => new Date(t), maxGuestSessions: 3 });
   const tokens = [];
-  for (let i = 0; i < 3; i++) tokens.push((await svc.issueGuestSession()).token);
-  await assert.rejects(() => svc.issueGuestSession(), (e) => e instanceof AppError && e.status === 503);
+  for (let i = 0; i < 3; i++) {
+    tokens.push((await svc.issueGuestSession()).token);
+  }
+  await assert.rejects(
+    () => svc.issueGuestSession(),
+    (e) => e instanceof AppError && e.status === 503,
+  );
   assert.ok(await svc.resolve(tokens[0], "guest")); // 기존 방문자는 영향 없음
   t += 31 * DAY;
   await svc.issueGuestSession(); // 만료되어 자리가 생김
@@ -154,12 +186,16 @@ test("비회원 세션 상한: 동시에 많이 발급해도 상한을 넘지 �
 test("요청 제한기: 서로 다른 키를 많이 넣어도 빠르고 키 개수는 상한을 넘지 않는다", () => {
   const limiter = createRateLimiter(10, 60_000);
   const started = Date.now();
-  for (let i = 0; i < 20_000; i++) limiter.hit("key-" + i);
+  for (let i = 0; i < 20_000; i++) {
+    limiter.hit("key-" + i);
+  }
   const elapsed = Date.now() - started;
   assert.ok(limiter.size() <= 10_000, "키 개수 " + limiter.size());
   assert.ok(elapsed < 1000, "20,000 키 처리 " + elapsed + "ms (예전에는 약 4,000ms)");
   const small = createRateLimiter(1, 60_000, { maxKeys: 3 });
-  for (const k of ["a", "b", "c", "d"]) small.hit(k);
+  for (const k of ["a", "b", "c", "d"]) {
+    small.hit(k);
+  }
   assert.equal(small.size(), 3); // 가장 오래된 키가 밀려났다
 });
 
@@ -168,7 +204,10 @@ test("요청 제한기: 한도 초과는 429, 시간 구간이 지나면 다시 
   const limiter = createRateLimiter(2, 1000, { now: () => t });
   limiter.hit("k");
   limiter.hit("k");
-  assert.throws(() => limiter.hit("k"), (e) => e instanceof AppError && e.status === 429);
+  assert.throws(
+    () => limiter.hit("k"),
+    (e) => e instanceof AppError && e.status === 429,
+  );
   limiter.hit("other"); // 다른 키는 별개
   t = 1001;
   limiter.hit("k"); // 구간이 지나 다시 허용
@@ -178,19 +217,34 @@ test("요청 제한기: 한도 초과는 429, 시간 구간이 지나면 다시 
 async function loginSetup(limits) {
   const now = () => new Date(T0);
   setServicesForTests({
-    orders: createOrdersService({ repository: createMemoryOrdersRepository({ getCatalog: async () => ({}), getPricingPolicy: async () => appDefaults().pricingPolicy, getDeliveryHours: async () => appDefaults().deliveryHours }) }),
-    identity: createIdentityService({ repository: createMemoryIdentityRepository([{ id: "a1", loginId: "admin", passwordHash: await hashPassword("pw") }]), now }),
+    orders: createOrdersService({
+      repository: createMemoryOrdersRepository({
+        getCatalog: async () => ({}),
+        getPricingPolicy: async () => appDefaults().pricingPolicy,
+        getDeliveryHours: async () => appDefaults().deliveryHours,
+      }),
+    }),
+    identity: createIdentityService({
+      repository: createMemoryIdentityRepository([
+        { id: "a1", loginId: "admin", passwordHash: await hashPassword("pw") },
+      ]),
+      now,
+    }),
     limits,
   });
 }
-const login = (loginId, password, headers) => loginRoute.POST(req("/api/v1/auth/login", { body: { loginId, password }, headers }));
+
+const login = (loginId, password, headers) =>
+  loginRoute.POST(req("/api/v1/auth/login", { body: { loginId, password }, headers }));
 
 test("로그인 제한: 'ghost-0'~'ghost-299' 300개 샘플에서는 키가 상한 안이고 실제 관리자 로그인이 막히지 않았다 (일반 보장이 아님)", async () => {
   // 한정된 샘플 검증이다. 아이디는 1,024칸을 공유하므로, admin 과 같은 칸에 걸리는 아이디를 고르면
   // 관리자 로그인이 막힐 수 있다 (아래 'collision-687' 테스트). 이 샘플은 그 칸을 우연히 피한 것뿐이다.
   const limits = createLimits({ account: 5, clientLogin: 1000, globalLogin: 1000 });
   await loginSetup(limits);
-  for (let i = 0; i < 300; i++) await login("ghost-" + i, "x", { "x-forwarded-for": "7.7.7." + i });
+  for (let i = 0; i < 300; i++) {
+    await login("ghost-" + i, "x", { "x-forwarded-for": "7.7.7." + i });
+  }
   assert.ok(limits.account.size() <= LOGIN_BUCKETS, "키 " + limits.account.size() + "개 (상한 " + LOGIN_BUCKETS + ")");
   const sampleBuckets = new Set(Array.from({ length: 300 }, (_, i) => loginRateKey("ghost-" + i)));
   assert.ok(!sampleBuckets.has(loginRateKey("admin")), "샘플이 admin 과 같은 칸을 쓰면 이 단언의 전제가 깨진다");
@@ -204,7 +258,9 @@ test("로그인 제한: 존재하지 않는 'collision-687' 이 admin 과 같은
   let t = 0;
   const limits = createLimits({ clientLogin: 1000, globalLogin: 1000 }, () => t); // account 기본 한도 10/분
   await loginSetup(limits);
-  for (let i = 0; i < 10; i++) assert.equal((await login("collision-687", "wrong")).status, 401);
+  for (let i = 0; i < 10; i++) {
+    assert.equal((await login("collision-687", "wrong")).status, 401);
+  }
   assert.equal((await login("admin", "pw")).status, 429); // 올바른 비밀번호여도 같은 칸이 소진되어 막힌다 (직접 admin 을 10회 공격한 것과 같은 효과)
   t += 60_000;
   assert.equal((await login("admin", "pw")).status, 200); // 한 구간(60초)이 지나 풀린다
@@ -214,9 +270,13 @@ test("로그인 제한: 응답이 계정 존재 여부를 드러내지 않는다
   const run = async (loginId, before) => {
     const limits = createLimits({ account: 5, clientLogin: 1000, globalLogin: 1000 });
     await loginSetup(limits);
-    for (let i = 0; i < before; i++) await login("ghost-spray", "x"); // 다른 모르는 아이디를 먼저 소진
+    for (let i = 0; i < before; i++) {
+      await login("ghost-spray", "x");
+    } // 다른 모르는 아이디를 먼저 소진
     const statuses = [];
-    for (let i = 0; i < 8; i++) statuses.push((await login(loginId, "wrong")).status);
+    for (let i = 0; i < 8; i++) {
+      statuses.push((await login(loginId, "wrong")).status);
+    }
     return statuses;
   };
   for (const before of [0, 8, 50]) {
@@ -236,7 +296,9 @@ test("로그인 제한: 같은 아이디는 대소문자·공백이 달라도 �
 test("로그인 제한: 전체 한도가 비밀번호 검사 총량을 막는다", async () => {
   await loginSetup(createLimits({ account: 1000, clientLogin: 1000, globalLogin: 5 }));
   const codes = [];
-  for (let i = 0; i < 8; i++) codes.push((await login("ghost-" + i, "x")).status);
+  for (let i = 0; i < 8; i++) {
+    codes.push((await login("ghost-" + i, "x")).status);
+  }
   assert.deepEqual(codes, [401, 401, 401, 401, 401, 429, 429, 429]);
 });
 
@@ -245,7 +307,9 @@ test("로그인 제한: 접속자 헤더를 바꿔도 같은 계정의 틀린 �
   const limits = createLimits({ account: 5, clientLogin: 1000, globalLogin: 1000 }, () => t);
   await loginSetup(limits);
   const codes = [];
-  for (let i = 0; i < 8; i++) codes.push((await login("admin", "wrong", { "x-forwarded-for": "6.6.6." + i })).status);
+  for (let i = 0; i < 8; i++) {
+    codes.push((await login("admin", "wrong", { "x-forwarded-for": "6.6.6." + i })).status);
+  }
   assert.deepEqual(codes, [401, 401, 401, 401, 401, 429, 429, 429]);
   t += 61_000;
   assert.equal((await login("admin", "pw")).status, 200);
@@ -256,22 +320,41 @@ test("기존 주문 조회: 세션 정리와 새 방문자 발급이 있어도 �
   const catalog = customerSeed();
   const dressing = catalog.products.find((p) => p.type === "dressing").id;
   setServicesForTests({
-    orders: createOrdersService({ repository: createMemoryOrdersRepository({ getCatalog: async () => catalog, getPricingPolicy: async () => appDefaults().pricingPolicy, getDeliveryHours: async () => appDefaults().deliveryHours }), now: () => new Date(T0) }),
+    orders: createOrdersService({
+      repository: createMemoryOrdersRepository({
+        getCatalog: async () => catalog,
+        getPricingPolicy: async () => appDefaults().pricingPolicy,
+        getDeliveryHours: async () => appDefaults().deliveryHours,
+      }),
+      now: () => new Date(T0),
+    }),
     identity: createIdentityService({ repository: createMemoryIdentityRepository(), now: () => new Date(idClock) }),
     limits: createLimits({ globalSession: 1000, clientSession: 1000 }),
   });
   const cookie = cookieOf(await issue());
-  const placed = await ordersRoute.POST(req("/api/v1/orders", {
-    cookie,
-    headers: { "idempotency-key": "keep-order-0001" },
-    body: { items: [{ productId: 0, dressingKey: dressing, quantity: 2 }], ordererName: "A", phone: "010-1234-5678", address: "x", desiredDate: "2026-10-13", desiredSlot: "12:00–13:00" },
-  }));
+  const placed = await ordersRoute.POST(
+    req("/api/v1/orders", {
+      cookie,
+      headers: { "idempotency-key": "keep-order-0001" },
+      body: {
+        items: [{ productId: 0, dressingKey: dressing, quantity: 2 }],
+        ordererName: "A",
+        phone: "010-1234-5678",
+        address: "x",
+        desiredDate: "2026-10-13",
+        desiredSlot: "12:00–13:00",
+      },
+    }),
+  );
   assert.equal(placed.status, 201);
   const id = (await placed.json()).id;
-  const get = (c) => orderRoute.GET(req("/api/v1/orders/" + id, { method: "GET", cookie: c }), { params: Promise.resolve({ id }) });
+  const get = (c) =>
+    orderRoute.GET(req("/api/v1/orders/" + id, { method: "GET", cookie: c }), { params: Promise.resolve({ id }) });
 
   idClock += 29 * DAY; // 정리가 돌지만 이 세션은 아직 유효
-  for (let i = 0; i < 20; i++) assert.equal((await issue()).status, 201);
+  for (let i = 0; i < 20; i++) {
+    assert.equal((await issue()).status, 201);
+  }
   assert.equal((await get(cookie)).status, 200);
 
   idClock += 2 * DAY; // 30일이 지나 이 세션은 만료 → 쿠키로는 더 이상 조회할 수 없고, 새 방문자에게는 보이지 않는다

@@ -4,10 +4,7 @@ export const HERO_SLIDES: HeroSlide[] = [
   {
     eyebrow: "FRESH BOWL, FRESH DAY",
     title: ["좋은 하루는,", "좋은 한 그릇에서."],
-    body: [
-      "신선한 재료와 기분 좋은 조합.",
-      "오늘의 나를 위한 샐러드를 만나보세요.",
-    ],
+    body: ["신선한 재료와 기분 좋은 조합.", "오늘의 나를 위한 샐러드를 만나보세요."],
     cta: "오늘의 샐러드 고르기",
     href: "/menu",
     src: "/images/hero-cutout.png",
@@ -20,10 +17,7 @@ export const HERO_SLIDES: HeroSlide[] = [
   {
     eyebrow: "PROTEIN BOWL, STRONG DAY",
     title: ["든든한 한 끼도,", "가볍게 한 그릇."],
-    body: [
-      "부드럽게 구운 연어와 잘 익은 아보카도.",
-      "단백질 29g으로 오후까지 든든하게.",
-    ],
+    body: ["부드럽게 구운 연어와 잘 익은 아보카도.", "단백질 29g으로 오후까지 든든하게."],
     cta: "연어 아보카도 보기",
     href: "/product/1",
     src: "/images/salad-01-cutout.png",
@@ -36,10 +30,7 @@ export const HERO_SLIDES: HeroSlide[] = [
   {
     eyebrow: "PLANT BOWL, GREEN DAY",
     title: ["초록으로 채운,", "가벼운 하루."],
-    body: [
-      "고소한 구운 두부와 알알이 퀴노아.",
-      "식물성 재료만으로도 충분히 맛있게.",
-    ],
+    body: ["고소한 구운 두부와 알알이 퀴노아.", "식물성 재료만으로도 충분히 맛있게."],
     cta: "두부 퀴노아 보기",
     href: "/product/3",
     src: "/images/salad-03-cutout.png",

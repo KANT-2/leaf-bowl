@@ -20,18 +20,13 @@ function AddressForm({
 }) {
   const { catalogConfig } = useCustomerCatalog();
   const [label, setLabel] = useState(initial?.label ?? "");
-  const [recipientName, setRecipientName] = useState(
-    initial?.recipientName ?? "",
-  );
+  const [recipientName, setRecipientName] = useState(initial?.recipientName ?? "");
   const [address, setAddress] = useState(initial?.address ?? "");
   const [detail, setDetail] = useState(initial?.detail ?? "");
   const [phone, setPhone] = useState(initial?.phone ?? "");
-  const [requestNote, setRequestNote] = useState(
-    initial?.requestNote ?? catalogConfig.deliveryRequestPresets[0],
-  );
+  const [requestNote, setRequestNote] = useState(initial?.requestNote ?? catalogConfig.deliveryRequestPresets[0]);
   const [customNote, setCustomNote] = useState(
-    initial?.requestNote &&
-      !catalogConfig.deliveryRequestPresets.includes(initial.requestNote)
+    initial?.requestNote && !catalogConfig.deliveryRequestPresets.includes(initial.requestNote)
       ? initial.requestNote
       : "",
   );
@@ -46,7 +41,9 @@ function AddressForm({
         className="mypage-form address-form"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!recipientName.trim() || !address.trim()) return;
+          if (!recipientName.trim() || !address.trim()) {
+            return;
+          }
           onSubmit({
             label: label.trim() || "배송지",
             recipientName: recipientName.trim(),
@@ -60,43 +57,18 @@ function AddressForm({
       >
         <label className="field">
           <span>배송지 별칭</span>
-          <input
-            value={label}
-            maxLength={20}
-            placeholder="집, 회사 등"
-            onChange={(e) => setLabel(e.target.value)}
-          />
+          <input value={label} maxLength={20} placeholder="집, 회사 등" onChange={(e) => setLabel(e.target.value)} />
         </label>
         <label className="field">
           <span>받는 사람</span>
-          <input
-            required
-            value={recipientName}
-            maxLength={30}
-            onChange={(e) => setRecipientName(e.target.value)}
-          />
+          <input required value={recipientName} maxLength={30} onChange={(e) => setRecipientName(e.target.value)} />
         </label>
         <label className="field">
           <span>주소</span>
           <div className="address-input-row">
-            <input
-              required
-              value={address}
-              maxLength={200}
-              onChange={(e) => setAddress(e.target.value)}
-            />
-            <button
-              type="button"
-              className="ghost-btn address-search-btn"
-              onClick={() => setSearchOpen(true)}
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                aria-hidden="true"
-              >
+            <input required value={address} maxLength={200} onChange={(e) => setAddress(e.target.value)} />
+            <button type="button" className="ghost-btn address-search-btn" onClick={() => setSearchOpen(true)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
                 <circle cx="10" cy="10" r="6" />
                 <path d="m15 15 5 5" />
               </svg>
@@ -106,27 +78,15 @@ function AddressForm({
         </label>
         <label className="field">
           <span>상세 주소</span>
-          <input
-            value={detail}
-            maxLength={100}
-            onChange={(e) => setDetail(e.target.value)}
-          />
+          <input value={detail} maxLength={100} onChange={(e) => setDetail(e.target.value)} />
         </label>
         <label className="field">
           <span>연락처</span>
-          <input
-            value={phone}
-            maxLength={20}
-            placeholder="010-0000-0000"
-            onChange={(e) => setPhone(e.target.value)}
-          />
+          <input value={phone} maxLength={20} placeholder="010-0000-0000" onChange={(e) => setPhone(e.target.value)} />
         </label>
         <label className="field">
           <span>배송 요청사항</span>
-          <select
-            value={requestNote}
-            onChange={(e) => setRequestNote(e.target.value)}
-          >
+          <select value={requestNote} onChange={(e) => setRequestNote(e.target.value)}>
             {catalogConfig.deliveryRequestPresets.map((p) => (
               <option key={p} value={p}>
                 {p}
@@ -138,19 +98,11 @@ function AddressForm({
         {isCustom && (
           <label className="field">
             <span>요청사항 직접 입력</span>
-            <input
-              value={customNote}
-              maxLength={60}
-              onChange={(e) => setCustomNote(e.target.value)}
-            />
+            <input value={customNote} maxLength={60} onChange={(e) => setCustomNote(e.target.value)} />
           </label>
         )}
         <label className="check-line">
-          <input
-            type="checkbox"
-            checked={isDefault}
-            onChange={(e) => setIsDefault(e.target.checked)}
-          />
+          <input type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} />
           기본 배송지로 선택
         </label>
         <div className="form-actions-stack">
@@ -165,11 +117,7 @@ function AddressForm({
                 </button>
               )}
               {onDelete && (
-                <button
-                  type="button"
-                  className="text-btn text-btn-danger"
-                  onClick={onDelete}
-                >
+                <button type="button" className="text-btn text-btn-danger" onClick={onDelete}>
                   삭제
                 </button>
               )}
@@ -187,13 +135,14 @@ function AddressForm({
 }
 
 export default function AddressTab() {
-  const { user, addAddress, updateAddress, removeAddress, setDefaultAddress } =
-    useAuth();
+  const { user, addAddress, updateAddress, removeAddress, setDefaultAddress } = useAuth();
   const toast = useToast();
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  if (!user) return null;
+  if (!user) {
+    return null;
+  }
 
   return (
     <section className="surface mypage-section">
@@ -248,18 +197,12 @@ export default function AddressTab() {
                 <div className="address-item-top">
                   <strong>
                     {a.recipientName}
-                    {a.label && (
-                      <span className="address-label-tag">{a.label}</span>
-                    )}
+                    {a.label && <span className="address-label-tag">{a.label}</span>}
                   </strong>
                   {a.isDefault ? (
                     <span className="address-default-tag">기본 배송지</span>
                   ) : (
-                    <button
-                      type="button"
-                      className="ghost-btn"
-                      onClick={() => setDefaultAddress(a.id)}
-                    >
+                    <button type="button" className="ghost-btn" onClick={() => setDefaultAddress(a.id)}>
                       기본으로 설정
                     </button>
                   )}
@@ -269,15 +212,9 @@ export default function AddressTab() {
                   {a.detail ? `, ${a.detail}` : ""}
                 </p>
                 {a.phone && <p className="meta">{a.phone}</p>}
-                {a.requestNote && (
-                  <p className="meta">배송 요청: {a.requestNote}</p>
-                )}
+                {a.requestNote && <p className="meta">배송 요청: {a.requestNote}</p>}
                 <div className="row-actions">
-                  <button
-                    type="button"
-                    className="ghost-btn"
-                    onClick={() => setEditingId(a.id)}
-                  >
+                  <button type="button" className="ghost-btn" onClick={() => setEditingId(a.id)}>
                     수정
                   </button>
                 </div>

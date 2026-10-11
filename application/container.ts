@@ -1,19 +1,10 @@
 import "server-only";
 import { prisma } from "@/infrastructure/database/prisma";
 import { createPostgresIdentityRepository } from "@/infrastructure/identity/postgres";
-import {
-  createIdentityService,
-  type IdentityService,
-} from "@/modules/identity/service";
+import { createIdentityService, type IdentityService } from "@/modules/identity/service";
 import { createPostgresOrdersRepository } from "@/infrastructure/orders/postgres";
-import {
-  createOrdersService,
-  type OrdersService,
-} from "@/modules/orders/service";
-import {
-  createRateLimiter,
-  type RateLimiter,
-} from "@/modules/shared/rate-limit";
+import { createOrdersService, type OrdersService } from "@/modules/orders/service";
+import { createRateLimiter, type RateLimiter } from "@/modules/shared/rate-limit";
 
 /**
  * 요청 제한 묶음 (분당).

@@ -38,8 +38,8 @@ export default function ProductForm({
       ingredients: value,
       allergens: ingredientAllergens(value, ingredients).allergens,
     }));
-  const set = <K extends keyof Product>(key: K, value: Product[K]) =>
-    setP((x) => ({ ...x, [key]: value }));
+
+  const set = <K extends keyof Product>(key: K, value: Product[K]) => setP((x) => ({ ...x, [key]: value }));
   return (
     <form
       onSubmit={async (e) => {
@@ -48,9 +48,7 @@ export default function ProductForm({
         try {
           await onSave({
             ...p,
-            optionIds: p.optionIds.filter((id) =>
-              groups.some((g) => g.id === id),
-            ),
+            optionIds: p.optionIds.filter((id) => groups.some((g) => g.id === id)),
           });
         } catch (e) {
           setError((e as Error).message);
@@ -112,21 +110,14 @@ export default function ProductForm({
                 value={p.badge}
                 label="배지"
                 onChange={(v) => set("badge", v as Product["badge"])}
-                options={["", "BEST", "NEW", "PLANT", "PICK"].map((v) => [
-                  v,
-                  v || "배지 없음",
-                ])}
+                options={["", "BEST", "NEW", "PLANT", "PICK"].map((v) => [v, v || "배지 없음"])}
               />
             </label>
           </div>
           <div>
             <div className="field">
               메뉴 이미지
-              <Upload
-                value={p.image}
-                onChange={(v) => set("image", v)}
-                onBusy={setUploading}
-              />
+              <Upload value={p.image} onChange={(v) => set("image", v)} onBusy={setUploading} />
             </div>
             <label className="field">
               메뉴 설명
@@ -141,11 +132,7 @@ export default function ProductForm({
               <>
                 <label className="field">
                   영문 이름
-                  <Input
-                    maxLength={100}
-                    value={p.en ?? ""}
-                    onChange={(e) => set("en", e.target.value)}
-                  />
+                  <Input maxLength={100} value={p.en ?? ""} onChange={(e) => set("en", e.target.value)} />
                 </label>
                 <label className="field">
                   구성 재료
@@ -159,22 +146,13 @@ export default function ProductForm({
             )}
             {p.type === "salad" && (
               <div className="field">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => set("allergens", inferred.allergens)}
-                >
+                <Button type="button" variant="outline" size="sm" onClick={() => set("allergens", inferred.allergens)}>
                   재료 기준으로 자동 입력
                 </Button>
-                <p className="meta">
-                  구성 재료 변경 시 등록된 재료의 안내를 자동 입력하며 직접
-                  보완할 수 있습니다.
-                </p>
+                <p className="meta">구성 재료 변경 시 등록된 재료의 안내를 자동 입력하며 직접 보완할 수 있습니다.</p>
                 {inferred.unknown.length > 0 && (
                   <p className="meta" role="status">
-                    등록된 재료와 일치하지 않아 확인이 필요합니다:{" "}
-                    {inferred.unknown.join(", ")}
+                    등록된 재료와 일치하지 않아 확인이 필요합니다: {inferred.unknown.join(", ")}
                   </p>
                 )}
               </div>
@@ -196,22 +174,13 @@ export default function ProductForm({
                     <Checkbox
                       checked={p.optionIds.includes(g.id)}
                       onCheckedChange={(v) =>
-                        set(
-                          "optionIds",
-                          v
-                            ? [...p.optionIds, g.id]
-                            : p.optionIds.filter((x) => x !== g.id),
-                        )
+                        set("optionIds", v ? [...p.optionIds, g.id] : p.optionIds.filter((x) => x !== g.id))
                       }
                     />
                     {g.name}
                   </label>
                 ))}
-                {!groups.length && (
-                  <div className="meta">
-                    옵션 관리에서 그룹을 먼저 등록해주세요.
-                  </div>
-                )}
+                {!groups.length && <div className="meta">옵션 관리에서 그룹을 먼저 등록해주세요.</div>}
               </div>
             )}
           </div>
@@ -220,25 +189,13 @@ export default function ProductForm({
       {error && (
         <div role="alert" className="error">
           {error}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="ml-3"
-            disabled={busy}
-            onClick={onRefresh}
-          >
+          <Button type="button" variant="outline" size="sm" className="ml-3" disabled={busy} onClick={onRefresh}>
             최신 내용 불러오기
           </Button>
         </div>
       )}
       <div className="form-footer">
-        <Button
-          type="button"
-          variant="outline"
-          disabled={busy || uploading}
-          onClick={onCancel}
-        >
+        <Button type="button" variant="outline" disabled={busy || uploading} onClick={onCancel}>
           취소
         </Button>
         <Button type="submit" disabled={busy || uploading}>

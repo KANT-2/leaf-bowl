@@ -1,8 +1,5 @@
 /** 저장소 접근 실패·잘못된 JSON은 각 도메인이 지정한 초기값으로 복구한다. */
-export function readBrowserJSON(
-  key: string,
-  fallback: unknown = null,
-): unknown {
+export function readBrowserJSON(key: string, fallback: unknown = null): unknown {
   try {
     const value = localStorage.getItem(key);
     return value === null ? fallback : JSON.parse(value);

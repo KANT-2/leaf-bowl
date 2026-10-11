@@ -4,10 +4,7 @@ import { catalogSchema } from "@/modules/catalog/schema";
 import type { CatalogState } from "@/modules/catalog/state";
 
 /** Readers share this lock; catalog writers hold it exclusively until commit. */
-export async function lockCatalog(
-  tx: DatabaseTransaction,
-  mode: "read" | "write",
-) {
+export async function lockCatalog(tx: DatabaseTransaction, mode: "read" | "write") {
   if (mode === "write") {
     await tx.$queryRaw`SELECT id FROM catalog_meta WHERE id = 1 FOR UPDATE`;
   } else {
@@ -15,14 +12,11 @@ export async function lockCatalog(
   }
 }
 
-export async function readCatalogState(
-  tx: DatabaseTransaction,
-): Promise<CatalogState> {
+export async function readCatalogState(tx: DatabaseTransaction): Promise<CatalogState> {
   const meta = await tx.catalogMeta.findUnique({ where: { id: 1 } });
-  if (!meta)
-    throw new Error(
-      "카탈로그가 초기화되지 않았습니다. npm run db:seed 또는 db:import를 실행해주세요.",
-    );
+  if (!meta) {
+    throw new Error("카탈로그가 초기화되지 않았습니다. npm run db:seed 또는 db:import를 실행해주세요.");
+  }
   const [
     products,
     groups,
@@ -80,9 +74,7 @@ export async function readCatalogState(
       allergens: row.allergensText,
       deleted: row.deleted,
       isNew: row.isNew ?? undefined,
-      optionIds: links
-        .filter((link) => link.productId === row.id)
-        .map((link) => link.groupId),
+      optionIds: links.filter((link) => link.productId === row.id).map((link) => link.groupId),
     })),
     groups: groups.map((row) => ({
       id: row.id,
@@ -128,12 +120,8 @@ export async function readCatalogState(
       via: row.via ?? undefined,
       createdAt: row.createdAt?.toISOString(),
       deleted: row.deleted,
-      images: images
-        .filter((image) => image.reviewId === row.id)
-        .map((image) => image.image),
-      drinks: drinks
-        .filter((drink) => drink.reviewId === row.id)
-        .map((drink) => drink.name),
+      images: images.filter((image) => image.reviewId === row.id).map((image) => image.image),
+      drinks: drinks.filter((drink) => drink.reviewId === row.id).map((drink) => drink.name),
     })),
     content: {
       heroTitle: content.heroTitle,
@@ -167,10 +155,7 @@ export async function readCatalogState(
 }
 
 /** Called under the exclusive catalog lock, or the initialization advisory lock. */
-export async function saveCatalogState(
-  tx: DatabaseTransaction,
-  state: CatalogState,
-): Promise<void> {
+export async function saveCatalogState(tx: DatabaseTransaction, state: CatalogState): Promise<void> {
   const catalog = catalogSchema.parse(state.catalog);
   const at = new Date(state.updatedAt);
   await tx.productOptionGroup.deleteMany();
@@ -255,8 +240,7 @@ export async function saveCatalogState(
       category: ingredient.category,
       status: ingredient.status,
       deleted: ingredient.deleted,
-      inBowlMatch:
-        ingredient.stage !== undefined && ingredient.price !== undefined,
+      inBowlMatch: ingredient.stage !== undefined && ingredient.price !== undefined,
       sortOrder,
       allergensText: ingredient.allergens,
       origin: ingredient.origin ?? null,
@@ -277,20 +261,14 @@ export async function saveCatalogState(
     ),
   ];
   const names = [
-    ...new Set(
-      [...catalog.products, ...(catalog.ingredients ?? [])].flatMap((row) =>
-        splitAllergens(row.allergens),
-      ),
-    ),
+    ...new Set([...catalog.products, ...(catalog.ingredients ?? [])].flatMap((row) => splitAllergens(row.allergens))),
   ];
   await tx.allergen.createMany({
     data: names.map((name) => ({ name })),
     skipDuplicates: true,
   });
   const allergenIds = new Map(
-    (await tx.allergen.findMany({ where: { name: { in: names } } })).map(
-      (row) => [row.name, row.id],
-    ),
+    (await tx.allergen.findMany({ where: { name: { in: names } } })).map((row) => [row.name, row.id]),
   );
   await tx.productAllergen.createMany({
     data: catalog.products.flatMap((product) =>
@@ -315,10 +293,7 @@ export async function saveCatalogState(
   await tx.review.createMany({
     data: (catalog.reviews ?? []).map((review, sortOrder) => ({
       id: review.id,
-      productId:
-        review.productId && productIds.has(review.productId)
-          ? review.productId
-          : null,
+      productId: review.productId && productIds.has(review.productId) ? review.productId : null,
       originalProductId: review.productId ?? null,
       isSample: review.sample ?? null,
       title: review.title,
@@ -379,8 +354,9 @@ export async function saveCatalogState(
     })),
   });
   await tx.storeLocation.deleteMany();
-  if (catalog.location)
+  if (catalog.location) {
     await tx.storeLocation.create({ data: { id: 1, ...catalog.location } });
+  }
   await tx.deletedReviewId.createMany({
     data: state.deletedReviewIds.map((id) => ({ id })),
     skipDuplicates: true,

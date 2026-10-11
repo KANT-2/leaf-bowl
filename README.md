@@ -117,7 +117,10 @@ npm run start
 | 명령 | 설명 |
 | --- | --- |
 | `npm run dev` | 개발 서버 실행 |
-| `npm run lint` | ESLint 검사 |
+| `npm run lint` | ESLint 규칙 및 Prettier 스타일 검사 |
+| `npm run format` | 코드 포맷 수정 |
+| `npm run format:check` | 코드 포맷 검사 |
+| `npx eslint --fix` | 중괄호·함수 간 빈 줄 등 린트 자동 수정 |
 | `npm run build` | 운영 빌드 생성 |
 | `npm run start` | 생성된 운영 빌드로 서버 실행 |
 | `npx --no-install tsc --noEmit` | TypeScript 검사 |
@@ -169,7 +172,13 @@ leaf-bowl/
 └── .github/workflows/    # Frontend CI
 ```
 
+코드 스타일은 들여쓰기 2칸, 쌍따옴표, 세미콜론, 줄 폭 120자, LF로 통일합니다. `if`·`else`·`for`·`while`·`do` 본문에는 중괄호를 반드시 사용합니다. 인접한 함수 선언(화살표 함수·export 함수 포함)과 클래스 메서드 사이에는 빈 줄을 한 줄 두고, 연속 빈 줄 두 개 이상은 허용하지 않습니다. 긴 문자열·URL처럼 나누기 어려운 값은 120자를 넘을 수 있습니다.
+
+`npx eslint --fix`로 중괄호·함수 간 간격을 수정한 다음 `npm run format`으로 포맷을 정리합니다. `npm run lint`는 두 검사 모두 수행하며 스타일 위반도 기존 CI에서 실패합니다. 생성 코드·빌드 결과·배포 상태·사진/정적 자산·문서는 자동 포맷 대상에서 제외합니다. SQL·Prisma 스키마·Python은 Prettier 포맷 대상이 아닙니다.
+
 [모듈 경계와 데이터 흐름](docs/architecture.md)에 책임·의존성 규칙과 변경 시 확인할 항목을 정리했습니다. `npm run lint`와 `npm test`가 경계 위반·순환 의존성·클라이언트의 서버 코드 참조를 검사합니다.
+
+Tailwind 색상·글꼴 토큰은 `app/styles/theme.css`에서 공유합니다. 기본 스타일은 `base`, 화면별 CSS는 `components` 레이어에 두어 Tailwind 유틸리티로 크기·여백을 조정할 수 있게 합니다. 고객의 기존 리셋과 관리자 Preflight는 각 루트 레이아웃에서 유지합니다. 공통 컴포넌트의 변형과 화면이 요구하는 크기는 컴포넌트 클래스에서 지정합니다.
 
 ### 데이터는 어디에 저장되나요?
 

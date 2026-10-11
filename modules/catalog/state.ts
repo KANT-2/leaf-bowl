@@ -26,21 +26,16 @@ export function snapshot(state: CatalogState): CatalogSnapshot {
   };
 }
 
-export function replaceCatalog(
-  current: CatalogState,
-  catalog: Catalog,
-  updatedAt: string,
-): CatalogState {
-  let nextId = Math.max(
-    current.nextCustomerId,
-    0,
-    ...current.catalog.products.map((p) => (p.customerId ?? -1) + 1),
-  );
+export function replaceCatalog(current: CatalogState, catalog: Catalog, updatedAt: string): CatalogState {
+  let nextId = Math.max(current.nextCustomerId, 0, ...current.catalog.products.map((p) => (p.customerId ?? -1) + 1));
   const incoming = catalog.reviews ?? current.catalog.reviews ?? [];
   const incomingIds = new Set(incoming.map((r) => r.id));
   const removed = new Set(current.deletedReviewIds);
-  for (const review of current.catalog.reviews ?? [])
-    if (!incomingIds.has(review.id)) removed.add(review.id);
+  for (const review of current.catalog.reviews ?? []) {
+    if (!incomingIds.has(review.id)) {
+      removed.add(review.id);
+    }
+  }
   const normalized: Catalog = {
     ...catalog,
     ingredients: catalog.ingredients ?? current.catalog.ingredients ?? [],
@@ -48,15 +43,12 @@ export function replaceCatalog(
     ...((catalog.location ?? current.catalog.location)
       ? { location: catalog.location ?? current.catalog.location }
       : {}),
-    reviews: incoming
-      .filter((r) => !removed.has(r.id))
-      .map(normalizeReviewTime),
+    reviews: incoming.filter((r) => !removed.has(r.id)).map(normalizeReviewTime),
     products: catalog.products.map((p) => ({
       ...p,
       customerId:
         p.type === "salad"
-          ? (current.catalog.products.find((old) => old.id === p.id)
-              ?.customerId ?? nextId++)
+          ? (current.catalog.products.find((old) => old.id === p.id)?.customerId ?? nextId++)
           : undefined,
     })),
   };
@@ -69,27 +61,19 @@ export function replaceCatalog(
   };
 }
 
-export function addReview(
-  current: CatalogState,
-  input: ReviewInput,
-  createdAt: string,
-): CatalogState {
-  if (
-    current.deletedReviewIds.includes(input.id) ||
-    current.catalog.reviews?.some((r) => r.id === input.id)
-  )
+export function addReview(current: CatalogState, input: ReviewInput, createdAt: string): CatalogState {
+  if (current.deletedReviewIds.includes(input.id) || current.catalog.reviews?.some((r) => r.id === input.id)) {
     return current;
+  }
   const product = current.catalog.products.find(
-    (p) =>
-      p.customerId === input.pid &&
-      p.type === "salad" &&
-      !p.deleted &&
-      p.status !== "hidden",
+    (p) => p.customerId === input.pid && p.type === "salad" && !p.deleted && p.status !== "hidden",
   );
-  if (!product)
+  if (!product) {
     throw new AppError(400, "해당 메뉴에 리뷰를 작성할 수 없습니다.");
-  if ((current.catalog.reviews ?? []).length >= 500)
+  }
+  if ((current.catalog.reviews ?? []).length >= 500) {
     throw new AppError(400, "리뷰 등록 한도에 도달했습니다.");
+  }
   return {
     ...current,
     revision: current.revision + 1,

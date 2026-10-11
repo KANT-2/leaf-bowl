@@ -12,10 +12,7 @@ export class DuplicateRequestError extends Error {
 }
 
 export interface OrdersTransaction {
-  findByRequest(
-    customerSessionId: string,
-    requestKey: string,
-  ): Promise<OrderRecord | null>;
+  findByRequest(customerSessionId: string, requestKey: string): Promise<OrderRecord | null>;
   /** Catalog prices cannot change until this transaction commits. */
   getCatalog(): Promise<Catalog>;
   getPricingPolicy(): Promise<PricingPolicy>;
@@ -26,10 +23,7 @@ export interface OrdersTransaction {
 /** PostgreSQL in the app; the memory adapter is retained for isolated unit tests. */
 export interface OrdersRepository {
   transaction<T>(work: (tx: OrdersTransaction) => Promise<T>): Promise<T>;
-  findByRequest(
-    customerSessionId: string,
-    requestKey: string,
-  ): Promise<OrderRecord | null>;
+  findByRequest(customerSessionId: string, requestKey: string): Promise<OrderRecord | null>;
   findById(id: string): Promise<OrderRecord | null>;
   /** @throws DuplicateRequestError */
   create(order: NewOrder): Promise<OrderRecord>;

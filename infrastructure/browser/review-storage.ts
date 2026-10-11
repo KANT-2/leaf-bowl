@@ -1,7 +1,4 @@
-import {
-  readBrowserJSON as readJSON,
-  writeBrowserJSON as writeJSON,
-} from "./json";
+import { readBrowserJSON as readJSON, writeBrowserJSON as writeJSON } from "./json";
 import { reviewDisplayDate, type Review } from "@/modules/reviews/model";
 import { isRecord, isProductId } from "@/modules/shared/validation";
 export const REVIEW_KEY = "bb-user-reviews";

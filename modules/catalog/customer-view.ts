@@ -18,6 +18,7 @@ const split = (s: string) =>
     .split(/[,·]/)
     .map((x) => x.trim())
     .filter(Boolean);
+
 export function customerCatalog(snapshot: PublicSnapshot) {
   const catalog = snapshot.catalog;
   const defaults = snapshot.defaults;
@@ -35,8 +36,7 @@ export function customerCatalog(snapshot: PublicSnapshot) {
       price: p.price,
       isNew: p.isNew,
       isOnSale: !p.deleted && p.status === "active",
-      category:
-        ownValue(defaults.catalogConfig.categoryAliases, p.category) ?? "other",
+      category: ownValue(defaults.catalogConfig.categoryAliases, p.category) ?? "other",
       categoryLabel: p.category,
       imageUrl: p.image,
       allergens: split(p.allergens),
@@ -63,28 +63,17 @@ export function customerCatalog(snapshot: PublicSnapshot) {
     available: !p.deleted && p.status === "active",
     image: p.image,
   }));
-  const nutrition = PRODUCTS.map((_, id) =>
-    ownValue(defaults.nutrition, String(id)),
-  );
-  const photoSrc = (id: number) =>
-    PRODUCTS[id]?.imageUrl || "/images/hero-cutout.png";
+  const nutrition = PRODUCTS.map((_, id) => ownValue(defaults.nutrition, String(id)));
+  const photoSrc = (id: number) => PRODUCTS[id]?.imageUrl || "/images/hero-cutout.png";
+
   const allergensOf = (id: number, dressing: number) => [
-    ...new Set([
-      ...(PRODUCTS[id]?.allergens ?? []),
-      ...(DRESSINGS[dressing]?.allergens ?? []),
-    ]),
+    ...new Set([...(PRODUCTS[id]?.allergens ?? []), ...(DRESSINGS[dressing]?.allergens ?? [])]),
   ];
+
   const unitPrice = (id: number, selected: number[]) =>
-    (PRODUCTS[id]?.price ?? 0) +
-    selected.reduce((n, i) => n + (DRINKS[i]?.price ?? 0), 0);
+    (PRODUCTS[id]?.price ?? 0) + selected.reduce((n, i) => n + (DRINKS[i]?.price ?? 0), 0);
   const ingredients: Ingredient[] = (catalog.ingredients ?? [])
-    .filter(
-      (i) =>
-        !i.deleted &&
-        i.status === "active" &&
-        i.price !== undefined &&
-        i.stage !== undefined,
-    )
+    .filter((i) => !i.deleted && i.status === "active" && i.price !== undefined && i.stage !== undefined)
     .map((i) => ({
       id: i.id,
       name: i.name,
@@ -102,11 +91,7 @@ export function customerCatalog(snapshot: PublicSnapshot) {
     .filter((r) => !r.deleted)
     .flatMap((r) => {
       const t = reviewTimestamp(r) ?? 0;
-      const product = salads.find(
-        (p) =>
-          p.id === r.productId ||
-          (!r.productId && p.name === r.menu.split(" · ")[0]),
-      );
+      const product = salads.find((p) => p.id === r.productId || (!r.productId && p.name === r.menu.split(" · ")[0]));
       return product && !product.deleted && product.status !== "hidden"
         ? [
             {
@@ -138,31 +123,21 @@ export function customerCatalog(snapshot: PublicSnapshot) {
           }
         : s,
     )
-    .filter(
-      (s) =>
-        !s.href.startsWith("/product/") ||
-        visibleProducts.some((p) => s.href === `/product/${p.id}`),
-    );
+    .filter((s) => !s.href.startsWith("/product/") || visibleProducts.some((p) => s.href === `/product/${p.id}`));
   const getProduct = (id: number) => visibleProducts.find((p) => p.id === id);
-  const productFromParam = (param: string) =>
-    /^\d+$/.test(param) ? getProduct(Number(param)) : undefined;
-  const {
-    itemAvailable,
-    defaultItem,
-    itemUnitPrice,
-    itemName,
-    itemOptions,
-    itemAllergens,
-  } = createCartSelectors(catalog, {
-    PRODUCTS,
-    DRESSINGS,
-    DRINKS,
-    ingredients,
-    baseBowlPrice: pricingPolicy.baseBowlPrice,
-  });
-  const dressingKcal = dressings.map((p) =>
-    ownValue(defaults.optionKcal, p.id),
+
+  const productFromParam = (param: string) => (/^\d+$/.test(param) ? getProduct(Number(param)) : undefined);
+  const { itemAvailable, defaultItem, itemUnitPrice, itemName, itemOptions, itemAllergens } = createCartSelectors(
+    catalog,
+    {
+      PRODUCTS,
+      DRESSINGS,
+      DRINKS,
+      ingredients,
+      baseBowlPrice: pricingPolicy.baseBowlPrice,
+    },
   );
+  const dressingKcal = dressings.map((p) => ownValue(defaults.optionKcal, p.id));
   const drinkKcal = drinks.map((p) => ownValue(defaults.optionKcal, p.id));
   return {
     catalog,
@@ -176,9 +151,7 @@ export function customerCatalog(snapshot: PublicSnapshot) {
     pricingPolicy,
     catalogConfig: defaults.catalogConfig,
     deliveryFee: (subtotal: number) => deliveryFee(subtotal, pricingPolicy),
-    bowlPrice: (list: Ingredient[]) =>
-      pricingPolicy.baseBowlPrice +
-      list.reduce((sum, item) => sum + item.price, 0),
+    bowlPrice: (list: Ingredient[]) => pricingPolicy.baseBowlPrice + list.reduce((sum, item) => sum + item.price, 0),
     ingredients,
     reviews,
     photoSrc,
@@ -190,25 +163,15 @@ export function customerCatalog(snapshot: PublicSnapshot) {
     itemName,
     itemOptions,
     itemAllergens,
-    OPTION_IMAGES: Object.fromEntries(
-      [...dressings, ...drinks].map((p) => [p.name, p.image]),
-    ),
+    OPTION_IMAGES: Object.fromEntries([...dressings, ...drinks].map((p) => [p.name, p.image])),
     DRESSING_KCAL: dressingKcal,
     DRINK_KCAL: drinkKcal,
     kcalOf: (id: number, d: number, ds: number[]) =>
-      totalKcal([
-        nutrition[id]?.kcal,
-        ...(d < 0 ? [] : [dressingKcal[d]]),
-        ...ds.map((i) => drinkKcal[i]),
-      ]),
+      totalKcal([nutrition[id]?.kcal, ...(d < 0 ? [] : [dressingKcal[d]]), ...ds.map((i) => drinkKcal[i])]),
     itemAvailable,
     defaultItem,
     groupsFor: (id: number) =>
-      catalog.groups.filter(
-        (g) =>
-          !g.deleted &&
-          salads.find((p) => p.customerId === id)?.optionIds.includes(g.id),
-      ),
+      catalog.groups.filter((g) => !g.deleted && salads.find((p) => p.customerId === id)?.optionIds.includes(g.id)),
   };
 }
 export type CustomerCatalog = ReturnType<typeof customerCatalog>;

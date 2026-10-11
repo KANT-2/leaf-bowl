@@ -5,26 +5,16 @@
 @layer theme, base, components, utilities;
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
+@import "./styles/theme.css";
 
 @theme static {
-  --color-brand: #194b38;
-  --color-lime: #d6ed83;
-  --color-ink: #233d31;
-  --color-muted: #7b8674;
-  --color-pale: #e8eddf;
-  --color-line: #d6dfd1;
-  --color-cream: #f8f6ef;
-  --color-soft: #ecf1df;
-  --color-soft-2: #e9eedf;
-  --color-focus: #81a951;
-  --font-sans: Pretendard, "Noto Sans KR", Arial, sans-serif;
-  --font-serif: Georgia, serif;
+  --color-muted: var(--color-muted-text);
 }
 
 @import "./styles/base.css";
-@import "./styles/home.css";
-@import "./styles/product.css";
-@import "./styles/reviews.css";
-@import "./styles/cart.css";
-@import "./styles/match.css";
-@import "./styles/account.css";
+@import "./styles/home.css" layer(components);
+@import "./styles/product.css" layer(components);
+@import "./styles/reviews.css" layer(components);
+@import "./styles/cart.css" layer(components);
+@import "./styles/match.css" layer(components);
+@import "./styles/account.css" layer(components);

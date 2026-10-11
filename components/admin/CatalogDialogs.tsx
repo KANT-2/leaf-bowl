@@ -10,13 +10,7 @@ import {
   AlertDialogTitle,
 } from "@/components/admin/alert-dialog";
 import { Button } from "@/components/admin/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/admin/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/admin/dialog";
 import { saladCategories } from "@/features/admin/catalog-presentation";
 import { type Catalog } from "@/modules/catalog/schema";
 import GroupForm from "./editors/GroupForm";
@@ -37,39 +31,24 @@ export default function CatalogDialogs({
   save: (catalog: Catalog, message?: string) => Promise<void>;
   action: (fn: () => Promise<void>) => Promise<void>;
 }) {
-  const {
-    product,
-    setProduct,
-    group,
-    setGroup,
-    deleting,
-    setDeleting,
-    purging,
-    setPurging,
-    preview,
-    setPreview,
-  } = editors;
+  const { product, setProduct, group, setGroup, deleting, setDeleting, purging, setPurging, preview, setPreview } =
+    editors;
   return (
     <>
       <Dialog
         open={!!product}
         onOpenChange={(v) => {
-          if (!busy && !v) setProduct(null);
+          if (!busy && !v) {
+            setProduct(null);
+          }
         }}
       >
-        <DialogContent
-          className="editor-dialog"
-          onInteractOutside={(e) => e.preventDefault()}
-        >
+        <DialogContent className="editor-dialog" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>
-              {product && catalog.products.some((p) => p.id === product.id)
-                ? "메뉴 수정"
-                : "새 메뉴 등록"}
+              {product && catalog.products.some((p) => p.id === product.id) ? "메뉴 수정" : "새 메뉴 등록"}
             </DialogTitle>
-            <DialogDescription>
-              저장한 메뉴는 고객 미리보기에 바로 반영됩니다.
-            </DialogDescription>
+            <DialogDescription>저장한 메뉴는 고객 미리보기에 바로 반영됩니다.</DialogDescription>
           </DialogHeader>
           {product && (
             <ProductForm
@@ -97,18 +76,15 @@ export default function CatalogDialogs({
       <Dialog
         open={!!group}
         onOpenChange={(v) => {
-          if (!busy && !v) setGroup(null);
+          if (!busy && !v) {
+            setGroup(null);
+          }
         }}
       >
-        <DialogContent
-          className="editor-dialog"
-          onInteractOutside={(e) => e.preventDefault()}
-        >
+        <DialogContent className="editor-dialog" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>옵션 그룹 설정</DialogTitle>
-            <DialogDescription>
-              선택 방식과 항목별 추가 금액을 설정합니다.
-            </DialogDescription>
+            <DialogDescription>선택 방식과 항목별 추가 금액을 설정합니다.</DialogDescription>
           </DialogHeader>
           {group && (
             <GroupForm
@@ -143,14 +119,14 @@ export default function CatalogDialogs({
       <AlertDialog
         open={!!deleting}
         onOpenChange={(v) => {
-          if (!v && !busy) setDeleting(null);
+          if (!v && !busy) {
+            setDeleting(null);
+          }
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              “{deleting?.name}”을 삭제할까요?
-            </AlertDialogTitle>
+            <AlertDialogTitle>“{deleting?.name}”을 삭제할까요?</AlertDialogTitle>
             <AlertDialogDescription>
               {deleting?.kind === "group"
                 ? "연결된 메뉴에서 이 옵션이 제거됩니다."
@@ -165,22 +141,18 @@ export default function CatalogDialogs({
               onClick={(e) => {
                 e.preventDefault();
                 action(async () => {
-                  if (!deleting) return;
+                  if (!deleting) {
+                    return;
+                  }
                   const next = structuredClone(catalog);
                   if (deleting.kind === "product") {
-                    next.products.find((p) => p.id === deleting.id)!.deleted =
-                      true;
-                    if (next.content.seasonProductId === deleting.id)
+                    next.products.find((p) => p.id === deleting.id)!.deleted = true;
+                    if (next.content.seasonProductId === deleting.id) {
                       next.content.seasonProductId = "";
+                    }
                   } else {
-                    next.groups.find((g) => g.id === deleting.id)!.deleted =
-                      true;
-                    next.products.forEach(
-                      (p) =>
-                        (p.optionIds = p.optionIds.filter(
-                          (id) => id !== deleting.id,
-                        )),
-                    );
+                    next.groups.find((g) => g.id === deleting.id)!.deleted = true;
+                    next.products.forEach((p) => (p.optionIds = p.optionIds.filter((id) => id !== deleting.id)));
                   }
                   await save(next);
                   setDeleting(null);
@@ -195,17 +167,15 @@ export default function CatalogDialogs({
       <AlertDialog
         open={!!purging}
         onOpenChange={(v) => {
-          if (!v && !busy) setPurging(null);
+          if (!v && !busy) {
+            setPurging(null);
+          }
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              “{purging?.name}”을 영구 삭제할까요?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              영구 삭제하면 복원할 수 없습니다.
-            </AlertDialogDescription>
+            <AlertDialogTitle>“{purging?.name}”을 영구 삭제할까요?</AlertDialogTitle>
+            <AlertDialogDescription>영구 삭제하면 복원할 수 없습니다.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>취소</AlertDialogCancel>
@@ -214,27 +184,21 @@ export default function CatalogDialogs({
               disabled={busy}
               onClick={() =>
                 action(async () => {
-                  if (!purging) return;
+                  if (!purging) {
+                    return;
+                  }
                   const next = structuredClone(catalog);
                   if (purging.kind === "product") {
-                    next.products = next.products.filter(
-                      (p) => p.id !== purging.id,
-                    );
-                    if (next.content.seasonProductId === purging.id)
+                    next.products = next.products.filter((p) => p.id !== purging.id);
+                    if (next.content.seasonProductId === purging.id) {
                       next.content.seasonProductId = "";
-                    next.content.seasonPages = next.content.seasonPages?.map(
-                      (p) =>
-                        p.productId === purging.id
-                          ? { ...p, productId: "" }
-                          : p,
+                    }
+                    next.content.seasonPages = next.content.seasonPages?.map((p) =>
+                      p.productId === purging.id ? { ...p, productId: "" } : p,
                     );
-                    next.reviews = next.reviews?.filter(
-                      (r) => r.productId !== purging.id,
-                    );
+                    next.reviews = next.reviews?.filter((r) => r.productId !== purging.id);
                   } else {
-                    next.groups = next.groups.filter(
-                      (g) => g.id !== purging.id,
-                    );
+                    next.groups = next.groups.filter((g) => g.id !== purging.id);
                     next.products = next.products.map((p) => ({
                       ...p,
                       optionIds: p.optionIds.filter((id) => id !== purging.id),
@@ -254,23 +218,12 @@ export default function CatalogDialogs({
         <DialogContent className="preview-dialog">
           <DialogHeader>
             <DialogTitle>고객 미리보기</DialogTitle>
-            <DialogDescription>
-              실제 고객 페이지를 미리 볼 수 있습니다.
-            </DialogDescription>
+            <DialogDescription>실제 고객 페이지를 미리 볼 수 있습니다.</DialogDescription>
           </DialogHeader>
-          <a
-            href="/"
-            target="_blank"
-            rel="noreferrer"
-            className="text-sm underline"
-          >
+          <a href="/" target="_blank" rel="noreferrer" className="text-sm underline">
             전체 페이지 새 창에서 보기 ↗
           </a>
-          <iframe
-            title="고객 페이지 미리보기"
-            src="/"
-            className="customer-preview-frame"
-          />
+          <iframe title="고객 페이지 미리보기" src="/" className="customer-preview-frame" />
         </DialogContent>
       </Dialog>
     </>

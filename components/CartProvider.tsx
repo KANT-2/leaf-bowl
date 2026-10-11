@@ -1,32 +1,11 @@
 "use client";
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { createContext, useCallback, useContext, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useCustomerCatalog } from "./CustomerCatalogProvider";
 import { createLocalStore } from "@/infrastructure/browser/local-store";
-import {
-  addCartItem,
-  changeCartChoice,
-  addCartVariant,
-  updateCartQuantity,
-} from "@/modules/cart/operations";
-import {
-  CART_KEY,
-  loadCart,
-  saveCart,
-} from "@/infrastructure/browser/cart-storage";
-import {
-  type CartItem,
-  type CustomItem,
-  type MenuItem,
-} from "@/modules/cart/types";
+import { addCartItem, changeCartChoice, addCartVariant, updateCartQuantity } from "@/modules/cart/operations";
+import { CART_KEY, loadCart, saveCart } from "@/infrastructure/browser/cart-storage";
+import { type CartItem, type CustomItem, type MenuItem } from "@/modules/cart/types";
 
 const EMPTY: CartItem[] = [];
 const store = createLocalStore<CartItem[]>(CART_KEY, loadCart, saveCart, EMPTY);
@@ -44,11 +23,7 @@ interface CartContextValue {
    * 한 줄의 단일 선택 옵션(드레싱 등)을 바꾼다. groupId 가 null 이면 예전 방식(dressing 번호) 줄이다.
    * 같은 구성이 이미 있으면 그 줄과 합치고 true 를 돌려준다.
    */
-  changeChoice: (
-    index: number,
-    groupId: string | null,
-    value: string,
-  ) => boolean;
+  changeChoice: (index: number, groupId: string | null, value: string) => boolean;
   /** 같은 샐러드를 다른 선택(드레싱 등)으로 1개 더 담는다. 새 줄(또는 합쳐진 줄)의 위치를 돌려준다. */
   addVariant: (index: number, groupId: string | null, value: string) => number;
   remove: (index: number) => void;
@@ -65,21 +40,15 @@ const CartContext = createContext<CartContextValue | null>(null);
 
 export function useCart(): CartContextValue {
   const ctx = useContext(CartContext);
-  if (!ctx) throw new Error("useCart must be used inside <CartProvider>");
+  if (!ctx) {
+    throw new Error("useCart must be used inside <CartProvider>");
+  }
   return ctx;
 }
 
-export default function CartProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function CartProvider({ children }: { children: React.ReactNode }) {
   const { DRESSINGS, DRINKS } = useCustomerCatalog();
-  const items = useSyncExternalStore(
-    store.subscribe,
-    store.getSnapshot,
-    store.getServerSnapshot,
-  );
+  const items = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getServerSnapshot);
   const [isOpen, setIsOpen] = useState(false);
   const [openedAt, setOpenedAt] = useState<number | null>(null);
   const opener = useRef<HTMLElement | null>(null);
@@ -91,9 +60,7 @@ export default function CartProvider({
         ...item,
         drinks,
         dressingKey: item.dressingKey ?? DRESSINGS[item.dressing]?.id,
-        drinkKeys:
-          item.drinkKeys ??
-          drinks.map((n) => DRINKS[n]?.id ?? `missing-drink-${n}`),
+        drinkKeys: item.drinkKeys ?? drinks.map((n) => DRINKS[n]?.id ?? `missing-drink-${n}`),
       };
       store.set(addCartItem(store.getSnapshot(), identified));
     },
@@ -116,7 +83,9 @@ export default function CartProvider({
   const addDrink = useCallback(
     (drink: number) => {
       const selected = DRINKS[drink];
-      if (!selected?.available) return;
+      if (!selected?.available) {
+        return;
+      }
       store.set(
         addCartItem(store.getSnapshot(), {
           kind: "drink",
@@ -129,28 +98,17 @@ export default function CartProvider({
     [DRINKS],
   );
 
-  const changeChoice = useCallback(
-    (index: number, groupId: string | null, value: string) => {
-      const result = changeCartChoice(
-        store.getSnapshot(),
-        index,
-        groupId,
-        value,
-      );
-      store.set(result.items);
-      return result.merged;
-    },
-    [],
-  );
+  const changeChoice = useCallback((index: number, groupId: string | null, value: string) => {
+    const result = changeCartChoice(store.getSnapshot(), index, groupId, value);
+    store.set(result.items);
+    return result.merged;
+  }, []);
 
-  const addVariant = useCallback(
-    (index: number, groupId: string | null, value: string) => {
-      const result = addCartVariant(store.getSnapshot(), index, groupId, value);
-      store.set(result.items);
-      return result.index;
-    },
-    [],
-  );
+  const addVariant = useCallback((index: number, groupId: string | null, value: string) => {
+    const result = addCartVariant(store.getSnapshot(), index, groupId, value);
+    store.set(result.items);
+    return result.index;
+  }, []);
 
   const update = useCallback((index: number, qty: number) => {
     store.set(updateCartQuantity(store.getSnapshot(), index, qty));
@@ -163,11 +121,7 @@ export default function CartProvider({
   const clear = useCallback(() => store.set([]), []);
 
   const open = useCallback((from?: HTMLElement | null) => {
-    opener.current =
-      from ??
-      (document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null);
+    opener.current = from ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
     setOpenedAt(Date.now());
     setIsOpen(true);
   }, []);
@@ -176,7 +130,9 @@ export default function CartProvider({
     setIsOpen(false);
     const el = opener.current;
     opener.current = null;
-    if (returnFocus && el && el.isConnected) el.focus({ preventScroll: true });
+    if (returnFocus && el && el.isConnected) {
+      el.focus({ preventScroll: true });
+    }
   }, []);
 
   const count = items.reduce((n, i) => n + i.qty, 0);

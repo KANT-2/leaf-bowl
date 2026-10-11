@@ -7,7 +7,9 @@ export async function request<T = Snapshot>(url: string, init?: RequestInit) {
   } catch {
     throw new Error("연결을 확인한 뒤 다시 시도해주세요.");
   }
-  if (!init?.signal?.aborted) redirectIfAdminUnauthorized(response);
+  if (!init?.signal?.aborted) {
+    redirectIfAdminUnauthorized(response);
+  }
   const data: T & { error?: string } = await response.json().catch(() => {
     throw new Error(
       response.status === 413
@@ -15,7 +17,8 @@ export async function request<T = Snapshot>(url: string, init?: RequestInit) {
         : "서버 응답을 확인할 수 없습니다.",
     );
   });
-  if (!response.ok)
+  if (!response.ok) {
     throw new Error(data.error || "요청을 처리하지 못했습니다.");
+  }
   return data;
 }

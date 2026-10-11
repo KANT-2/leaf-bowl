@@ -3,7 +3,9 @@ import type { PublicSnapshot } from "./public-schema";
 
 /** Keep option slots stable while withholding hidden and deleted content. */
 export function publicSnapshot(snapshot: Snapshot): PublicSnapshot {
-  if (!snapshot.defaults) throw new Error("카탈로그 DB 설정이 없습니다.");
+  if (!snapshot.defaults) {
+    throw new Error("카탈로그 DB 설정이 없습니다.");
+  }
   const catalog = snapshot.catalog;
   return {
     ...snapshot,
@@ -27,9 +29,7 @@ export function publicSnapshot(snapshot: Snapshot): PublicSnapshot {
           : p,
       ),
       groups: catalog.groups.filter((g) => !g.deleted),
-      ingredients: catalog.ingredients?.filter(
-        (i) => !i.deleted && i.status === "active",
-      ),
+      ingredients: catalog.ingredients?.filter((i) => !i.deleted && i.status === "active"),
       reviews: catalog.reviews?.filter((r) => !r.deleted),
       content: {
         ...catalog.content,

@@ -14,7 +14,6 @@ import { newest } from "@/modules/reviews/model";
 /** 다음 제품으로 넘어가기까지의 시간 (밀리초) */
 export const ROTATE_MS = 6000;
 
-
 const two = (n: number) => String(n).padStart(2, "0");
 
 export default function ReviewRotator() {
@@ -36,7 +35,9 @@ export default function ReviewRotator() {
 
   useEffect(() => {
     const el = box.current;
-    if (!el || !("IntersectionObserver" in window)) return;
+    if (!el || !("IntersectionObserver" in window)) {
+      return;
+    }
     const io = new IntersectionObserver((en) => setVisible(en[0].isIntersecting), { threshold: 0.15 });
     io.observe(el);
     return () => io.disconnect();
@@ -55,7 +56,9 @@ export default function ReviewRotator() {
   };
 
   const onDotKey = (e: React.KeyboardEvent<HTMLButtonElement>) => {
-    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") {
+      return;
+    }
     e.preventDefault();
     const next = (index + (e.key === "ArrowRight" ? 1 : -1) + TOTAL) % TOTAL;
     go(next);
@@ -63,8 +66,10 @@ export default function ReviewRotator() {
   };
 
   const paused = hover || focus || !visible || pageHidden;
-  const p = PRODUCTS[index % Math.max(TOTAL,1)];
-  if (!p) return null;
+  const p = PRODUCTS[index % Math.max(TOTAL, 1)];
+  if (!p) {
+    return null;
+  }
   const s = statsFor(p.id);
   const list = [...reviewsFor(p.id)].sort(newest).slice(0, 3);
 
@@ -76,7 +81,11 @@ export default function ReviewRotator() {
           <h2 id="reviewsTitle">한 그릇에 담긴 좋은 이야기</h2>
         </div>
         {/* 지금 보이는 제품의 리뷰 페이지로 이동 */}
-        <Link className="rs-link ghost rs-all" href={`/product/${p.id}/reviews`} aria-label={`${p.name} 리뷰 전체 보기`}>
+        <Link
+          className="rs-link ghost rs-all"
+          href={`/product/${p.id}/reviews`}
+          aria-label={`${p.name} 리뷰 전체 보기`}
+        >
           리뷰 전체 보기
         </Link>
       </div>
@@ -91,7 +100,9 @@ export default function ReviewRotator() {
         // 키보드 포커스일 때만 멈춘다. 마우스로 점을 누르면 버튼에 포커스가 남는데, 이걸 멈춤으로 치면 자동 전환이 다시 시작되지 않는다.
         onFocus={(e) => setFocus(e.target.matches(":focus-visible"))}
         onBlur={(e) => {
-          if (!e.currentTarget.contains(e.relatedTarget)) setFocus(false);
+          if (!e.currentTarget.contains(e.relatedTarget)) {
+            setFocus(false);
+          }
         }}
       >
         <div key={`${index}-${cycle}`} className={`rs-stage${animate && !reduced ? " is-in" : ""}`}>
@@ -130,7 +141,9 @@ export default function ReviewRotator() {
               key={`${index}-${cycle}`}
               style={{ animationDuration: `${ROTATE_MS}ms` }}
               onAnimationEnd={(e) => {
-                if (e.target === e.currentTarget) go(index + 1);
+                if (e.target === e.currentTarget) {
+                  go(index + 1);
+                }
               }}
             />
           </div>

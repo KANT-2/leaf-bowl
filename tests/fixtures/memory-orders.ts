@@ -2,10 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Catalog } from "@/modules/catalog/schema";
 import type { PricingPolicy } from "@/modules/settings/schema";
 import type { DeliveryHours } from "@/modules/delivery/hours";
-import {
-  DuplicateRequestError,
-  type OrdersRepository,
-} from "@/modules/orders/repository";
+import { DuplicateRequestError, type OrdersRepository } from "@/modules/orders/repository";
 import type { OrderRecord } from "@/modules/orders/types";
 
 /** 서비스 계약을 검증하는 테스트 전용 어댑터. 운영 조합에서는 사용하지 않는다. */
@@ -47,8 +44,12 @@ export function createMemoryOrdersRepository({
       } catch (error) {
         orders.clear();
         requests.clear();
-        for (const [id, order] of savedOrders) orders.set(id, order);
-        for (const [key, id] of savedRequests) requests.set(key, id);
+        for (const [id, order] of savedOrders) {
+          orders.set(id, order);
+        }
+        for (const [key, id] of savedRequests) {
+          requests.set(key, id);
+        }
         throw error;
       } finally {
         unlock();
@@ -64,7 +65,9 @@ export function createMemoryOrdersRepository({
     },
     async create(input) {
       const mapKey = `${input.customerSessionId}|${input.requestKey}`;
-      if (requests.has(mapKey)) throw new DuplicateRequestError();
+      if (requests.has(mapKey)) {
+        throw new DuplicateRequestError();
+      }
       const at = now();
       const order: OrderRecord = {
         ...structuredClone(input),
@@ -91,12 +94,9 @@ export function createMemoryOrdersRepository({
     },
     async updateStatus(u) {
       const o = orders.get(u.id);
-      if (
-        !o ||
-        o.version !== u.expectedVersion ||
-        o.status !== u.expectedStatus
-      )
+      if (!o || o.version !== u.expectedVersion || o.status !== u.expectedStatus) {
         return null;
+      }
       const at = now();
       o.history.push({
         fromStatus: o.status,
@@ -118,23 +118,11 @@ export function createMemoryOrdersRepository({
       const afterAt = after ? Date.parse(after.createdAt) : 0;
       return [...orders.values()]
         .filter((o) => !status || o.status === status)
+        .filter((o) => !customerSessionId || o.customerSessionId === customerSessionId)
+        .filter((o) => (!from || o.createdAt >= from) && (!to || o.createdAt < to))
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0))
         .filter(
-          (o) =>
-            !customerSessionId || o.customerSessionId === customerSessionId,
-        )
-        .filter(
-          (o) => (!from || o.createdAt >= from) && (!to || o.createdAt < to),
-        )
-        .sort(
-          (a, b) =>
-            b.createdAt.getTime() - a.createdAt.getTime() ||
-            (a.id < b.id ? 1 : a.id > b.id ? -1 : 0),
-        )
-        .filter(
-          (o) =>
-            !after ||
-            o.createdAt.getTime() < afterAt ||
-            (o.createdAt.getTime() === afterAt && o.id < after.id),
+          (o) => !after || o.createdAt.getTime() < afterAt || (o.createdAt.getTime() === afterAt && o.id < after.id),
         )
         .slice(0, limit)
         .map(copy);

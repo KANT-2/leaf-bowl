@@ -5,12 +5,9 @@ import { salesDataSchema, type SalesData } from "@/modules/reports/sales";
 import type { OrderItemRecord } from "@/modules/orders/types";
 
 type Item = OrderItemRecord & { originalProductId?: string | null };
-export function salesItems(
-  items: Item[],
-): SalesData["orders"][number]["items"] {
+export function salesItems(items: Item[]): SalesData["orders"][number]["items"] {
   return items.flatMap((item, index) => {
-    const productType =
-      item.productType ?? (item.productId ? "salad" : "custom");
+    const productType = item.productType ?? (item.productId ? "salad" : "custom");
     const dressing = item.options.dressing;
     const line = {
       productId: item.originalProductId ?? item.productId ?? `custom-${index}`,
@@ -55,9 +52,7 @@ export function salesItems(
 }
 
 /** Only completed orders are sales; this app does not claim to have payment confirmation. */
-export async function readSalesData(
-  db: PrismaClient = prisma(),
-): Promise<SalesData> {
+export async function readSalesData(db: PrismaClient = prisma()): Promise<SalesData> {
   const rows = await db.order.findMany({
     where: { status: "completed" },
     include: { items: { orderBy: { position: "asc" } } },

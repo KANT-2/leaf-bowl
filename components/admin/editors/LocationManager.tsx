@@ -23,10 +23,7 @@ export default function LocationManager({
     ),
     [mapAddress, setMapAddress] = useState(catalog.location?.address ?? ""),
     [error, setError] = useState("");
-  const mapUrl =
-    "https://maps.google.com/maps?q=" +
-    encodeURIComponent(mapAddress) +
-    "&output=embed&hl=ko";
+  const mapUrl = "https://maps.google.com/maps?q=" + encodeURIComponent(mapAddress) + "&output=embed&hl=ko";
   return (
     <>
       <div className="page-heading">
@@ -71,9 +68,7 @@ export default function LocationManager({
                   required
                   maxLength={100}
                   value={location.name}
-                  onChange={(e) =>
-                    setLocation({ ...location, name: e.target.value })
-                  }
+                  onChange={(e) => setLocation({ ...location, name: e.target.value })}
                   placeholder="예: leaf & bowl 시청점"
                 />
               </label>
@@ -83,9 +78,7 @@ export default function LocationManager({
                   required
                   maxLength={300}
                   value={location.address}
-                  onChange={(e) =>
-                    setLocation({ ...location, address: e.target.value })
-                  }
+                  onChange={(e) => setLocation({ ...location, address: e.target.value })}
                   placeholder="도로명 주소를 입력해주세요"
                 />
               </label>
@@ -94,9 +87,7 @@ export default function LocationManager({
                 <Input
                   maxLength={200}
                   value={location.detailAddress}
-                  onChange={(e) =>
-                    setLocation({ ...location, detailAddress: e.target.value })
-                  }
+                  onChange={(e) => setLocation({ ...location, detailAddress: e.target.value })}
                   placeholder="예: 1층, 101호"
                 />
               </label>
@@ -136,10 +127,7 @@ export default function LocationManager({
                 <p className="meta">{mapAddress}</p>
                 <a
                   className="store-map-link"
-                  href={
-                    "https://www.google.com/maps/search/?api=1&query=" +
-                    encodeURIComponent(mapAddress)
-                  }
+                  href={"https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(mapAddress)}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -164,9 +152,7 @@ export default function LocationManager({
           <h2>배달 관리</h2>
           <span className="pill">보류</span>
         </div>
-        <p className="muted">
-          배달 설정은 운영 방식이 정해진 뒤 추가할 예정입니다.
-        </p>
+        <p className="muted">배달 설정은 운영 방식이 정해진 뒤 추가할 예정입니다.</p>
       </section>
     </>
   );

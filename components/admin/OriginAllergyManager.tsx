@@ -5,26 +5,10 @@ import { useState } from "react";
 import { Plus, Pencil } from "lucide-react";
 import { Button } from "./button";
 import { Input } from "./input";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "./dialog";
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from "./table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./dialog";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "./table";
 import { type Catalog, type Ingredient } from "@/modules/catalog/schema";
-import {
-  ingredientAllergens,
-  matchesIngredient,
-} from "@/modules/catalog/allergens";
+import { ingredientAllergens, matchesIngredient } from "@/modules/catalog/allergens";
 
 const PAGE_SIZE = 15;
 const split = (value: string) =>
@@ -51,69 +35,51 @@ export default function OriginAllergyManager({
   const [error, setError] = useState("");
   const ingredients = (catalog.ingredients ?? []).filter((i) => !i.deleted);
   const filteredIngredients = ingredients.filter((i) =>
-    [i.name, i.origin ?? "", i.originDetail ?? ""].some((t) =>
-      t.includes(query),
-    ),
+    [i.name, i.origin ?? "", i.originDetail ?? ""].some((t) => t.includes(query)),
   );
-  const pageCount = Math.max(
-    1,
-    Math.ceil(filteredIngredients.length / PAGE_SIZE),
-  );
+  const pageCount = Math.max(1, Math.ceil(filteredIngredients.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
-  const pagedIngredients = filteredIngredients.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
-  );
+  const pagedIngredients = filteredIngredients.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const usedBy = (ingredient: Ingredient) =>
     catalog.products.filter(
       (p) =>
         !p.deleted &&
         p.type === "salad" &&
-        (p.ingredients ?? "")
-          .split(/[·,，、;\n]+/)
-          .some((t) => matchesIngredient(t, ingredient)),
+        (p.ingredients ?? "").split(/[·,，、;\n]+/).some((t) => matchesIngredient(t, ingredient)),
     );
+
   const open = (ingredient: Ingredient) => {
     setEditing(structuredClone(ingredient));
     setShowAll(false);
     setError("");
   };
+
   async function save() {
-    if (!editing || busy) return;
+    if (!editing || busy) {
+      return;
+    }
     setError("");
     try {
-      const previous = (catalog.ingredients ?? []).find(
-        (i) => i.id === editing.id,
-      );
+      const previous = (catalog.ingredients ?? []).find((i) => i.id === editing.id);
       const nextIngredients = previous
-        ? (catalog.ingredients ?? []).map((i) =>
-            i.id === editing.id ? editing : i,
-          )
+        ? (catalog.ingredients ?? []).map((i) => (i.id === editing.id ? editing : i))
         : [...(catalog.ingredients ?? []), editing];
       const products = catalog.products.map((p) => {
         if (
           p.deleted ||
           p.type !== "salad" ||
-          !(p.ingredients ?? "")
-            .split(/[·,，、;\n]+/)
-            .some((t) => matchesIngredient(t, previous ?? editing))
-        )
+          !(p.ingredients ?? "").split(/[·,，、;\n]+/).some((t) => matchesIngredient(t, previous ?? editing))
+        ) {
           return p;
+        }
         // Keep manual supplements; replace only allergens previously supplied by ingredients.
-        const oldAuto = split(
-          ingredientAllergens(p.ingredients ?? "", catalog.ingredients ?? [])
-            .allergens,
-        );
+        const oldAuto = split(ingredientAllergens(p.ingredients ?? "", catalog.ingredients ?? []).allergens);
         const extras = split(p.allergens).filter((x) => !oldAuto.includes(x));
         const newText = (p.ingredients ?? "")
           .split(/([·,，、;\n])/)
-          .map((t) =>
-            previous && matchesIngredient(t, previous) ? editing.name : t,
-          )
+          .map((t) => (previous && matchesIngredient(t, previous) ? editing.name : t))
           .join("");
-        const inferred = split(
-          ingredientAllergens(newText, nextIngredients).allergens,
-        );
+        const inferred = split(ingredientAllergens(newText, nextIngredients).allergens);
         return {
           ...p,
           ingredients: newText,
@@ -188,19 +154,13 @@ export default function OriginAllergyManager({
                 <TableCell>{i.category}</TableCell>
                 <TableCell>
                   {i.origin || "미입력"}
-                  {i.originDetail && (
-                    <div className="meta">{i.originDetail}</div>
-                  )}
+                  {i.originDetail && <div className="meta">{i.originDetail}</div>}
                 </TableCell>
                 <TableCell>{i.allergens || "등록된 안내 없음"}</TableCell>
                 <TableCell>{usedBy(i).length}개</TableCell>
                 <TableCell>
                   <div className="row-actions">
-                    <Button
-                      variant="outline"
-                      disabled={busy}
-                      onClick={() => open(i)}
-                    >
+                    <Button variant="outline" disabled={busy} onClick={() => open(i)}>
                       <Pencil size={15} />
                       수정
                     </Button>
@@ -211,9 +171,7 @@ export default function OriginAllergyManager({
           </TableBody>
         </Table>
         {!filteredIngredients.length && (
-          <p className="empty">
-            {query ? "검색 결과가 없습니다." : "등록된 재료가 없습니다."}
-          </p>
+          <p className="empty">{query ? "검색 결과가 없습니다." : "등록된 재료가 없습니다."}</p>
         )}
       </section>
       {filteredIngredients.length > 0 && (
@@ -256,18 +214,15 @@ export default function OriginAllergyManager({
       <Dialog
         open={!!editing}
         onOpenChange={(v) => {
-          if (!v && !busy) setEditing(null);
+          if (!v && !busy) {
+            setEditing(null);
+          }
         }}
       >
-        <DialogContent
-          className="editor-dialog"
-          onInteractOutside={(e) => e.preventDefault()}
-        >
+        <DialogContent className="editor-dialog" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>재료 수정</DialogTitle>
-            <DialogDescription>
-              저장하면 이 재료를 사용하는 메뉴의 알레르기 안내에 반영됩니다.
-            </DialogDescription>
+            <DialogDescription>저장하면 이 재료를 사용하는 메뉴의 알레르기 안내에 반영됩니다.</DialogDescription>
           </DialogHeader>
           {editing && (
             <form
@@ -284,9 +239,7 @@ export default function OriginAllergyManager({
                       required
                       maxLength={80}
                       value={editing.name}
-                      onChange={(e) =>
-                        setEditing({ ...editing, name: e.target.value })
-                      }
+                      onChange={(e) => setEditing({ ...editing, name: e.target.value })}
                     />
                   </label>
                   <label className="field">
@@ -296,9 +249,7 @@ export default function OriginAllergyManager({
                       maxLength={80}
                       list="origin-categories"
                       value={editing.category}
-                      onChange={(e) =>
-                        setEditing({ ...editing, category: e.target.value })
-                      }
+                      onChange={(e) => setEditing({ ...editing, category: e.target.value })}
                     />
                     <datalist id="origin-categories">
                       {config.ingredientCategories.map((x) => (
@@ -312,9 +263,7 @@ export default function OriginAllergyManager({
                       maxLength={100}
                       list="origin-countries"
                       value={editing.origin ?? ""}
-                      onChange={(e) =>
-                        setEditing({ ...editing, origin: e.target.value })
-                      }
+                      onChange={(e) => setEditing({ ...editing, origin: e.target.value })}
                       placeholder="예: 국내산, 미국산"
                     />
                     <datalist id="origin-countries">
@@ -328,9 +277,7 @@ export default function OriginAllergyManager({
                     <Input
                       maxLength={300}
                       value={editing.originDetail ?? ""}
-                      onChange={(e) =>
-                        setEditing({ ...editing, originDetail: e.target.value })
-                      }
+                      onChange={(e) => setEditing({ ...editing, originDetail: e.target.value })}
                       placeholder="예: 콩 미국산, 흰다리새우"
                     />
                   </label>
@@ -340,20 +287,14 @@ export default function OriginAllergyManager({
                   <div className="allergen-options">
                     {[
                       ...new Set([
-                        ...(showAll
-                          ? config.allergenOptions
-                          : config.allergenOptions.slice(0, 5)),
+                        ...(showAll ? config.allergenOptions : config.allergenOptions.slice(0, 5)),
                         ...split(editing.allergens),
                       ]),
                     ].map((value) => (
                       <Button
                         type="button"
                         key={value}
-                        variant={
-                          split(editing.allergens).includes(value)
-                            ? "default"
-                            : "outline"
-                        }
+                        variant={split(editing.allergens).includes(value) ? "default" : "outline"}
                         aria-pressed={split(editing.allergens).includes(value)}
                         onClick={() =>
                           setEditing({
@@ -371,14 +312,8 @@ export default function OriginAllergyManager({
                       </Button>
                     ))}
                     {config.allergenOptions.length > 5 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => setShowAll(!showAll)}
-                      >
-                        {showAll
-                          ? "접기"
-                          : `+ ${config.allergenOptions.length - 5}개 더보기`}
+                      <Button type="button" variant="ghost" onClick={() => setShowAll(!showAll)}>
+                        {showAll ? "접기" : `+ ${config.allergenOptions.length - 5}개 더보기`}
                       </Button>
                     )}
                   </div>
@@ -396,12 +331,7 @@ export default function OriginAllergyManager({
                 </p>
               )}
               <div className="form-footer">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() => setEditing(null)}
-                >
+                <Button type="button" variant="outline" disabled={busy} onClick={() => setEditing(null)}>
                   취소
                 </Button>
                 <Button disabled={busy} type="submit">

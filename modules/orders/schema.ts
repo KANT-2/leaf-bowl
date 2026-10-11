@@ -1,10 +1,6 @@
 import { z } from "zod";
 import { ORDER_STATUSES } from "./status";
-import {
-  deliveryWindowKST,
-  deliveryWindowUTC,
-  utcISOString,
-} from "@/modules/delivery/time";
+import { deliveryWindowKST, deliveryWindowUTC, utcISOString } from "@/modules/delivery/time";
 
 const key = z
   .string()
@@ -39,16 +35,10 @@ export const orderItemSchema = z
     (v) => {
       const menu = v.productId !== undefined;
       const custom = v.ingredientKeys.length > 0;
-      const drinkOnly =
-        !menu &&
-        !custom &&
-        v.drinkKeys.length === 1 &&
-        v.dressingKey === undefined;
-      if (
-        v.optionSelections !== undefined &&
-        (!menu || v.dressingKey !== undefined || v.drinkKeys.length > 0)
-      )
+      const drinkOnly = !menu && !custom && v.drinkKeys.length === 1 && v.dressingKey === undefined;
+      if (v.optionSelections !== undefined && (!menu || v.dressingKey !== undefined || v.drinkKeys.length > 0)) {
         return false;
+      }
       return (menu && !custom) || (custom && !menu) || drinkOnly;
     },
     { message: "메뉴, 재료 조합, 음료 단품 중 하나만 선택해주세요." },
@@ -75,24 +65,20 @@ export const createOrderSchema = z
   })
   .strict()
   .superRefine((input, ctx) => {
-    const hasUTC =
-      input.desiredStartAt !== undefined || input.desiredEndAt !== undefined;
-    const hasLegacy =
-      input.desiredDate !== undefined || input.desiredSlot !== undefined;
+    const hasUTC = input.desiredStartAt !== undefined || input.desiredEndAt !== undefined;
+    const hasLegacy = input.desiredDate !== undefined || input.desiredSlot !== undefined;
     const valid = hasUTC
       ? !hasLegacy &&
         input.desiredStartAt &&
         input.desiredEndAt &&
         deliveryWindowKST(input.desiredStartAt, input.desiredEndAt)
-      : input.desiredDate &&
-        input.desiredSlot &&
-        deliveryWindowUTC(input.desiredDate, input.desiredSlot);
-    if (!valid)
+      : input.desiredDate && input.desiredSlot && deliveryWindowUTC(input.desiredDate, input.desiredSlot);
+    if (!valid) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message:
-          "받을 시간대를 확인해주세요. UTC 시작·종료 시각 또는 기존 날짜·시간대 한 쌍을 입력해주세요.",
+        message: "받을 시간대를 확인해주세요. UTC 시작·종료 시각 또는 기존 날짜·시간대 한 쌍을 입력해주세요.",
       });
+    }
   })
   .transform((input) => {
     const window =
@@ -102,10 +88,7 @@ export const createOrderSchema = z
             desiredEndAt: utcISOString(input.desiredEndAt!)!,
           }
         : deliveryWindowUTC(input.desiredDate!, input.desiredSlot!)!;
-    const display = deliveryWindowKST(
-      window.desiredStartAt,
-      window.desiredEndAt,
-    )!;
+    const display = deliveryWindowKST(window.desiredStartAt, window.desiredEndAt)!;
     return {
       ...input,
       ...window,
@@ -121,9 +104,7 @@ export const idempotencyKeySchema = z
   .max(80)
   .regex(/^[a-zA-Z0-9_-]+$/);
 
-export const cancelOrderSchema = z
-  .object({ reason: z.string().trim().max(200).optional() })
-  .strict();
+export const cancelOrderSchema = z.object({ reason: z.string().trim().max(200).optional() }).strict();
 
 export const changeStatusSchema = z
   .object({

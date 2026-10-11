@@ -56,16 +56,7 @@ export function dateStr(t: number): string {
 
 /** Timestamp wins over cached display text, including dates saved by older clients. */
 export function reviewDisplayDate(review: Pick<Review, "t" | "date">): string {
-  return Number.isFinite(new Date(review.t).getTime()) && review.t !== 0
-    ? dateStr(review.t)
-    : review.date;
+  return Number.isFinite(new Date(review.t).getTime()) && review.t !== 0 ? dateStr(review.t) : review.date;
 }
 
-export const RATE_LABELS = [
-  "",
-  "아쉬워요",
-  "별로예요",
-  "보통이에요",
-  "좋아요",
-  "최고예요",
-];
+export const RATE_LABELS = ["", "아쉬워요", "별로예요", "보통이에요", "좋아요", "최고예요"];

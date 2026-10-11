@@ -67,26 +67,31 @@ export default function CheckoutView({ hours }: { hours: DeliveryHours }) {
   const total = subtotal + fee;
 
   const cardValid =
-    cardNumber.replace(/\s/g, "").length >= 14 &&
-    /^\d{2}\/\d{2}$/.test(cardExpiry) &&
-    /^\d{3}$/.test(cardCvc);
+    cardNumber.replace(/\s/g, "").length >= 14 && /^\d{2}\/\d{2}$/.test(cardExpiry) && /^\d{3}$/.test(cardCvc);
   const delivery = { address, day, timeLabel, hours };
   // 시간은 확정 동작에서도 다시 확인한다. 초기 렌더에서는 시각 의존 검사 없이 상태만 표시한다.
   const unavailable = items.some((i) => !catalog.itemAvailable(i));
   const canPay = items.length > 0 && !unavailable && !paying && (method !== "card" || cardValid);
 
   const pay = async () => {
-    if (!canPay || pending.current) return;
+    if (!canPay || pending.current) {
+      return;
+    }
     pending.current = true;
     setPaying(true);
     setError("");
     try {
       const response = await fetch("/api/catalog", { cache: "no-store", signal: AbortSignal.timeout(15_000) });
-      if (!response.ok) throw Error("메뉴 상태를 확인하지 못했습니다. 다시 시도해주세요.");
+      if (!response.ok) {
+        throw Error("메뉴 상태를 확인하지 못했습니다. 다시 시도해주세요.");
+      }
       const snapshot = publicSnapshotSchema.parse(await response.json());
       const latest = customerCatalog(snapshot);
       const issue = checkoutIssue(items, latest, delivery);
-      if (issue) { setError(issue); return; }
+      if (issue) {
+        setError(issue);
+        return;
+      }
       const latestSubtotal = items.reduce((sum, item) => sum + latest.itemUnitPrice(item) * item.qty, 0);
       const latestTotal = latestSubtotal + latest.deliveryFee(latestSubtotal);
       if (latestTotal !== total) {
@@ -94,11 +99,17 @@ export default function CheckoutView({ hours }: { hours: DeliveryHours }) {
         return;
       }
       const window = deliveryWindowUTC(day, timeLabel);
-      if (!window) throw Error("받을 시간대를 다시 선택해주세요.");
-      if (!ordererName.trim() || !/^0\d[\d -]{7,27}$/.test(phone.trim())) throw Error("받는 분의 이름과 연락처를 확인해주세요.");
+      if (!window) {
+        throw Error("받을 시간대를 다시 선택해주세요.");
+      }
+      if (!ordererName.trim() || !/^0\d[\d -]{7,27}$/.test(phone.trim())) {
+        throw Error("받는 분의 이름과 연락처를 확인해주세요.");
+      }
       const input = { ...window, address, ordererName: ordererName.trim(), phone: phone.trim(), items };
       const body = JSON.stringify(input);
-      if (submission.current?.body !== body) submission.current = { body, key: await orderRequestKey(input) };
+      if (submission.current?.body !== body) {
+        submission.current = { body, key: await orderRequestKey(input) };
+      }
       const order = await submitOrder(input, submission.current.key);
       clearOrderRequestKey();
       setDoneTotal(order.total);
@@ -116,7 +127,9 @@ export default function CheckoutView({ hours }: { hours: DeliveryHours }) {
     return (
       <main className="wrap pv-wrap checkout-wrap">
         <div className="checkout-done">
-          <div className="success-icon" aria-hidden="true">✓</div>
+          <div className="success-icon" aria-hidden="true">
+            ✓
+          </div>
           <h1>주문이 접수되었어요</h1>
           <p>
             {money(doneTotal)} · {day} {timeLabel}
@@ -155,7 +168,14 @@ export default function CheckoutView({ hours }: { hours: DeliveryHours }) {
       <PageHeading>결제</PageHeading>
       <p className="auth-note">체험용 결제 화면입니다. 실제로 청구되지 않아요.</p>
 
-      {(error || unavailable) && <div role="alert"><p>{error || "품절되거나 삭제된 메뉴·옵션이 있어요."}</p><button type="button" className="ghost-btn" onClick={(e) => open(e.currentTarget)}>장바구니 확인</button></div>}
+      {(error || unavailable) && (
+        <div role="alert">
+          <p>{error || "품절되거나 삭제된 메뉴·옵션이 있어요."}</p>
+          <button type="button" className="ghost-btn" onClick={(e) => open(e.currentTarget)}>
+            장바구니 확인
+          </button>
+        </div>
+      )}
       <section className="surface mypage-section">
         <h2>주문 내용</h2>
         <ul className="order-item-lines checkout-lines">
@@ -190,8 +210,26 @@ export default function CheckoutView({ hours }: { hours: DeliveryHours }) {
           {address} · {day} {timeLabel}
         </p>
         <div className="mypage-form">
-          <label className="field"><span>받는 분</span><input autoComplete="name" maxLength={50} value={ordererName} onChange={event => setOrdererName(event.target.value)} /></label>
-          <label className="field"><span>연락처</span><input autoComplete="tel" inputMode="tel" maxLength={30} placeholder="010-1234-5678" value={phone} onChange={event => setPhone(event.target.value)} /></label>
+          <label className="field">
+            <span>받는 분</span>
+            <input
+              autoComplete="name"
+              maxLength={50}
+              value={ordererName}
+              onChange={(event) => setOrdererName(event.target.value)}
+            />
+          </label>
+          <label className="field">
+            <span>연락처</span>
+            <input
+              autoComplete="tel"
+              inputMode="tel"
+              maxLength={30}
+              placeholder="010-1234-5678"
+              value={phone}
+              onChange={(event) => setPhone(event.target.value)}
+            />
+          </label>
         </div>
       </section>
 

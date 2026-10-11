@@ -45,10 +45,7 @@ test("changing a cart option merges into an existing variant and retains its pos
   assert.equal(result.merged, true);
   assert.deepEqual(result.items, [{ ...items[1], qty: 6 }, items[2]]);
   assert.equal(items[0].qty, 2);
-  assert.equal(
-    cart.changeCartChoice(items, 99, "dressing", "dressing-1").items,
-    items,
-  );
+  assert.equal(cart.changeCartChoice(items, 99, "dressing", "dressing-1").items, items);
 });
 
 test("adding a cart variant increments or inserts one item without changing the original", () => {
@@ -77,18 +74,10 @@ test("profile default address changes preserve one default and ignore missing ta
     [false, true],
   );
   assert.equal(profile.setDefaultProfileAddress(value, "missing"), value);
-  assert.equal(
-    profile.updateProfileAddress(value, "missing", { isDefault: true }),
-    value,
-  );
-  assert.equal(
-    profile.addProfileAddress(value, { id: "b", isDefault: false }),
-    value,
-  );
+  assert.equal(profile.updateProfileAddress(value, "missing", { isDefault: true }), value);
+  assert.equal(profile.addProfileAddress(value, { id: "b", isDefault: false }), value);
   assert.deepEqual(
-    profile
-      .setDefaultProfileAddress(value, "a")
-      .addresses.map((address) => address.isDefault),
+    profile.setDefaultProfileAddress(value, "a").addresses.map((address) => address.isDefault),
     [true, false],
   );
   assert.equal(
@@ -197,8 +186,7 @@ test("DB dictionary lookups never treat inherited names as configured data", () 
   const catalog = customerSeed();
   catalog.products[0].category = "constructor";
   catalog.ingredients[0].id = "constructor";
-  catalog.products.find((product) => product.type === "drink").id =
-    "constructor";
+  catalog.products.find((product) => product.type === "drink").id = "constructor";
   const customer = customerCatalog({
     catalog,
     revision: 1,

@@ -19,9 +19,7 @@ const shots = path.join(__dirname, "../docs/screenshots/issue-97");
     const page = await context.newPage();
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
-    const snapshot = await (
-      await context.request.get(base + "/api/catalog")
-    ).json();
+    const snapshot = await (await context.request.get(base + "/api/catalog")).json();
     snapshot.revision += 100;
     snapshot.defaults.updatedAt = new Date().toISOString();
     snapshot.defaults.pricingPolicy.deliveryFee = 700;
@@ -29,14 +27,9 @@ const shots = path.join(__dirname, "../docs/screenshots/issue-97");
     delete snapshot.defaults.nutrition["0"];
     snapshot.defaults.catalogConfig.allergenOptions = ["DB 선택지 검증"];
     snapshot.defaults.catalogConfig.originCountries = ["DB 원산지 검증"];
-    await page.route("**/api/catalog", (route) =>
-      route.fulfill({ json: snapshot }),
-    );
+    await page.route("**/api/catalog", (route) => route.fulfill({ json: snapshot }));
     await page.goto(base + "/product/0");
-    await page
-      .locator(".pv-meta dd")
-      .filter({ hasText: "영양 정보 준비 중" })
-      .waitFor();
+    await page.locator(".pv-meta dd").filter({ hasText: "영양 정보 준비 중" }).waitFor();
     await page.getByText(/예약 배달 700원 \(99,999원 이상 무료\)/).waitFor();
     await page.screenshot({
       path: path.join(shots, "db-policy-and-unknown-nutrition.png"),
@@ -50,31 +43,16 @@ const shots = path.join(__dirname, "../docs/screenshots/issue-97");
       },
     });
     assert.equal(login.status(), 200, await login.text());
-    await page.route("**/api/admin/catalog", (route) =>
-      route.fulfill({ json: snapshot }),
-    );
+    await page.route("**/api/admin/catalog", (route) => route.fulfill({ json: snapshot }));
     await page.goto(base + "/admin");
     await page.getByRole("button", { name: /원산지.*알레르기/ }).click();
-    await page
-      .getByRole("button", { name: "수정", exact: true })
-      .first()
-      .click();
+    await page.getByRole("button", { name: "수정", exact: true }).first().click();
     const dialog = page.getByRole("dialog");
-    await dialog
-      .getByRole("button", { name: "DB 선택지 검증", exact: true })
-      .waitFor();
-    assert.equal(
-      await dialog
-        .locator("#origin-countries option")
-        .first()
-        .getAttribute("value"),
-      "DB 원산지 검증",
-    );
+    await dialog.getByRole("button", { name: "DB 선택지 검증", exact: true }).waitFor();
+    assert.equal(await dialog.locator("#origin-countries option").first().getAttribute("value"), "DB 원산지 검증");
     await dialog.evaluate(async (element) => {
       await Promise.all(
-        element
-          .getAnimations({ subtree: true })
-          .map((animation) => animation.finished.catch(() => {})),
+        element.getAnimations({ subtree: true }).map((animation) => animation.finished.catch(() => {})),
       );
     });
     await page.screenshot({ path: path.join(shots, "db-editor-options.png") });

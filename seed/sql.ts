@@ -11,7 +11,13 @@ export async function applyDefaultSql(connectionString: string, filename = path.
     await client.connect();
     await client.query(sql);
   } catch (error) {
-    try { await client.query("ROLLBACK"); } catch { /* connection may already be closed */ }
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      /* connection may already be closed */
+    }
     throw error;
-  } finally { await client.end(); }
+  } finally {
+    await client.end();
+  }
 }

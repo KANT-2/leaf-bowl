@@ -10,22 +10,9 @@ import {
   AlertDialogTitle,
 } from "@/components/admin/alert-dialog";
 import { Button } from "@/components/admin/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/admin/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/admin/dialog";
 import { Input } from "@/components/admin/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/admin/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/admin/table";
 import { Textarea } from "@/components/admin/textarea";
 import { type Catalog, type Ingredient } from "@/modules/catalog/schema";
 import { uid } from "@/features/admin/editor-helpers";
@@ -63,15 +50,22 @@ export default function BowlMatchManager({
       return false;
     }
   }
+
   async function reorder(from: string, to: string) {
-    if (busy || from === to) return;
+    if (busy || from === to) {
+      return;
+    }
     const next = [...items],
       a = next.findIndex((i) => i.id === from),
       b = next.findIndex((i) => i.id === to);
-    if (a < 0 || b < 0) return;
+    if (a < 0 || b < 0) {
+      return;
+    }
     const [moved] = next.splice(a, 1);
     next.splice(b, 0, moved);
-    if (await persist(next)) toast.success("재료 순서를 저장했습니다.");
+    if (await persist(next)) {
+      toast.success("재료 순서를 저장했습니다.");
+    }
   }
   return (
     <>
@@ -123,10 +117,7 @@ export default function BowlMatchManager({
                   (over === item.id && dragged !== item.id ? " drag-over" : "")
                 }
                 tabIndex={0}
-                aria-label={
-                  item.name +
-                  " 재료, 드래그 또는 Alt와 위아래 방향키로 순서 변경"
-                }
+                aria-label={item.name + " 재료, 드래그 또는 Alt와 위아래 방향키로 순서 변경"}
                 onDragStart={(e) => {
                   if (busy || (e.target as HTMLElement).closest("button")) {
                     e.preventDefault();
@@ -138,7 +129,9 @@ export default function BowlMatchManager({
                   e.dataTransfer.setData("text/plain", item.id);
                 }}
                 onDragOver={(e) => {
-                  if (!drag.current || busy) return;
+                  if (!drag.current || busy) {
+                    return;
+                  }
                   e.preventDefault();
                   e.dataTransfer.dropEffect = "move";
                   setOver(item.id);
@@ -149,7 +142,9 @@ export default function BowlMatchManager({
                   drag.current = null;
                   setDragged(null);
                   setOver(null);
-                  if (from) void reorder(from, item.id);
+                  if (from) {
+                    void reorder(from, item.id);
+                  }
                 }}
                 onDragEnd={() => {
                   drag.current = null;
@@ -157,9 +152,10 @@ export default function BowlMatchManager({
                   setOver(null);
                 }}
                 onKeyDown={(e) => {
-                  if (e.target !== e.currentTarget || !e.altKey || busy) return;
-                  const step =
-                    e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
+                  if (e.target !== e.currentTarget || !e.altKey || busy) {
+                    return;
+                  }
+                  const step = e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
                   if (step && visible[index + step]) {
                     e.preventDefault();
                     void reorder(item.id, visible[index + step].id);
@@ -178,17 +174,13 @@ export default function BowlMatchManager({
                     <div>
                       <strong>{item.name}</strong>
                       <div className="ingredient">{item.description}</div>
-                      {item.allergens && (
-                        <div className="meta">알레르기: {item.allergens}</div>
-                      )}
+                      {item.allergens && <div className="meta">알레르기: {item.allergens}</div>}
                     </div>
                   </div>
                 </TableCell>
                 <TableCell>{item.category}</TableCell>
                 <TableCell>
-                  <span className={"status-tag " + item.status}>
-                    {labels[item.status]}
-                  </span>
+                  <span className={"status-tag " + item.status}>{labels[item.status]}</span>
                 </TableCell>
                 <TableCell>
                   <div className="row-actions">
@@ -220,9 +212,7 @@ export default function BowlMatchManager({
           </TableBody>
         </Table>
         {!visible.length && (
-          <div className="empty">
-            등록된 재료가 없습니다. 재료 추가 버튼으로 첫 카드를 등록해주세요.
-          </div>
+          <div className="empty">등록된 재료가 없습니다. 재료 추가 버튼으로 첫 카드를 등록해주세요.</div>
         )}
       </section>
       {items.some((i) => i.deleted) && (
@@ -237,13 +227,7 @@ export default function BowlMatchManager({
                   variant="outline"
                   size="sm"
                   disabled={busy}
-                  onClick={() =>
-                    persist(
-                      items.map((x) =>
-                        x.id === i.id ? { ...x, deleted: false } : x,
-                      ),
-                    )
-                  }
+                  onClick={() => persist(items.map((x) => (x.id === i.id ? { ...x, deleted: false } : x)))}
                 >
                   복원
                 </Button>
@@ -259,22 +243,15 @@ export default function BowlMatchManager({
       <Dialog
         open={!!editing}
         onOpenChange={(v) => {
-          if (!v && !busy && !uploading) setEditing(null);
+          if (!v && !busy && !uploading) {
+            setEditing(null);
+          }
         }}
       >
-        <DialogContent
-          className="editor-dialog"
-          onInteractOutside={(e) => e.preventDefault()}
-        >
+        <DialogContent className="editor-dialog" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
-            <DialogTitle>
-              {items.some((i) => i.id === editing?.id)
-                ? "재료 수정"
-                : "재료 추가"}
-            </DialogTitle>
-            <DialogDescription>
-              재료 정보와 카드 노출 상태를 설정하세요.
-            </DialogDescription>
+            <DialogTitle>{items.some((i) => i.id === editing?.id) ? "재료 수정" : "재료 추가"}</DialogTitle>
+            <DialogDescription>재료 정보와 카드 노출 상태를 설정하세요.</DialogDescription>
           </DialogHeader>
           {editing && (
             <form
@@ -286,8 +263,9 @@ export default function BowlMatchManager({
                       ? items.map((i) => (i.id === editing.id ? editing : i))
                       : [...items, editing],
                   )
-                )
+                ) {
                   setEditing(null);
+                }
               }}
             >
               <fieldset disabled={busy || uploading}>
@@ -299,9 +277,7 @@ export default function BowlMatchManager({
                         required
                         maxLength={80}
                         value={editing.name}
-                        onChange={(e) =>
-                          setEditing({ ...editing, name: e.target.value })
-                        }
+                        onChange={(e) => setEditing({ ...editing, name: e.target.value })}
                       />
                     </label>
                     <label className="field">
@@ -345,9 +321,7 @@ export default function BowlMatchManager({
                         maxLength={80}
                         value={editing.category}
                         placeholder="채소 · 단백질 · 토핑"
-                        onChange={(e) =>
-                          setEditing({ ...editing, category: e.target.value })
-                        }
+                        onChange={(e) => setEditing({ ...editing, category: e.target.value })}
                       />
                     </label>
                     <label className="field">
@@ -369,9 +343,7 @@ export default function BowlMatchManager({
                       <Input
                         maxLength={400}
                         value={editing.allergens}
-                        onChange={(e) =>
-                          setEditing({ ...editing, allergens: e.target.value })
-                        }
+                        onChange={(e) => setEditing({ ...editing, allergens: e.target.value })}
                       />
                     </label>
                   </div>
@@ -406,12 +378,7 @@ export default function BowlMatchManager({
                 </p>
               )}
               <div className="form-footer">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={busy || uploading}
-                  onClick={() => setEditing(null)}
-                >
+                <Button type="button" variant="outline" disabled={busy || uploading} onClick={() => setEditing(null)}>
                   취소
                 </Button>
                 <Button type="submit" disabled={busy || uploading}>
@@ -425,15 +392,16 @@ export default function BowlMatchManager({
       <AlertDialog
         open={!!removing}
         onOpenChange={(v) => {
-          if (!v && !busy) setRemoving(null);
+          if (!v && !busy) {
+            setRemoving(null);
+          }
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>재료를 삭제할까요?</AlertDialogTitle>
             <AlertDialogDescription>
-              {removing?.name}을 목록에서 제외합니다. 삭제된 재료에서 복원할 수
-              있습니다.
+              {removing?.name}을 목록에서 제외합니다. 삭제된 재료에서 복원할 수 있습니다.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -444,13 +412,10 @@ export default function BowlMatchManager({
                 e.preventDefault();
                 if (
                   removing &&
-                  (await persist(
-                    items.map((i) =>
-                      i.id === removing.id ? { ...i, deleted: true } : i,
-                    ),
-                  ))
-                )
+                  (await persist(items.map((i) => (i.id === removing.id ? { ...i, deleted: true } : i))))
+                ) {
                   setRemoving(null);
+                }
               }}
             >
               삭제

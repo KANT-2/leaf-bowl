@@ -24,10 +24,7 @@ export default function DrinksView() {
       </div>
       <div className="product-grid">
         {list.map((d) => (
-          <div
-            key={d.id}
-            className={`product drink-card${d.available ? "" : " is-soldout"}`}
-          >
+          <div key={d.id} className={`product drink-card${d.available ? "" : " is-soldout"}`}>
             <div className="product-photo">
               {d.image && (
                 <Image
@@ -60,13 +57,9 @@ export default function DrinksView() {
               )}
             </div>
             <h3>{d.name}</h3>
-            {(DRINK_KCAL[d.n] ?? 0) > 0 && (
-              <span className="card-nutri">약 {DRINK_KCAL[d.n]}kcal</span>
-            )}
+            {(DRINK_KCAL[d.n] ?? 0) > 0 && <span className="card-nutri">약 {DRINK_KCAL[d.n]}kcal</span>}
             <strong>{money(d.price)}</strong>
-            {!d.available && (
-              <span className="card-soldout">현재 주문할 수 없어요</span>
-            )}
+            {!d.available && <span className="card-soldout">현재 주문할 수 없어요</span>}
           </div>
         ))}
       </div>

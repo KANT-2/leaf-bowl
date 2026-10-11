@@ -13,7 +13,9 @@ export async function adminGate(request: Request): Promise<Response | null> {
     await requireAdmin(request, services().identity);
     return null;
   } catch (e) {
-    if (e instanceof AppError) return jsonError(e.message, e.status);
+    if (e instanceof AppError) {
+      return jsonError(e.message, e.status);
+    }
     throw e;
   }
 }
