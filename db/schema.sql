@@ -277,8 +277,8 @@ CREATE TABLE orders (
   phone               VARCHAR(30)  NOT NULL,
   address             VARCHAR(300) NOT NULL,
   address_detail      VARCHAR(200) NOT NULL DEFAULT '',
-  desired_date        DATE         NOT NULL,            -- 받을 날짜
-  desired_slot        VARCHAR(30)  NOT NULL,            -- 받을 시간대 표시 (예: 10:00–11:00)
+  desired_start_at    TIMESTAMPTZ  NOT NULL,            -- UTC 배송 시작 시각. 화면은 KST로 표시
+  desired_end_at      TIMESTAMPTZ  NOT NULL,            -- UTC 배송 종료 시각
   subtotal            BIGINT       NOT NULL CHECK (subtotal >= 0),
   delivery_fee        BIGINT       NOT NULL CHECK (delivery_fee >= 0),
   total               BIGINT       NOT NULL,
@@ -289,6 +289,7 @@ CREATE TABLE orders (
   created_at          TIMESTAMPTZ  NOT NULL DEFAULT now(),
   updated_at          TIMESTAMPTZ  NOT NULL DEFAULT now(),
   CONSTRAINT chk_order_total   CHECK (total = subtotal + delivery_fee),
+  CONSTRAINT chk_order_window  CHECK (desired_end_at = desired_start_at + INTERVAL '1 hour'),
   CONSTRAINT chk_order_cancel  CHECK ((status = 'canceled') = (canceled_at IS NOT NULL)),
   -- 같은 방문자가 같은 키로 다시 보내도 주문은 한 건
   CONSTRAINT uq_order_request  UNIQUE (customer_session_id, request_key)

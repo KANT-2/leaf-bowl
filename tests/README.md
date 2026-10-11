@@ -16,8 +16,11 @@ npm exec --package=playwright -- playwright install chromium
 FRONT5_BASE_URL=http://localhost:3337 npm exec --package=playwright -- node tests/admin-editors-browser.cjs
 FRONT5_BASE_URL=http://localhost:3337 npm exec --package=playwright -- node tests/catalog-browser.cjs
 FRONT5_BASE_URL=http://localhost:3337 npm exec --package=playwright -- node tests/restore-status-browser.cjs
+FRONT5_BASE_URL=http://localhost:3337 npm exec --package=playwright -- node tests/delivery-timezone-browser.cjs
 ```
 
 관리자 편집 테스트는 테스트 카탈로그의 첫 메뉴를 수정하고, 409 응답 후 입력 보존·재조회·저장을 확인한다. 이미지 산출물은 `docs/screenshots/code-quality/`에 생성된다. 실행 전후 변경된 스크린샷을 확인한다.
 
 복원 상태 테스트는 격리한 API 응답으로 메뉴·음료·드레싱의 상태 3종, 옵션 연결 정리, 저장 실패·재시도 및 재접속을 검증한다. 서버의 실제 카탈로그에는 저장하지 않는다.
+
+시간대 테스트는 UTC·서울·로스앤젤레스 브라우저에서 UTC 배송 요청/응답·체험 주문 저장과 KST 결제/주문 내역을 확인한다. 별도 테스트 서버의 메모리 주문 API에 주문 3건을 생성하므로 운영 서버에서 실행하지 않는다. 화면 캡처는 `docs/screenshots/delivery-timezone/`에 저장한다.

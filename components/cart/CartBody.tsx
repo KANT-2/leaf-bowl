@@ -1,6 +1,7 @@
 "use client";
 import { isDrink, itemKey, withChoice } from "@/lib/cart";
 import { drinkKey } from "@/lib/cart-identifiers";
+import { deliveryWindowUTC } from "@/lib/delivery-time";
 import type { DeliveryHours } from "@/lib/data/delivery";
 import {
   dateValue,
@@ -108,9 +109,9 @@ export default function CartBody({ openedAt, hours, closeBtn }: BodyProps) {
       toast("현재 시간 이후의 시간대를 선택해주세요");
       return;
     }
-    router.push(
-      `/checkout?${new URLSearchParams({ address, day, time: slot.label }).toString()}`,
-    );
+    const delivery = deliveryWindowUTC(day, slot.label);
+    if (!delivery) { toast("받을 시간대를 다시 선택해주세요"); return; }
+    router.push(`/checkout?${new URLSearchParams({ address, ...delivery }).toString()}`);
     close(false);
   };
 

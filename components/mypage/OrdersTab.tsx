@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { ordersStore } from "@/lib/orders";
 import { money } from "@/lib/products";
+import { deliveryWindowKST } from "@/lib/delivery-time";
 
 function formatDay(day: string) {
   const [y, m, d] = day.split("-");
@@ -18,10 +19,14 @@ export default function OrdersTab() {
       <h2>주문 내역</h2>
       {orders.length ? (
         <ul className="order-list">
-          {orders.map((o) => (
+          {orders.map((o) => {
+            const delivery = o.desiredStartAt && o.desiredEndAt
+              ? deliveryWindowKST(o.desiredStartAt, o.desiredEndAt)
+              : null;
+            return (
             <li key={o.id} className="order-item">
               <div className="order-item-top">
-                <strong>{formatDay(o.day)} · {o.timeLabel}</strong>
+                <strong>{formatDay(delivery?.day ?? o.day ?? "")} · {delivery?.timeLabel ?? o.timeLabel}</strong>
                 <span>{money(o.total)}</span>
               </div>
               <p className="meta">{o.address}</p>
@@ -35,7 +40,8 @@ export default function OrdersTab() {
                 ))}
               </ul>
             </li>
-          ))}
+            );
+          })}
         </ul>
       ) : (
         <div className="empty">
