@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test tests/*.test.cjs"
+    "test": "node --test tests/*.test.cjs",
+    "seed:sales-demo": "node scripts/seed-sales-demo.mjs"
   },
   "dependencies": {
     "next": "16.4.0",
