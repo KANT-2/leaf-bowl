@@ -14,6 +14,7 @@ export const salesDataSchema = z.object({
     id: z.string().min(1),
     status: z.enum(['pending', 'paid', 'completed', 'cancelled', 'refunded']),
     paidAt: utcTimestampSchema.nullable(),
+    completedAt: utcTimestampSchema.nullable().optional(),
     items: z.array(z.object({
       productId: z.string().min(1),
       productType: z.enum(['salad', 'drink', 'dressing', 'custom']),
@@ -23,7 +24,7 @@ export const salesDataSchema = z.object({
       quantity: z.number().int().positive().max(1000000),
       refundedQuantity: z.number().int().nonnegative().default(0),
     }).refine(item => item.refundedQuantity <= item.quantity, '환불 수량은 판매 수량을 초과할 수 없습니다.')),
-  }).refine(order => !['paid', 'completed', 'refunded'].includes(order.status) || order.paidAt !== null, '결제 확정 주문에는 결제 시각이 필요합니다.')),
+  }).refine(order => order.status === 'completed' ? !!(order.completedAt ?? order.paidAt) : !['paid', 'refunded'].includes(order.status) || order.paidAt !== null, '확정 주문에는 결제 또는 완료 시각이 필요합니다.')),
 }).refine(data => new Set(data.orders.map(order => order.id)).size === data.orders.length, '주문 번호가 중복되었습니다.');
 export type SalesData = z.infer<typeof salesDataSchema>;
 export type SalesRow = {
@@ -59,8 +60,9 @@ export function buildSalesReport(catalog: Catalog, data: SalesData | null, perio
   let orderCount = 0;
   const start = salesPeriodStart(period, now);
   for (const order of data?.orders ?? []) {
-    if (!['paid', 'completed'].includes(order.status) || !order.paidAt) continue;
-    const paidAt = Date.parse(order.paidAt);
+    const soldAt = order.completedAt ?? order.paidAt;
+    if (!['paid', 'completed'].includes(order.status) || !soldAt) continue;
+    const paidAt = Date.parse(soldAt);
     if (paidAt < start || paidAt > now.getTime()) continue;
     let counted = false;
     for (const item of order.items) {

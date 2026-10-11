@@ -67,13 +67,14 @@ export function createOrdersService({
       input: CreateOrderInput,
     ): Promise<{ order: OrderRecord; created: boolean }> {
       const hash = requestHash(input);
-      const existing = await repository.findByRequest(customerSessionId, idempotencyKey);
-      if (existing) return sameRequest(existing, hash);
-
-      assertDeliverySlot(input, await getHours(), now());
-      const priced = priceOrder(await getCatalog(), input.items);
       try {
-        const order = await repository.create({
+        return await repository.transaction(async tx => {
+          const existing = await tx.findByRequest(customerSessionId, idempotencyKey);
+          if (existing) return sameRequest(existing, hash);
+          assertDeliverySlot(input, await getHours(), now());
+          const catalog = await tx.getCatalog();
+          const priced = priceOrder(catalog, input.items);
+          const order = await tx.create({
           customerSessionId,
           ordererName: input.ordererName,
           phone: input.phone,
@@ -88,13 +89,15 @@ export function createOrdersService({
           requestHash: hash,
           items: priced.lines.map((l) => ({
             productId: l.productId,
+            productType: l.productId === null ? "custom" : catalog.products.find(p => p.id === l.productId)?.type === "drink" ? "drink" : "salad",
             name: l.name,
             options: l.options,
             unitPrice: l.unitPrice,
             quantity: l.quantity,
           })),
-        });
-        return { order, created: true };
+          });
+          return { order, created: true };
+        }, getCatalog);
       } catch (e) {
         if (!(e instanceof DuplicateRequestError)) throw e;
         // 동시에 같은 키가 먼저 저장됨: 저장된 주문을 다시 읽어 같은 규칙으로 처리

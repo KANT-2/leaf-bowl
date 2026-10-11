@@ -11,7 +11,7 @@ import type { DeliveryHours } from "@/lib/data/delivery";
 import { checkoutIssue } from "@/lib/checkout-validation";
 import { customerCatalog } from "@/lib/customer/catalog";
 import type { Snapshot } from "@/lib/admin/catalog";
-import { recordOrder } from "@/lib/orders";
+import { submitOrder, orderRequestKey, clearOrderRequestKey } from "@/lib/order-client";
 import { deliveryWindowKST, deliveryWindowUTC } from "@/lib/delivery-time";
 import { deliveryFee, money } from "@/lib/products";
 import { CardIcon, KakaoPayMark, TossMark } from "./icons/BrandMarks";
@@ -54,8 +54,11 @@ export default function CheckoutView({ hours }: { hours: DeliveryHours }) {
   const [cardExpiry, setCardExpiry] = useState("");
   const [cardCvc, setCardCvc] = useState("");
   const [paying, setPaying] = useState(false);
+  const [ordererName, setOrdererName] = useState("");
+  const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
   const pending = useRef(false);
+  const submission = useRef<{ body: string; key: string } | null>(null);
   const [done, setDone] = useState(false);
   const [doneTotal, setDoneTotal] = useState(0);
 
@@ -92,11 +95,13 @@ export default function CheckoutView({ hours }: { hours: DeliveryHours }) {
       }
       const window = deliveryWindowUTC(day, timeLabel);
       if (!window) throw Error("받을 시간대를 다시 선택해주세요.");
-      recordOrder({
-        ...window, address, total: latestTotal,
-        items: items.map((item) => ({ name: latest.itemName(item), options: latest.itemOptions(item), qty: item.qty, unitPrice: latest.itemUnitPrice(item) })),
-      });
-      setDoneTotal(latestTotal);
+      if (!ordererName.trim() || !/^0\d[\d -]{7,27}$/.test(phone.trim())) throw Error("받는 분의 이름과 연락처를 확인해주세요.");
+      const input = { ...window, address, ordererName: ordererName.trim(), phone: phone.trim(), items };
+      const body = JSON.stringify(input);
+      if (submission.current?.body !== body) submission.current = { body, key: await orderRequestKey(input) };
+      const order = await submitOrder(input, submission.current.key);
+      clearOrderRequestKey();
+      setDoneTotal(order.total);
       clear();
       setDone(true);
     } catch (cause) {
@@ -112,9 +117,9 @@ export default function CheckoutView({ hours }: { hours: DeliveryHours }) {
       <main className="wrap pv-wrap checkout-wrap">
         <div className="checkout-done">
           <div className="success-icon" aria-hidden="true">✓</div>
-          <h1>결제가 완료되었어요</h1>
+          <h1>주문이 접수되었어요</h1>
           <p>
-            {money(doneTotal)} 결제 · {day} {timeLabel}
+            {money(doneTotal)} · {day} {timeLabel}
           </p>
           <p className="demo-note">체험용 결제입니다. 실제로 청구되지 않았어요.</p>
           <div className="form-actions-stack">
@@ -184,6 +189,10 @@ export default function CheckoutView({ hours }: { hours: DeliveryHours }) {
         <p className="meta">
           {address} · {day} {timeLabel}
         </p>
+        <div className="mypage-form">
+          <label className="field"><span>받는 분</span><input autoComplete="name" maxLength={50} value={ordererName} onChange={event => setOrdererName(event.target.value)} /></label>
+          <label className="field"><span>연락처</span><input autoComplete="tel" inputMode="tel" maxLength={30} placeholder="010-1234-5678" value={phone} onChange={event => setPhone(event.target.value)} /></label>
+        </div>
       </section>
 
       <section className="surface mypage-section">

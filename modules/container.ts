@@ -1,8 +1,8 @@
 import { readCatalog } from "@/lib/admin/store";
-import { hashPassword } from "./identity/crypto";
-import { createMemoryIdentityRepository, type AdminUserRecord } from "./identity/repository";
+import { prisma } from "@/lib/prisma";
+import { createPostgresIdentityRepository } from "./identity/postgres-repository";
 import { createIdentityService, type IdentityService } from "./identity/service";
-import { createMemoryOrdersRepository } from "./orders/memory-repository";
+import { createPostgresOrdersRepository } from "./orders/postgres-repository";
 import { createOrdersService, type OrdersService } from "./orders/service";
 import { createRateLimiter, type RateLimiter } from "./shared/rate-limit";
 
@@ -45,31 +45,14 @@ export interface Services {
 }
 
 /**
- * 서비스를 한곳에서 조립한다. DB 로 바꿀 때 route.ts 와 업무 규칙(service.ts)은 그대로 쓰지만,
- * 저장소 계약은 트랜잭션을 표현하도록 바꿔야 한다 (docs/db-design.md "저장소 트랜잭션 계약").
- *
- * 임시 관리자 계정: 환경변수 ADMIN_LOGIN_ID, ADMIN_PASSWORD 가 모두 있을 때만 만든다.
- * 기본 비밀번호는 없다 (설정하지 않으면 어떤 로그인도 실패한다).
+ * PostgreSQL-backed services. Administrator provisioning happens explicitly in db:seed.
  */
 export function createServices(): Services {
-  const admins: AdminUserRecord[] = [];
-  const loginId = process.env.ADMIN_LOGIN_ID;
-  const password = process.env.ADMIN_PASSWORD;
-  const identityRepository = createMemoryIdentityRepository(admins);
-  if (loginId && password) {
-    // 해시 계산이 끝나기 전에 로그인 요청이 오지 않도록 목록에 넣는 시점을 첫 로그인 직전으로 미룬다
-    const ready = hashPassword(password).then((passwordHash) => {
-      admins.push({ id: "admin-1", loginId, passwordHash });
-    });
-    const original = identityRepository.findAdminByLoginId;
-    identityRepository.findAdminByLoginId = async (id) => {
-      await ready;
-      return original(id);
-    };
-  }
+  const db = prisma();
+  const identityRepository = createPostgresIdentityRepository(db);
   return {
     orders: createOrdersService({
-      repository: createMemoryOrdersRepository(),
+      repository: createPostgresOrdersRepository(db),
       getCatalog: async () => (await readCatalog()).catalog,
     }),
     identity: createIdentityService({ repository: identityRepository }),

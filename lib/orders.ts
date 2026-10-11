@@ -1,5 +1,5 @@
 import { readBrowserJSON as readJSON, writeBrowserJSON as writeJSON } from "./browser-json";
-/** 마이페이지 "주문 내역"용 mock 주문 기록. 실제 서버 주문 전까지 localStorage에만 저장한다. */
+/** 과거 브라우저 체험 주문의 호환 저장소. 새 주문은 order-client.ts를 통해 DB에 접수한다. */
 import { createLocalStore } from "./local-store";
 import { deliveryWindowUTC, deliveryWindowKST, type DeliveryWindow } from "./delivery-time";
 

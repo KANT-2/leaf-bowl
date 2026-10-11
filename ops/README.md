@@ -75,8 +75,13 @@ Python 3.12 이상, Linux, Git, Node.js 22, npm과 GitHub/npm/Google Fonts 네�
 
 빌드·후보·운영 Next.js 프로세스에 `TZ=UTC`를 주입한다. 배포 로그와 상태의 시각은 UTC `Z`로 기록한다. 화면 날짜·시간은 공통 변환으로 KST를 표시하며, 브라우저 시스템 시간대에 의존하지 않는다.
 
-그 외 앱별 환경 변수는 현재 구성하지 않는다. 환경별 변수를 추가할 때는 앱별 프로세스의 환경으로
-주입하고, `NEXT_PUBLIC_*`는 빌드에 포함되므로 기존 같은-SHA 빌드 캐시를 사용하지 않도록
+PostgreSQL 저장을 사용하는 버전은 배포 전에 환경별 DB에 migration과 import/seed를 실행하고,
+supervisor 프로세스에 `DATABASE_URL`과 고정된 `ADMIN_DATA_DIR`를 주입해야 한다.
+릴리스 안의 `.env.local` 대신 supervisor 환경을 사용한다. 상세 절차는
+[PostgreSQL 실행과 이관](../docs/postgres.md)을 따른다.
+
+환경별 변수를 추가할 때는 앱별 프로세스의 환경으로 주입하고,
+`NEXT_PUBLIC_*`는 빌드에 포함되므로 기존 같은-SHA 빌드 캐시를 사용하지 않도록
 앱을 중지한 상태에서 해당 환경의 생성된 릴리스 디렉터리를 정리한 뒤 다시 준비한다.
 GitHub 워크플로를 재생성해 ID가 바뀌면 스크립트의 `WORKFLOW_ID`도 갱신한다.
 
