@@ -33,7 +33,7 @@ const { createOrdersService } = require("../modules/orders/service.ts");
 const { createMemoryOrdersRepository } = require("../modules/orders/memory-repository.ts");
 const { createIdentityService } = require("../modules/identity/service.ts");
 const { createMemoryIdentityRepository } = require("../modules/identity/repository.ts");
-const { hashToken, hashPassword } = require("../modules/identity/crypto.ts");
+const { hashToken, hashPassword, loginRateKey, LOGIN_BUCKETS } = require("../modules/identity/crypto.ts");
 const { createRateLimiter, clientKey } = require("../modules/shared/rate-limit.ts");
 const { AppError } = require("../modules/shared/errors.ts");
 const sessionRoute = require("../app/api/v1/session/route.ts");
@@ -133,6 +133,18 @@ test("비회원 세션 상한: 가득 차면 503, 만료되면 다시 발급, �
   assert.equal(await repo.countSessions("guest", new Date(t)), 1);
 });
 
+test("비회원 세션 상한: 동시에 많이 발급해도 상한을 넘지 않는다", async () => {
+  const repo = createMemoryIdentityRepository();
+  const svc = createIdentityService({ repository: repo, now: () => new Date(T0), maxGuestSessions: 3 });
+  const results = await Promise.allSettled(Array.from({ length: 20 }, () => svc.issueGuestSession()));
+  const ok = results.filter((r) => r.status === "fulfilled").length;
+  const rejected = results.filter((r) => r.status === "rejected");
+  assert.equal(ok, 3);
+  assert.equal(rejected.length, 17);
+  assert.ok(rejected.every((r) => r.reason instanceof AppError && r.reason.status === 503));
+  assert.equal(await repo.countSessions("guest", new Date(T0)), 3); // 예전에는 20 이 되었다
+});
+
 test("요청 제한기: 서로 다른 키를 많이 넣어도 빠르고 키 개수는 상한을 넘지 않는다", () => {
   const limiter = createRateLimiter(10, 60_000);
   const started = Date.now();
@@ -167,20 +179,47 @@ async function loginSetup(limits) {
 }
 const login = (loginId, password, headers) => loginRoute.POST(req("/api/v1/auth/login", { body: { loginId, password }, headers }));
 
-test("로그인 제한: 존재하지 않는 아이디를 아무리 보내도 키가 늘지 않고, 실제 관리자 로그인은 막히지 않는다", async () => {
-  const limits = createLimits({ account: 5, clientLogin: 1000 });
+test("로그인 제한: 임의의 아이디를 아무리 보내도 키가 늘지 않고, 실제 관리자 로그인은 막히지 않는다", async () => {
+  const limits = createLimits({ account: 5, clientLogin: 1000, globalLogin: 1000 });
   await loginSetup(limits);
+  for (let i = 0; i < 300; i++) await login("ghost-" + i, "x", { "x-forwarded-for": "7.7.7." + i });
+  assert.ok(limits.account.size() <= LOGIN_BUCKETS, "키 " + limits.account.size() + "개 (상한 " + LOGIN_BUCKETS + ")");
+  assert.equal((await login("admin", "pw")).status, 200); // 임의 아이디 공격이 실제 관리자 로그인을 막지 않는다
+});
+
+test("로그인 제한: 응답이 계정 존재 여부를 드러내지 않는다 (모르는 아이디와 실제 계정이 같은 응답)", async () => {
+  const run = async (loginId, before) => {
+    const limits = createLimits({ account: 5, clientLogin: 1000, globalLogin: 1000 });
+    await loginSetup(limits);
+    for (let i = 0; i < before; i++) await login("ghost-spray", "x"); // 다른 모르는 아이디를 먼저 소진
+    const statuses = [];
+    for (let i = 0; i < 8; i++) statuses.push((await login(loginId, "wrong")).status);
+    return statuses;
+  };
+  for (const before of [0, 8, 50]) {
+    const known = await run("admin", before);
+    const unknown = await run("ghost-other", before);
+    assert.deepEqual(known, unknown, "앞선 시도 " + before + "회 뒤 응답 순서가 같아야 한다");
+    assert.deepEqual(known, [401, 401, 401, 401, 401, 429, 429, 429]);
+  }
+});
+
+test("로그인 제한: 같은 아이디는 대소문자·공백이 달라도 같은 칸을 쓴다", () => {
+  assert.equal(loginRateKey("Admin"), loginRateKey(" admin "));
+  assert.match(loginRateKey("x"), /^account:\d+$/);
+  assert.notEqual(loginRateKey("admin"), loginRateKey("administrator-x"));
+});
+
+test("로그인 제한: 전체 한도가 비밀번호 검사 총량을 막는다", async () => {
+  await loginSetup(createLimits({ account: 1000, clientLogin: 1000, globalLogin: 5 }));
   const codes = [];
-  for (let i = 0; i < 200; i++) codes.push((await login("ghost-" + i, "x", { "x-forwarded-for": "7.7.7." + i })).status);
-  assert.equal(count(codes, 401), 5);
-  assert.equal(count(codes, 429), 195); // 모르는 아이디는 한 칸을 같이 쓴다
-  assert.ok(limits.account.size() <= 2, "키 " + limits.account.size() + "개");
-  assert.equal((await login("admin", "pw")).status, 200); // 실제 관리자는 영향 없음
+  for (let i = 0; i < 8; i++) codes.push((await login("ghost-" + i, "x")).status);
+  assert.deepEqual(codes, [401, 401, 401, 401, 401, 429, 429, 429]);
 });
 
 test("로그인 제한: 접속자 헤더를 바꿔도 같은 계정의 틀린 시도는 한도에서 막히고, 구간이 지나면 풀린다", async () => {
   let t = 0;
-  const limits = createLimits({ account: 5, clientLogin: 1000 }, () => t);
+  const limits = createLimits({ account: 5, clientLogin: 1000, globalLogin: 1000 }, () => t);
   await loginSetup(limits);
   const codes = [];
   for (let i = 0; i < 8; i++) codes.push((await login("admin", "wrong", { "x-forwarded-for": "6.6.6." + i })).status);

@@ -40,34 +40,29 @@ export function createIdentityService({
     await repository.purgeExpired(at);
   }
 
-  async function issue(kind: SessionRecord["kind"], adminUserId: string | null, ttlMs: number) {
+  /** maxActive 가 있으면 상한 확인과 저장을 한 번에 한다. 가득 차 저장하지 못하면 null */
+  async function issue(kind: SessionRecord["kind"], adminUserId: string | null, ttlMs: number, maxActive?: number) {
     const token = newSessionToken();
-    const expiresAt = new Date(now().getTime() + ttlMs);
-    const session = await repository.createSession({
-      tokenHash: hashToken(token),
-      kind,
-      adminUserId,
-      expiresAt,
-    });
-    return { token, expiresAt, session };
+    const at = now();
+    const expiresAt = new Date(at.getTime() + ttlMs);
+    const record = { tokenHash: hashToken(token), kind, adminUserId, expiresAt };
+    const session =
+      maxActive === undefined
+        ? await repository.createSession(record)
+        : await repository.createSessionWithinLimit(record, { max: maxActive, now: at });
+    return session ? { token, expiresAt, session } : null;
   }
 
   return {
     async issueGuestSession() {
       await purgeIfDue();
-      if ((await repository.countSessions("guest", now())) >= maxGuestSessions) {
-        throw new AppError(503, "현재 접속이 많아 잠시 후 다시 시도해주세요.");
+      let issued = await issue("guest", null, GUEST_SESSION_MS, maxGuestSessions);
+      if (!issued) {
+        await purgeIfDue(true); // 가득 찼으면 만료된 세션을 바로 정리하고 한 번 더 시도한다
+        issued = await issue("guest", null, GUEST_SESSION_MS, maxGuestSessions);
       }
-      return issue("guest", null, GUEST_SESSION_MS);
-    },
-
-    /**
-     * 로그인 시도 제한에 쓰는 계정 단위 키. 존재하는 계정은 계정별로, 없는 아이디는 모두 한 칸으로 묶는다.
-     * 그래야 임의의 아이디를 무한히 보내도 제한기의 키가 늘지 않고, 실제 계정의 카운터를 밀어내지도 못한다.
-     */
-    async loginRateKey(loginId: string): Promise<string> {
-      const admin = await repository.findAdminByLoginId(loginId);
-      return admin ? `account:${admin.id}` : "account:unknown";
+      if (!issued) throw new AppError(503, "현재 접속이 많아 잠시 후 다시 시도해주세요.");
+      return issued;
     },
 
     async login(loginId: string, password: string) {
@@ -75,7 +70,7 @@ export function createIdentityService({
       const admin = await repository.findAdminByLoginId(loginId);
       const ok = await verifyPassword(password, admin?.passwordHash ?? (await dummyHash));
       if (!admin || !ok) throw new AppError(401, LOGIN_FAILED);
-      return issue("admin", admin.id, ADMIN_SESSION_MS);
+      return issue("admin", admin.id, ADMIN_SESSION_MS) as Promise<NonNullable<Awaited<ReturnType<typeof issue>>>>;
     },
 
     /** 쿠키의 원본 토큰으로 유효한 세션을 찾는다. 없거나 만료되었거나 종류가 다르면 null */

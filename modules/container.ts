@@ -9,25 +9,29 @@ import { createRateLimiter, type RateLimiter } from "./shared/rate-limit";
 /**
  * 요청 제한 묶음 (분당).
  * - clientLogin·clientSession: 요청자별. TRUSTED_PROXY_HOPS 로 신뢰할 프록시를 알려 줬을 때만 적용된다 (clientKey).
- * - account: 로그인 시도의 계정 단위. 접속자를 속여도 같은 계정이면 같은 칸이라 무차별 대입을 막는다.
+ * - account: 로그인 시도의 아이디 단위(해시 칸). 접속자를 속여도 같은 아이디면 같은 칸이라 무차별 대입을 막는다.
+ *   계정이 존재하는지와 무관하게 정해져서 응답으로 계정 존재 여부를 알 수 없다.
+ * - globalLogin: 로그인 시도 전체 한도. 비밀번호 검사의 CPU 총량을 제한한다.
  * - globalSession: 비회원 세션 발급 전체 한도. 헤더를 매번 바꿔도 발급 속도가 이 값을 넘지 못한다.
  */
 export interface Limits {
   clientLogin: RateLimiter;
   account: RateLimiter;
+  globalLogin: RateLimiter;
   clientSession: RateLimiter;
   globalSession: RateLimiter;
   order: RateLimiter;
 }
 
 export function createLimits(
-  perMinute: { clientLogin?: number; account?: number; clientSession?: number; globalSession?: number; order?: number } = {},
+  perMinute: { clientLogin?: number; account?: number; globalLogin?: number; clientSession?: number; globalSession?: number; order?: number } = {},
   now?: () => number,
 ): Limits {
   const make = (limit: number) => createRateLimiter(limit, 60_000, { now });
   return {
     clientLogin: make(perMinute.clientLogin ?? 10),
     account: make(perMinute.account ?? 10),
+    globalLogin: make(perMinute.globalLogin ?? 120),
     clientSession: make(perMinute.clientSession ?? 30),
     globalSession: make(perMinute.globalSession ?? 120),
     order: make(perMinute.order ?? 20),

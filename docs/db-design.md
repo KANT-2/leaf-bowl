@@ -345,7 +345,8 @@ erDiagram
 ### 세션 정리와 상한
 
 - 만료된 세션은 해당 토큰으로 다시 접근할 때만 지워지면 계속 쌓이므로, 세션을 발급할 때 1분에 한 번 `purgeExpired(now)` 로 쓸어낸다. DB 에서는 `DELETE FROM sessions WHERE expires_at <= $1` 이고 `idx_sessions_expires` 를 쓴다.
-- 비회원 세션은 동시에 유효한 개수에 상한(10,000)을 둔다. 상한에 이르면 새 세션 발급은 503, 이미 가진 세션은 계속 쓸 수 있다. DB 에서는 `SELECT count(*) FROM sessions WHERE kind = 'guest' AND expires_at > $1` 로 센다.
+- 비회원 세션은 동시에 유효한 개수에 상한(10,000)을 둔다. 상한에 이르면 새 세션 발급은 503, 이미 가진 세션은 계속 쓸 수 있다. **개수 확인과 저장은 한 번에(원자적으로) 해야 한다**: 먼저 세고 따로 저장하면 동시 요청이 모두 통과해 상한을 넘는다(상한 3에 동시 20건이 모두 성공하는 것을 재현했다). 저장소 계약의 `createSessionWithinLimit` 이 이를 맡고, DB 에서는 한 문장 `INSERT ... SELECT ... WHERE (SELECT count(*) FROM sessions WHERE kind = 'guest' AND expires_at > $1) < $2` 를 `pg_advisory_xact_lock` 아래에서 실행한다(READ COMMITTED 에서는 잠금 없이는 동시 삽입이 서로를 보지 못한다).
+- 로그인 시도 제한은 **계정이 존재하는지와 무관한** 키(아이디를 1,024칸으로 해시)를 쓴다. 존재 여부로 칸을 나누면 모르는 아이디와 실제 계정의 응답(429/401)이 달라져 계정 존재 여부가 드러난다. 비밀번호 검사의 CPU 총량은 전체 한도(분당 120)로 따로 제한한다.
 - 요청 제한기(로그인·세션·주문)는 서버 메모리의 임시 장치다. 서버가 여러 대가 되면 DB 나 Redis 로 옮겨야 한다.
 
 ### 저장소 트랜잭션 계약 (제안, 정민님과 합의 필요)
