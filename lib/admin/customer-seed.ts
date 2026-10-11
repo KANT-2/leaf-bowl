@@ -21,6 +21,7 @@ export function customerSeed(): Catalog {
         customerId: p.id,
         type: "salad" as const,
         name: p.name,
+        ...(p.isNew !== undefined ? { isNew: p.isNew } : {}),
         en: p.en,
         price: p.price,
         description: p.description,

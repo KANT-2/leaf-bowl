@@ -2,15 +2,14 @@
 
 시간 처리: 모든 절대 시각은 UTC로 저장·응답하고 고객·관리자·미리보기 표시는 KST로 변환한다. 리뷰·매출·기존 기록 이관 규칙은 [시간 처리 규칙](time-policy.md)을 따른다.
 
-PostgreSQL · 정민님 원격 리눅스 서버에서 실행 · 작성: 안형준 (백엔드)
+PostgreSQL 18 · Prisma 7.10 · 기존 SQL 설계와 현재 앱 저장소 구현
 
 ## 목표
 
-관리자 기능(#16)은 지금 카탈로그 전체를 `.data/admin/catalog.json` 한 파일에 저장한다.
-이 설계는 같은 데이터를 PostgreSQL 테이블로 옮긴다. **화면과 API(`/api/admin/catalog`)는 그대로 두고**,
-`lib/admin/store.ts` 의 `readCatalog` · `writeCatalog` 안쪽만 DB 조회·저장으로 바꾸는 것이 목표다.
+카탈로그·리뷰·주문·관리자 및 비회원 세션을 PostgreSQL에 저장한다.
+기존 카탈로그 API 계약과 고객 상품 번호를 유지하고, 서버 재시작 이후에도 데이터와 세션을 보존한다.
 
-기준: `lib/admin/catalog.ts` 의 `catalogSchema` (main, #23 반영). PR #24 리뷰에 따라 알레르기는 연관 테이블, 리뷰 via 는 제외. 재료·재료 기준 자동 품절·메뉴별 드레싱은 아래 '재료와 재료 기준 자동 품절' 절에 추가.
+기준: `lib/admin/catalog.ts` 의 `catalogSchema` (main, #23 반영). 알레르기는 연관 테이블과 원문 문구를 함께 저장하고 리뷰 via도 보존한다. 재료·재료 기준 자동 품절·메뉴별 드레싱은 아래 '재료와 재료 기준 자동 품절' 절에 추가.
 
 ## ERD
 
@@ -176,7 +175,7 @@ ERD 외에 1행짜리 테이블 2개가 더 있다: `catalog_meta` (저장 버�
 | `content.seasonPages[]` | season_pages |
 
 이름 규칙: 코드의 camelCase 는 컬럼에서 snake_case (`detailAddress` → `detail_address`, `en` → `name_en`, `sample` → `is_sample`, `date` → `date_label`).
-리뷰의 `via`(픽업·배달)는 저장하지 않는다. 수령 방식이 배달로 고정되었다.
+리뷰의 `via`(픽업·배달)는 기존 기록과 표시 호환성을 위해 저장한다.
 
 ## 설계 결정
 
@@ -353,137 +352,41 @@ erDiagram
   - **아이디별 독립 카운터가 아니다.** 아이디는 1,024칸을 공유하고 칸 안에서 카운터를 같이 쓴다. 기본 한도는 칸당 분당 10회다.
   - **충돌하는 아이디로 관리자 로그인을 1분간 막을 수 있다.** 예: 존재하지 않는 `collision-687` 은 `admin` 과 같은 `account:741` 칸이다. `collision-687` 로 틀린 시도 10회(401) 뒤에는 올바른 `admin` 비밀번호도 429 이고, 60초가 지나면 다시 200 이다(`tests/session-abuse.test.cjs`). 이는 `admin` 을 직접 10회 틀려 잠그는 것과 같은 효과라 공격자의 능력이 늘지는 않지만, `admin` 이라는 아이디를 보내지 않고도 가능하다. 해시가 비밀값 없는 SHA-256 이라 충돌 아이디는 약 1,024회 계산으로 찾을 수 있다. "임의의 아이디 공격이 관리자 로그인을 막지 않는다"는 말은 무작위 아이디(테스트의 `ghost-0`~`ghost-299` 300개 샘플)에서만 관찰된 것이며 일반 보장이 아니다.
   - **전체 한도(분당 120)는 전체 로그인을 잠글 수 있다.** 누구나 1분에 요청 120개를 보내면 관리자를 포함한 모든 로그인이 그 구간 동안 429 이다. CPU 보호(비밀번호 검사 총량 제한)를 가용성보다 우선한 선택이다. 세션 발급 전체 한도(분당 120)도 같은 방식으로 새 방문자의 발급을 막을 수 있다.
-  - 요청자별 제한은 신뢰할 프록시(`TRUSTED_PROXY_HOPS`) 확인 후에 보완할 수 있다. 메모리 저장소(mock) 기준이라 서버를 다시 시작하면 제한 카운터와 세션이 사라지고, 서버가 여러 대면 공유되지 않는다.
+  - 요청자별 제한은 신뢰할 프록시(`TRUSTED_PROXY_HOPS`) 확인 후에 보완할 수 있다. 요청 제한 카운터는 서버 재시작 시 초기화되고 서버 간 공유되지 않는다. 주문·세션은 DB에 보존된다.
 - 요청 제한기(로그인·세션·주문)는 서버 메모리의 임시 장치다. 서버가 여러 대가 되면 DB 나 Redis 로 옮겨야 한다.
 
-### 저장소 트랜잭션 계약 (제안, 정민님과 합의 필요)
+### 구현된 저장소 트랜잭션 계약
 
-"DB 가 준비되면 `container.ts` 에서 저장소만 바꾸면 된다"는 말은 **route 와 service 의 업무 규칙은 그대로 둔다**는 뜻에서만 맞다. 지금의 저장소 계약(`modules/orders/repository.ts`)은 설계안(`docs/backend-design.md` "주문 API와 트랜잭션 처리")이 요구하는 트랜잭션을 표현하지 못해서, DB 를 붙일 때 **계약 자체를 아래처럼 바꿔야** 한다.
+`modules/orders/repository.ts`의 `transaction(work, catalogForTests)`는 기존 요청 조회, 잠금 아래 카탈로그 조회, 주문·항목·초기 이력 생성을 하나로 묶는다. PostgreSQL 어댑터는 `OrdersTransaction.getCatalog()`에서 `catalog_meta`를 `FOR SHARE`로 잠그며 관리자 저장은 `FOR UPDATE`를 사용한다. 테스트용 메모리 어댑터만 `catalogForTests`를 사용한다.
 
-**설계안과 현재 구현의 차이**
+키 중복 P2002는 `DuplicateRequestError`로 변환한 뒤 트랜잭션을 취소한다. 서비스는 콜백 밖에서 승자의 주문을 다시 읽어 요청 해시를 비교한다. 상태 변경은 저장소의 `updateStatus`가 자체 트랜잭션에서 조건부 갱신과 이력을 함께 기록한다. P2034 충돌만 최대 3회 재시도하며 업로드·외부 API 호출은 이 콜백 안에서 수행하지 않는다.
 
-| 설계안 | 현재 구현 | 차이 |
-| --- | --- | --- |
-| 기존 키 확인 → 상품 검증·가격 계산 → 주문·항목·이력 저장을 `prisma.$transaction` 한 번에 | `findByRequest`, `getCatalog`, `create` 가 각각 따로 호출된다. `create` 안에서만 주문·항목·접수 이력을 한 번에 저장한다 | 키 확인과 카탈로그 읽기가 저장과 같은 트랜잭션에 묶이지 않는다 |
-| Service 가 연 `tx` 를 모든 Repository 호출에 전달 | `tx` 개념이 계약에 없다 | Repository 가 트랜잭션을 스스로 열면 service 가 앞선 읽기를 포함시킬 수 없다 |
-| 카탈로그 버전 행을 읽기 잠금(`FOR SHARE`), 관리자 저장은 쓰기 잠금(`FOR UPDATE`) | `getCatalog()` 는 파일 저장소를 읽고 잠금이 없다 | 가격 계산 중 관리자가 상품을 바꿔도 막지 못한다 |
-| 상태 변경: 조건부 갱신 + `version + 1` + 이력을 한 트랜잭션에 | `updateStatus` 한 메서드 안에서 처리한다는 주석뿐 | 계약에 "셋이 함께 성공하거나 함께 취소"가 명시되어 있지 않다 |
+### 적용된 Prisma 모델과 마이그레이션
 
-**실제 PostgreSQL 엔진(PGlite)으로 확인한 동작** (`schema.sql` 의 `orders`, `order_status_history`)
+Prisma CLI·Client·PostgreSQL adapter는 7.10.0이다. 전체 카탈로그·주문·인증 모델을 `prisma/schema.prisma`에 정의했고 `@@map`·`@map`으로 기존 테이블·열 이름을 유지한다. `lib/prisma.ts`는 연결 풀(프로세스당 최대 5개)을 재사용한다. 생성 코드 `generated/prisma`는 `npm ci`의 postinstall에서 생성하고 Git에서 제외한다.
 
-| 시도 | 결과 |
+| 마이그레이션 | 내용 |
 | --- | --- |
-| 같은 트랜잭션 안에서 `(customer_session_id, request_key)` 중복 INSERT | `23505` 오류. 이 트랜잭션은 **중단 상태**가 되어 이어지는 SELECT 도 `current transaction is aborted` 로 실패한다 |
-| 롤백 후 새 트랜잭션에서 기존 주문 재조회 | 가능 |
-| `SAVEPOINT` 로 INSERT 를 감싸고 오류 시 `ROLLBACK TO SAVEPOINT` | 같은 트랜잭션에서 재조회 가능 |
-| `INSERT ... ON CONFLICT (customer_session_id, request_key) DO NOTHING RETURNING id` | 오류 없이 0행, 같은 트랜잭션에서 재조회 가능 |
-| 상태 `UPDATE` 후 이력 INSERT 가 실패 | 롤백하면 `status`, `version` 이 원래대로 돌아온다 (둘은 한 트랜잭션이어야 한다) |
+| `0001_baseline` | 기존 `db/schema.sql`의 테이블, IDENTITY, CHECK, 부분 인덱스, 생성 열, 뷰, 상태 전이 트리거를 그대로 생성 |
+| `0002_catalog_persistence` | 다음 고객 상품 번호, 리뷰 삭제 이력·via, 원산지, 원문 알레르기, 시즌 페이지 유무, 주문 항목 순서·종류 |
+| `0003_allergen_text` | 알레르기 문구 길이 호환, 상품 삭제 후에도 주문 상품 식별자를 보존하는 스냅샷 열 |
 
-즉 **P2002 처리는 "트랜잭션을 끝낸 뒤 밖에서 기존 주문을 다시 읽는" 구조여야 한다.** 지금 service 의 `catch (DuplicateRequestError) → findByRequest` 는 이 구조라 그대로 쓸 수 있지만, 그 재조회는 반드시 실패한 트랜잭션 **밖**의 호출이어야 한다.
+Prisma가 표현하지 못하는 DB 규칙은 migration SQL에서 유지한다. 생성 열은 `dbgenerated()`로 표시해 INSERT 시 직접 값을 보내지 않는다. `prisma db push`나 스키마에서 자동 생성한 DDL로 baseline SQL을 대체하지 않는다.
 
-**제안하는 최소 계약** (코드는 아직 바꾸지 않았다. 합의 후 DB 연결 때 함께 적용)
+### 저장 방식
 
-```ts
-/** 하나의 DB 트랜잭션 안에서만 쓰는 연산. 콜백 밖으로 꺼내 쓰지 않는다 */
-interface OrdersTx {
-  readCatalog(): Promise<Catalog>;                 // 카탈로그 버전 행 FOR SHARE 후 같은 트랜잭션에서 읽기
-  findByRequest(sessionId: string, key: string): Promise<OrderRecord | null>;
-  insertOrder(order: NewOrder): Promise<OrderRecord>;   // 주문 + 항목 + 접수 이력. 키 중복이면 DuplicateRequestError
-  findById(id: string): Promise<OrderRecord | null>;
-  /** id + version + status 조건 갱신, version + 1, 취소 시각·사유, 상태 이력 INSERT 를 모두 이 트랜잭션에서. 조건이 안 맞으면 null */
-  updateStatus(update: StatusUpdate): Promise<OrderRecord | null>;
-}
+카탈로그 읽기는 공유 잠금 아래 모든 테이블을 읽어 하나의 스냅샷으로 조립한다. 전체 저장·리뷰 추가는 배타 잠금 아래 revision·리뷰 중복/삭제 이력을 확인하고 원자적으로 반영한다. 새 상품 번호는 `next_customer_id`로 계속 증가하며 영구 제거된 리뷰는 `deleted_review_ids`에서 보존한다. 선택 배열이 없는 경우와 빈 시즌 페이지 배열도 구분한다. 연결 실패를 JSON 파일이나 메모리 저장으로 대체하지 않는다.
 
-interface OrdersRepository {
-  /** fn 이 던지면 전체를 롤백하고 그 오류를 다시 던진다. 일시적 충돌(P2034)은 최대 3회 다시 실행한다 */
-  transaction<T>(fn: (tx: OrdersTx) => Promise<T>): Promise<T>;
-  // 트랜잭션이 필요 없는 읽기
-  findByRequest(sessionId: string, key: string): Promise<OrderRecord | null>;
-  findById(id: string): Promise<OrderRecord | null>;
-  list(query: ListQuery): Promise<OrderRecord[]>;
-}
-```
+관리자·고객 화면, 개별 상품 API, 주문 가격 계산은 같은 카탈로그를 사용한다. 주문 항목에는 이름·단가·옵션·상품 식별자를 스냅샷으로 보존한다. 판매 현황은 DB의 완료 주문만 집계하며 완료 시각을 사용한다. 결제 확정이나 실제 청구를 의미하지 않는다. 기존 가상 판매 JSON은 실제 매출로 가져오지 않는다.
 
-규칙
-
-1. `transaction` 의 콜백은 **다시 실행되어도 안전**해야 한다(P2034 재시도). 콜백 안에서 파일 업로드 같은 외부 호출을 하지 않는다.
-2. 주문 생성은 한 콜백 안에서 `findByRequest → readCatalog → 가격 계산·검증 → insertOrder` 를 한다. `DuplicateRequestError` 는 콜백 밖에서 잡아 `repository.findByRequest` 로 다시 읽고 해시를 비교한다(같으면 기존 주문, 다르면 409).
-3. 상태 변경·취소는 `transaction(tx => tx.updateStatus(...))` 로 한다. 상태·`version`·이력이 한 번에 반영되거나 한 번에 취소된다. 취소가 관리자 변경과 겹쳐 `null` 이면 service 가 최신 상태를 다시 읽어 판단한다(현재 구현 그대로).
-4. 메모리 구현은 같은 계약으로 쓸 수 있다: `transaction` 이 변경을 임시 버퍼에 쓰고 콜백이 성공하면 반영, 실패하면 버린다.
-
-**정민님과 합의할 것**
-
-1. 위 계약의 방향(`transaction` + `OrdersTx`)이 설계안의 의도와 맞는지.
-2. 카탈로그 읽기 잠금을 `OrdersTx.readCatalog()` 로 둘지, `modules/catalog` 가 `tx` 를 받아 읽게 할지 (카탈로그 저장소 통합 담당과 맞춰야 한다).
-3. 격리 수준: 기본(READ COMMITTED) + 조건부 `UPDATE` + 카탈로그 `FOR SHARE` 로 충분한지.
-
-이 절은 **제안**이다. Prisma 저장소 구현이나 `docs/backend-design.md` 의 수정은 포함하지 않는다.
-
-### Prisma 스키마 초안 (`prisma/schema.prisma`)
-
-DB 를 붙이기 전에 설계안(`docs/backend-design.md` "Prisma 구성과 데이터 모델")의 모델을 미리 만들어 둔 **부분 초안**이다.
-
-| 항목 | 내용 |
-| --- | --- |
-| 범위 | `AdminUser`, `Session`, `Order`, `OrderItem`, `OrderStatusHistory`, `Product`(주문 항목이 참조). 옵션 그룹·재료·리뷰·콘텐츠 등 나머지 카탈로그 테이블은 상품 API 통합(#72)·카탈로그 저장소 전환 때 같은 방식으로 추가한다 |
-| 이름 | 테이블·컬럼·인덱스 이름을 `db/schema.sql` 그대로 `@@map`·`@map`·`map:` 으로 맞췄다 (기존 DB 를 `db pull` 로 편입할 때 어긋나지 않게) |
-| 금액 | `BigInt` (JSON 응답에서는 십진 문자열), 옵션 스냅샷은 `Json`(`JSONB`) |
-| 검증 | Prisma 7.10.0 으로 `prisma validate` 통과, `prisma format --check` 통과, 임시 폴더에서 `prisma generate` 로 Client 생성 성공, `prisma migrate diff --from-empty --to-schema --script` 로 생성되는 DDL 을 `db/schema.sql` 과 대조했다. DB 연결은 하지 않았다 |
-| 외래키 | `db/schema.sql` 은 `ON UPDATE` 를 생략(= `NO ACTION`)하는데 Prisma 기본값은 `Cascade` 라서, 5개 관계 모두 `onUpdate: NoAction` 을 명시했다. 생성 DDL 로 `ON DELETE CASCADE/SET NULL` + `ON UPDATE NO ACTION` 이 SQL 과 같음을 확인했다 |
-
-**Prisma 스키마로 표현할 수 없어서 마이그레이션 SQL 에 그대로 보존해야 하는 것**: CHECK 제약(상태 값, `total = subtotal + delivery_fee`, 취소 상태·시각 일치, 수량 1~99, 세션 종류와 관리자 계정 일치), 생성 컬럼과 복합 외래키 `(id, type)`, 부분 유니크 인덱스 `uq_product_dressings_default`, 뷰 `product_availability`·`bowl_match_ingredients`, 트리거 `trg_order_status_transition`. 이것들은 `db/schema.sql` 에 이미 있으므로 baseline 마이그레이션에 포함한다.
-
-**Prisma 가 새로 만든 DDL 과 `db/schema.sql` 의 알려진 차이**
-
-1. `order_items.id`, `order_status_history.id`: SQL 은 `GENERATED ALWAYS AS IDENTITY`, Prisma `autoincrement()` DDL 은 `BIGSERIAL`. **ID 를 생략해 자동 발급받는 INSERT 에서는 같은 역할**이지만 **명시 ID 를 넣는 INSERT 는 다르다.** 실제 PostgreSQL 엔진(PGlite)으로 확인: `ALWAYS` 는 `cannot insert a non-DEFAULT value into column "id"` 로 거부하고(`OVERRIDING SYSTEM VALUE` 를 붙이면 허용), `BIGSERIAL` 은 명시 ID 를 그대로 받는다. 그래서 둘을 서로 바꿔 쓸 수 있는 것으로 보면 안 된다. 앱은 이 두 테이블의 ID 를 직접 지정하지 않는다.
-2. 시각 기본값 `CURRENT_TIMESTAMP`(SQL 은 `now()`, 같은 값).
-3. CHECK 제약·트리거·뷰 등 Prisma 로 표현하지 못하는 규칙은 위 목록처럼 **이 스키마에서는 빠져 있고 동등하지 않다.** baseline 마이그레이션에서 `db/schema.sql` 의 것을 보존해야 한다.
-
-그래서 **새 DB 를 Prisma 마이그레이션으로 처음부터 만들지 않고**, `db/schema.sql` 로 만든 DB 를 `prisma db pull` 로 편입(baseline)한다. 이때 IDENTITY 컬럼이 `autoincrement()` 로 읽히는 것은 Prisma 문서 기준이며 실제 `db pull` 로는 아직 확인하지 않았다(DB 가 없다).
-
-**아직 하지 않은 것**: `package.json` 의존성(`prisma`, `@prisma/client`, `@prisma/adapter-pg`)과 `prisma.config.ts` 추가(설정 파일이라 정민님 담당), 마이그레이션 생성·적용, Client 를 쓰는 저장소 구현, CI 의 Prisma 검증 단계.
-
-**참고**: 개발 서버(Fedora 컨테이너)에서는 Prisma CLI 가 시작 단계에서 세그폴트(종료 코드 139)로 죽어서, 검증은 Windows(Node 24)에서 했다. CI(GitHub Actions)나 배포 서버에 Prisma 검증을 넣을 때는 그 환경에서 CLI 가 도는지 먼저 확인해야 한다.
+고객 주문 화면은 비회원 쿠키 세션을 발급받고 `/api/v1/orders`에 접수한다. 마이페이지는 같은 세션으로 DB 주문을 조회하며 과거 브라우저의 체험 기록도 별도로 보존한다. 관리자 세션·비밀번호 해시는 DB에 저장한다. 비회원 세션의 개수 확인·발급은 종류별 advisory lock 아래 실행한다. 요청 제한 카운터는 프로세스 메모리이며 다중 인스턴스 전체 제한이 필요하면 별도 공유 제한기가 필요하다.
 
 ### 이번에 넣지 않은 것
 
-- 고객 계정(회원): 설계안은 "고객 세션"만 있다. 프론트의 로그인·마이페이지(#55, mock)와 맞추려면 고객 계정 테이블이 필요하며, 범위는 팀 결정을 기다린다.
-- 결제(PG): 별도 범위.
-- 주문 알림, 매장 관리: 제외.
+- 회원 계정·소셜 인증: 고객 프로필·배송지·취향은 기존 브라우저 체험 저장을 유지한다.
+- 실제 결제(PG), 주문 알림, 매장 관리.
+- 레시피 관계를 편집하는 관리자 UI와 재료 자동 품절 UI: 기존 SQL 관계·뷰는 보존하며 이 화면 기능은 별도 작업이다.
 
-## 저장 방식 (store.ts 교체 계획)
+## 실행과 이관
 
-`lib/admin/store.ts` (#23 기준)의 공개 함수 3개를 DB 로 바꾼다. 호출하는 API·화면은 그대로 둔다.
-
-| 함수 | 지금 (파일) | DB |
-| --- | --- | --- |
-| `readCatalog()` | catalog.json 읽기. 없으면 `customerSeed()` 로 생성, schemaVersion 이 3 이 아니면 `migrateCatalog` 후 저장 | 테이블을 읽어 Catalog 객체로 조립. 비어 있으면 `customerSeed()` 를 넣고 revision 1 |
-| `writeCatalog(catalog, revision)` | 파일 잠금 → revision 비교 → 샐러드에 `customerId` 부여(기존 값 유지, 새 메뉴는 최댓값+1, 최소 12) → `migrateCatalog` → 저장 | **트랜잭션** 안에서 `catalog_meta` 를 `FOR UPDATE` 로 잠그고 revision 비교 → 다르면 null(409) → 같은 규칙으로 `customer_id` 부여 → 테이블 내용 교체 + revision + 1 |
-| `appendCustomerReview(input)` | 고객이 쓴 리뷰 1개 추가. `customerId` 로 판매 중인 샐러드를 찾고, 같은 id 리뷰가 있으면 그대로 반환, 500개 한도 | 트랜잭션 안에서 `products` 조회(`customer_id`, `type = 'salad'`, `deleted = false`, `status <> 'hidden'`) → `reviews` 에 INSERT → revision + 1 |
-
-- 관리자 화면은 저장할 때마다 카탈로그 전체를 보내므로(PUT), `writeCatalog` 는 처음에는 "전체 교체" 방식으로 단순하게 구현한다.
-- 트랜잭션이라 중간에 실패하면 이전 상태가 그대로 남는다.
-- `customer_id` 는 샐러드만 가진다 (음료·드레싱은 NULL). 기존 0~11번은 고객 주소(/product/0)와 같다.
-- 파일 방식의 `schemaVersion`·`migrateCatalog` 는 예전 JSON 을 옮길 때만 필요하다. DB 는 스키마가 곧 버전이므로 마이그레이션 SQL 로 관리한다.
-
-## 실행 방법
-
-```bash
-psql "$DATABASE_URL" -f db/schema.sql
-psql "$DATABASE_URL" -f db/seed.sql
-```
-
-DBeaver 에서는 SQL 편집기에 파일 내용을 붙여넣고 **스크립트 실행(Alt+X)** 으로 schema.sql → seed.sql 순서로 실행한다.
-초기 데이터는 `customerSeed()`(파일 저장소가 처음 만들어질 때와 같은 데이터) 결과를 옮긴 것이다:
-상품 21 (샐러드 12 · 음료 4 · 드레싱 5) · 알레르기 15종 · 상품-알레르기 연결 28 · 분류 4 · 옵션 그룹 2 · 리뷰 48 · 재료 31 · 메뉴-재료 49 · 메뉴-드레싱 60.
-
-## 확인할 것
-
-- [ ] 정민님: 테이블 구조 검토, DB 이름·계정 생성, DATABASE_URL 전달
-- [ ] 서현님: store.ts 의 readCatalog·writeCatalog·appendCustomerReview 를 DB 로 바꾸는 것 동의, catalog.ts 변경 계획 공유
-- [ ] DB 접근 방식: Prisma (정민님 설계 PR #45). 이 문서의 `db/schema.sql` 은 기존 DB 를 `db pull` 로 가져올 때 기준(baseline)이 된다
-- [ ] 재료·메뉴별 드레싱: 위 '정해야 할 것' 5개, 관리자 화면의 재료·드레싱 선택 (서현님)
-- [ ] 주문·인증: 비회원 주문 조회 방식(세션이 만료되면 본인 주문을 어떻게 확인하나), 주문·개인정보 보관 기간, 배달 가능 조건 (설계안의 미정 사항)
-- [ ] 실제 PostgreSQL 서버에서 읽기·쓰기 잠금 동시성 시험
-
-배송 예약은 `desired_start_at`·`desired_end_at` TIMESTAMPTZ로 저장하고 API에서 UTC ISO (`Z`)로 직렬화한다. KST 날짜/시간대 문자열은 프론트 표시용으로 계산한다. 종료는 시작의 한 시간 뒤여야 한다. 현재 주문은 메모리 저장소를 사용하며 `db/schema.sql`은 DB 연결 전 설계이므로, 실제 운영 DB 마이그레이션을 실행한 것은 아니다.
+실제 실행, 기존 JSON 백업·가져오기, 계정 설정, 테스트 DB와 배포 환경은 [PostgreSQL 운영 가이드](postgres.md)를 따른다. 새 DB에는 `npm run db:migrate`를 사용한다. 현재 앱 초기값은 `npm run db:seed`로 넣으며 기존 JSON을 가져올 때는 seed보다 먼저 `db:import`를 실행한다. 과거 `db/seed.sql`은 설계 검증용 SQL이고 앱 초기화와 함께 실행하지 않는다.

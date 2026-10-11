@@ -30,6 +30,8 @@ export function customerCatalog(snapshot: Snapshot) {
       description: p.description,
       ingredients: p.ingredients ?? p.description,
       price: p.price,
+      isNew: p.isNew,
+      isOnSale: !p.deleted && p.status === "active",
       category: labels[p.category] ?? "other",
       categoryLabel: p.category,
       imageUrl: p.image,

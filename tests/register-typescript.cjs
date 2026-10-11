@@ -3,6 +3,11 @@ const fs = require("node:fs");
 const path = require("node:path");
 const Module = require("node:module");
 const ts = require("typescript");
+// Next.js checks server-only boundaries when building; isolated Node tests have no RSC resolver.
+const load = Module._load;
+Module._load = function (request, ...args) {
+  return request === "server-only" ? {} : load.call(this, request, ...args);
+};
 // Load the project's TypeScript domain modules without a second test toolchain.
 require.extensions[".ts"] = (module, filename) =>
   module._compile(

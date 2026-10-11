@@ -28,7 +28,7 @@ Module._resolveFilename = function (request, ...args) {
   );
 };
 const { customerSeed } = require("../lib/admin/customer-seed.ts");
-const { setServicesForTests, createServices, createLimits } = require("../modules/container.ts");
+const { setServicesForTests, createLimits } = require("../modules/container.ts");
 const { createOrdersService } = require("../modules/orders/service.ts");
 const { createMemoryOrdersRepository } = require("../modules/orders/memory-repository.ts");
 const { createIdentityService } = require("../modules/identity/service.ts");
@@ -60,6 +60,11 @@ const withProxyHops = async (hops, fn) => {
   }
 };
 const count = (codes, c) => codes.filter((x) => x === c).length;
+const createServices = () => ({
+  orders: createOrdersService({ repository: createMemoryOrdersRepository(), getCatalog: async () => customerSeed() }),
+  identity: createIdentityService({ repository: createMemoryIdentityRepository() }),
+  limits: createLimits(),
+});
 
 test("clientKey: 신뢰할 프록시를 설정하지 않으면 X-Forwarded-For 를 믿지 않는다", async () => {
   const r = (h) => new Request(B, { headers: h });

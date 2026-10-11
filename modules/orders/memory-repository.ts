@@ -11,8 +11,28 @@ export function createMemoryOrdersRepository(now: () => Date = () => new Date())
   const orders = new Map<string, OrderRecord>();
   const requests = new Map<string, string>(); // `${세션}|${키}` → 주문 id
   const copy = (o: OrderRecord): OrderRecord => structuredClone(o);
+  let queue: Promise<void> = Promise.resolve();
 
   return {
+    async transaction(work, getCatalog) {
+      const previous = queue;
+      let unlock!: () => void;
+      queue = new Promise<void>(resolve => { unlock = resolve; });
+      await previous;
+      const savedOrders = structuredClone(orders);
+      const savedRequests = structuredClone(requests);
+      try {
+        return await work({ findByRequest: this.findByRequest.bind(this), create: this.create.bind(this), getCatalog });
+      } catch (error) {
+        orders.clear();
+        requests.clear();
+        for (const [id, order] of savedOrders) orders.set(id, order);
+        for (const [key, id] of savedRequests) requests.set(key, id);
+        throw error;
+      } finally {
+        unlock();
+      }
+    },
     async findByRequest(sessionId, key) {
       const id = requests.get(`${sessionId}|${key}`);
       return id ? copy(orders.get(id)!) : null;

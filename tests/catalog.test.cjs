@@ -83,7 +83,7 @@ test("persistent edits survive restart; revision conflicts and review moderation
       readCatalog,
       writeCatalog,
       appendCustomerReview,
-    } = require("../lib/admin/store.ts");
+    } = require("../lib/admin/file-store.ts");
     const initial = await readCatalog();
     initial.catalog.products[0].price = 16000;
     const saved = await writeCatalog(initial.catalog, initial.revision);
@@ -184,7 +184,7 @@ test("permanently removed product IDs are not reused after a review write", asyn
   const previous = process.env.ADMIN_DATA_DIR;
   process.env.ADMIN_DATA_DIR = directory;
   try {
-    const { readCatalog, writeCatalog, appendCustomerReview } = require("../lib/admin/store.ts");
+    const { readCatalog, writeCatalog, appendCustomerReview } = require("../lib/admin/file-store.ts");
     let state = await readCatalog();
     const prototype = state.catalog.products.find(p=>p.type==="salad");
     state = await writeCatalog({...state.catalog,products:[...state.catalog.products,{...prototype,id:"new-first"}]},state.revision);
@@ -213,7 +213,7 @@ test('origin details survive catalog validation and persistent storage',async()=
  const previous=process.env.ADMIN_DATA_DIR;process.env.ADMIN_DATA_DIR=directory;
  try{
   const {catalogSchema}=require('../lib/admin/catalog.ts');
-  const {readCatalog,writeCatalog}=require('../lib/admin/store.ts');
+  const {readCatalog,writeCatalog}=require('../lib/admin/file-store.ts');
   let state=await readCatalog();
   const ingredients=state.catalog.ingredients.map((i,index)=>index===0?{...i,origin:'국내산',originDetail:'충청남도',allergens:'대두, 우유'}:i);
   const validated=catalogSchema.parse({...state.catalog,ingredients});
@@ -229,7 +229,7 @@ test('permanently deleted reviews stay removed after reload and later saves', as
   const previous = process.env.ADMIN_DATA_DIR;
   process.env.ADMIN_DATA_DIR = directory;
   try {
-    const { readCatalog, writeCatalog } = require('../lib/admin/store.ts');
+    const { readCatalog, writeCatalog } = require('../lib/admin/file-store.ts');
     let state = await readCatalog();
     const target = state.catalog.reviews[0];
     const otherIds = state.catalog.reviews.slice(1).map(r => r.id);
@@ -254,7 +254,7 @@ test('purged review retries cannot restore content and deletion IDs remain inter
   const previous = process.env.ADMIN_DATA_DIR;
   process.env.ADMIN_DATA_DIR = directory;
   try {
-    const { readCatalog, writeCatalog, appendCustomerReview } = require('../lib/admin/store.ts');
+    const { readCatalog, writeCatalog, appendCustomerReview } = require('../lib/admin/file-store.ts');
     const payload = { id: 'purged-retry', pid: 0, author: '검증', stars: 5, title: '삭제 대상', text: '삭제할 본문', via: 'delivery' };
     let state = await appendCustomerReview(payload);
     const removedReview = state.catalog.reviews.find(r => r.id === payload.id);
@@ -301,9 +301,12 @@ test("review retries keep an ID and duplicated/deleted requests leave no orphan 
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "review-retry-"));
   const oldDirectory = process.env.ADMIN_DATA_DIR;
   process.env.ADMIN_DATA_DIR = directory;
+  const store = require("../lib/admin/store.ts");
+  const originalStore = { ...store };
+  Object.assign(store, require("../lib/admin/file-store.ts"));
   try {
     const { POST } = require("../app/api/reviews/route.ts");
-    const { readCatalog, writeCatalog } = require("../lib/admin/store.ts");
+    const { readCatalog, writeCatalog } = require("../lib/admin/file-store.ts");
     const request = () => new Request("http://localhost/api/reviews", { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost" }, body: JSON.stringify({ ...first, photos: [photo] }) });
     const results = await Promise.all([POST(request()), POST(request())]);
     assert.deepEqual(results.map((r) => r.status), [200, 200]);
@@ -316,6 +319,7 @@ test("review retries keep an ID and duplicated/deleted requests leave no orphan 
     assert.equal((await POST(request())).status, 200);
     assert.deepEqual(fs.readdirSync(path.join(directory, "images")), existingImages);
   } finally {
+    Object.assign(store, originalStore);
     if (oldDirectory === undefined) delete process.env.ADMIN_DATA_DIR;
     else process.env.ADMIN_DATA_DIR = oldDirectory;
     fs.rmSync(directory, { recursive: true, force: true });

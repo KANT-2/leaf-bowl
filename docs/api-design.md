@@ -354,5 +354,5 @@
 
 - 2번은 화면(`ReviewsProvider`)의 호출 주소를 바꿔야 하고 리뷰 사진 PR(#28)이 같은 파일을 수정 중이라 **그 PR 머지 후에** 옮긴다.
 - 이 문서의 `ProductSummary` 에는 `type` 이 없다 (경로로 구분하므로). 구현 초안(#39)은 `type` 을 포함하고 `/api/v1` 이 아니므로 설계안 구조(`modules/`)로 다시 만든다.
-- 주문·인증 API(`/api/v1/session`, `auth`, `orders`, `admin/orders`)는 `feat/orders-core` 에서 **메모리 저장소로 먼저 구현**했다. 서버를 다시 시작하면 주문·세션이 사라진다. DB(Prisma)로 바꿀 때 route·service 의 업무 규칙은 그대로 두지만, 설계안의 트랜잭션(키 확인·가격 계산·저장을 한 트랜잭션에)을 표현하려면 저장소 계약을 바꿔야 한다. 제안은 `docs/db-design.md` 의 "저장소 트랜잭션 계약" 에 있다.
+- 주문·인증 API는 PostgreSQL 저장소를 사용한다. 서버 재시작 후에도 주문·세션이 보존되며 키 확인·가격 계산·저장은 하나의 트랜잭션에서 실행한다. 실행·이관은 `docs/postgres.md`를 따른다.
 - 관리자 주문 API 는 임시 계정(환경변수 `ADMIN_LOGIN_ID`, `ADMIN_PASSWORD`)으로 로그인한다. 설정하지 않으면 로그인할 수 없다.

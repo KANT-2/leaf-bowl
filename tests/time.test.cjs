@@ -20,7 +20,7 @@ async function withCatalog(fn) {
   const previous = process.env.ADMIN_DATA_DIR;
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "front5-time-"));
   process.env.ADMIN_DATA_DIR = directory;
-  try { await fn(directory, require("../lib/admin/store.ts")); }
+  try { await fn(directory, require("../lib/admin/file-store.ts")); }
   finally {
     if (previous === undefined) delete process.env.ADMIN_DATA_DIR; else process.env.ADMIN_DATA_DIR = previous;
     fs.rmSync(directory, { recursive: true, force: true });

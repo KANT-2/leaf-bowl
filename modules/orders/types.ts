@@ -5,6 +5,7 @@ export type ChangedBy = "customer" | "admin" | "system";
 
 export interface OrderItemRecord {
   productId: string | null;
+  productType?: "salad" | "drink" | "custom";
   name: string;
   options: PricedLine["options"];
   unitPrice: bigint;

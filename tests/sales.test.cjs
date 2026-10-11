@@ -2,8 +2,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
 const ts = require('typescript');
 require("./register-typescript.cjs");
 require.extensions['.ts'] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText, filename);
@@ -73,21 +71,18 @@ test('rejects duplicate orders, invalid refunds, quantities and missing payment 
   assert.throws(() => data([order('1', [item('a', 1)], 'paid', null)]));
 });
 
-test('sales adapter reads persisted records, distinguishes missing files and reports corrupt data', async () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'front5-sales-'));
-  const previous = process.env.ADMIN_DATA_DIR;
-  process.env.ADMIN_DATA_DIR = directory;
-  const { readSalesData } = require('../lib/admin/sales-store.ts');
-  try {
-    assert.equal(await readSalesData(), null);
-    fs.writeFileSync(path.join(directory, 'sales-orders.json'), JSON.stringify(data([order('1', [item('a', 2)])])));
-    assert.equal((await readSalesData()).orders[0].items[0].quantity, 2);
-    fs.writeFileSync(path.join(directory, 'sales-orders.json'), '{bad json');
-    await assert.rejects(readSalesData());
-  } finally {
-    if (previous === undefined) delete process.env.ADMIN_DATA_DIR; else process.env.ADMIN_DATA_DIR = previous;
-    fs.rmSync(directory, { recursive: true, force: true });
-  }
+test('completed order snapshots count options without double-counting standalone drinks', () => {
+  const { salesItems } = require('../lib/admin/sales-store.ts');
+  const options = { drinks: [{ key: 'drink', name: '음료', price: 4000 }], ingredients: [] };
+  const items = salesItems([
+    { productId: 'a', productType: 'salad', name: 'A 샐러드', quantity: 2, options: { ...options, dressing: { key: 'lemon', name: '레몬', price: 0 } } },
+    { productId: 'drink', productType: 'drink', name: '음료', quantity: 3, options },
+  ]);
+  const source = salesDataSchema.parse({ updatedAt: now.toISOString(), orders: [{ id: 'completed', status: 'completed', paidAt: null, completedAt: now.toISOString(), items }] });
+  assert.equal(buildSalesReport(catalog, source, 'all', now, 'drink').totalQuantity, 5);
+  assert.equal(buildSalesReport(catalog, source, 'all', now).totalQuantity, 2);
+  assert.equal(items.find(item => item.productType === 'salad').dressing.productId, 'lemon');
+  assert.equal(items.filter(item => item.productType === 'dressing').length, 1);
 });
 
 test('drink and dressing reports count normalized option units and refunds within each category', () => {
