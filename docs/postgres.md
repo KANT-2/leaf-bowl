@@ -23,7 +23,10 @@ npm run dev
 
 ```sh
 export PATH=/workspace/.dev-mcp-home/leaf-bowl-toolchain/bin:$PATH
+export NODE_ENV=development
 ```
+
+컨테이너 기본 `NODE_ENV=production`은 개발 의존성을 설치하지 않으므로 개발 서버 준비에는 `NODE_ENV=development npm ci --include=dev`를 사용한다. 개발 서버 역시 `NODE_ENV=development`로 시작한다.
 
 ## 기존 JSON을 가져오는 경우
 
