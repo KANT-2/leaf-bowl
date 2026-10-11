@@ -1,8 +1,9 @@
 "use client";
 
 import { useCustomerCatalog } from "./CustomerCatalogProvider";
-import Image from "next/image";
-import Link from "next/link";
+import BowlResultDialog from "./bowl-match/BowlResultDialog";
+import { CardFace, DoneCard } from "./bowl-match/MatchCards";
+import { useSwipeDeck } from "./bowl-match/use-swipe-deck";
 import {
   useEffect,
   useLayoutEffect,
@@ -13,124 +14,20 @@ import {
 import { useCart } from "./CartProvider";
 import { useToast } from "./ToastProvider";
 import type { Ingredient } from "@/lib/data/ingredients";
-import { useReducedMotion } from "@/lib/hooks";
 import {
   BASE_BOWL_PRICE,
   STAGES,
   bowlPrice,
   decisionsStore,
-  ingredientPhoto,
   mainIngredient,
   matchProduct,
   recipeStore,
   type Decision,
 } from "@/lib/match";
-import { money} from "@/lib/products";
+import { money } from "@/lib/products";
 
 const two = (n: number) => String(n).padStart(2, "0");
-/** 카드를 넘길 때 옆으로 날아가는 거리(px)와 기울기(도) */
-const FLY_X = 420;
-const FLY_DEG = 22;
-/** 이만큼 끌면 선택으로 본다 (px) */
-const SWIPE_AT = 70;
 const unique = (list: string[]) => [...new Set(list)];
-
-/** 같은 스타일 변경을 transition 없이 즉시 적용한다. */
-function instant(el: HTMLElement, fn: () => void) {
-  el.style.transition = "none";
-  fn();
-  void el.offsetWidth;
-  el.style.transition = "";
-}
-
-function CardFace({
-  item,
-  index,
-  front = false,
-}: {
-  item: Ingredient;
-  index: number;
-  front?: boolean;
-}) {
-  return (
-    <>
-      <div className="ingredient-visual" style={{ background: item.color }}>
-        <span className="number">INGREDIENT {two(index + 1)}</span>
-        <span className="category">{item.group}</span>
-        <Image
-          className="ingredient-photo"
-          src={item.image || ingredientPhoto(item.id)}
-          alt={item.name}
-          width={1254}
-          height={1254}
-          sizes="380px"
-          draggable={false}
-          loading={front ? "eager" : "lazy"}
-        />
-      </div>
-      <div className="ingredient-info">
-        <h2>{item.name}</h2>
-        <p>{item.desc}</p>
-        <div className="ingredient-bottom">
-          <span>
-            {item.allergens.length
-              ? `알레르기: ${item.allergens.join(", ")}`
-              : "주요 알레르기 표기 없음"}
-          </span>
-          <strong>
-            {item.price ? `+ ${money(item.price)}` : "기본 볼에 포함"}
-          </strong>
-        </div>
-      </div>
-      {front && (
-        <>
-          <div className="swipe-stamp yes-stamp">LOVE IT</div>
-          <div className="swipe-stamp no-stamp">NEXT</div>
-        </>
-      )}
-    </>
-  );
-}
-
-/** 재료를 모두 고른 뒤 카드 자리에 나오는 완료 카드. 버튼은 맨 앞 카드에만 둔다. */
-function DoneCard({
-  count,
-  onFinish,
-  onRestart,
-}: {
-  count: number;
-  onFinish?: () => void;
-  onRestart?: () => void;
-}) {
-  return (
-    <div className="done-card">
-      <span aria-hidden="true">♡</span>
-      <h2>
-        당신의 취향,
-        <br />한 그릇에 모였어요.
-      </h2>
-      <p>
-        {count}가지 재료를 선택했어요.
-        <br />
-        드레싱을 더해 완성해볼까요?
-      </p>
-      {onFinish && onRestart && (
-        <>
-          <button
-            type="button"
-            className="primary"
-            onClick={count ? onFinish : onRestart}
-          >
-            {count ? "내 샐러드 완성하기" : "다시 고르기"} ↗
-          </button>
-          <button type="button" className="secondary" onClick={onRestart}>
-            처음부터 다시
-          </button>
-        </>
-      )}
-    </div>
-  );
-}
 
 /**
  * 재료 카드를 좌우로 넘겨 나만의 샐러드를 만드는 화면 (예전 public/bowl-match 정적 페이지를 옮김).
@@ -138,15 +35,21 @@ function DoneCard({
  * 남는다. 지금 넘기고 있는 카드 진행 상황은 이번 방문에서만 유지된다.
  */
 export default function BowlMatch() {
-  const { ingredients,revision,visibleProducts,DRESSINGS }=useCustomerCatalog();
-  if(!ingredients.length||!visibleProducts.length||!DRESSINGS.some(d=>d.available))return <p role="status">현재 조합할 수 있는 재료와 메뉴를 준비 중입니다.</p>;
-  return <BowlMatchBody key={revision} ingredients={ingredients}/>;
+  const { ingredients, visibleProducts, DRESSINGS } = useCustomerCatalog();
+  if (
+    !ingredients.length ||
+    !visibleProducts.length ||
+    !DRESSINGS.some((d) => d.available)
+  )
+    return (
+      <p role="status">현재 조합할 수 있는 재료와 메뉴를 준비 중입니다.</p>
+    );
+  return <BowlMatchBody ingredients={ingredients} />;
 }
-function BowlMatchBody({ingredients}:{ingredients:Ingredient[]}) {
+function BowlMatchBody({ ingredients }: { ingredients: Ingredient[] }) {
   const { DRESSINGS, PRODUCTS, photoSrc } = useCustomerCatalog();
   const { addCustom, open } = useCart();
   const toast = useToast();
-  const reduced = useReducedMotion();
   const total = ingredients.length;
 
   const saved = useSyncExternalStore(
@@ -160,14 +63,17 @@ function BowlMatchBody({ingredients}:{ingredients:Ingredient[]}) {
     recipeStore.getServerSnapshot,
   );
   // 재료 목록이 줄어든 경우를 위해 지금 목록 길이까지만 쓴다.
-  const invalid=saved.findIndex(d=>d.ingredientId&&d.ingredientId!==ingredients[d.index]?.id);
-  const decisions=saved.slice(0,invalid<0?total:invalid);
+  const invalid = saved.findIndex(
+    (d) => d.ingredientId && d.ingredientId !== ingredients[d.index]?.id,
+  );
+  const decisions = saved.slice(0, invalid < 0 ? total : invalid);
   const idx = decisions.length;
   const item = ingredients[idx];
   const next = ingredients[idx + 1];
   const selected = decisions
     .filter((d) => d.liked)
-    .map((d) => ingredients[d.index]).filter(Boolean);
+    .map((d) => ingredients[d.index])
+    .filter(Boolean);
   const ids = selected.map((i) => i.id);
   const price = bowlPrice(selected);
   const savedRecipe =
@@ -177,13 +83,20 @@ function BowlMatchBody({ingredients}:{ingredients:Ingredient[]}) {
       ? recipe
       : null;
 
-  const [busy, setBusy] = useState(false);
-  const busyRef = useRef(false);
-  const cardRef = useRef<HTMLDivElement>(null);
-  const nextRef = useRef<HTMLDivElement>(null);
-  const pointer = useRef<{ id: number; x: number; dx: number } | null>(null);
-  /** 되돌리기 직후 카드가 들어올 방향 (1 오른쪽, -1 왼쪽, 0 없음) */
-  const enterFrom = useRef(0);
+  const {
+    busy,
+    busyRef,
+    cardRef,
+    nextRef,
+    choose,
+    undo,
+    restart,
+    removeIngredient,
+    onPointerDown,
+    onPointerMove,
+    endDrag,
+    onCardKey,
+  } = useSwipeDeck(ingredients, decisions, toast);
 
   const [confirm, setConfirm] = useState(false);
   const confirming = confirm && selected.length > 0;
@@ -196,10 +109,11 @@ function BowlMatchBody({ingredients}:{ingredients:Ingredient[]}) {
 
   const [resultOpen, setResultOpen] = useState(false);
   const [name, setName] = useState("");
-  const [dressingId, setDressing] = useState(DRESSINGS.find(d => d.available)?.id ?? "");
+  const [dressingId, setDressing] = useState(
+    DRESSINGS.find((d) => d.available)?.id ?? "",
+  );
   const dressing = DRESSINGS.findIndex((d) => d.id === dressingId);
   const [savedNote, setSavedNote] = useState("");
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const makeBtn = useRef<HTMLButtonElement>(null);
 
   const setDecisions = (list: Decision[]) => decisionsStore.set(list);
@@ -213,165 +127,6 @@ function BowlMatchBody({ingredients}:{ingredients:Ingredient[]}) {
       setSavedNote("");
     };
   }, []);
-
-  const lock = (v: boolean) => {
-    busyRef.current = v;
-    setBusy(v);
-  };
-
-  /** 뒤 카드(다음 재료)를 끈 거리만큼 앞으로 당겨 보여준다. */
-  const reveal = (distance: number) => {
-    const n = nextRef.current;
-    if (!n) return;
-    const p = Math.min(Math.abs(distance) / 120, 1);
-    n.style.transform = `translateY(${8 * (1 - p)}px) scale(${0.965 + 0.035 * p})`;
-    n.style.filter = `brightness(${0.97 + 0.03 * p})`;
-  };
-
-  const setStamps = (yes: number, no: number) => {
-    const c = cardRef.current;
-    c?.querySelectorAll<HTMLElement>(".yes-stamp").forEach(
-      (s) => (s.style.opacity = String(yes)),
-    );
-    c?.querySelectorAll<HTMLElement>(".no-stamp").forEach(
-      (s) => (s.style.opacity = String(no)),
-    );
-  };
-
-  // 카드가 바뀌면 끌던 위치를 즉시 원래대로 돌리고, 되돌리기였다면 넘어간 쪽에서 들어오게 한다.
-  useLayoutEffect(() => {
-    const c = cardRef.current;
-    const n = nextRef.current;
-    pointer.current = null;
-    if (c)
-      instant(c, () => {
-        c.style.transform = "";
-        c.style.opacity = "1";
-        c.classList.remove("dragging");
-      });
-    setStamps(0, 0);
-    if (n) instant(n, () => reveal(0));
-    const dir = enterFrom.current;
-    enterFrom.current = 0;
-    if (dir && c && !reduced) {
-      instant(c, () => {
-        c.style.transform = `translateX(${dir * FLY_X}px) rotate(${dir * FLY_DEG}deg)`;
-        c.style.opacity = "0";
-      });
-      requestAnimationFrame(() => {
-        c.style.transform = "";
-        c.style.opacity = "1";
-      });
-    }
-  }, [idx, reduced]);
-
-  const choose = (liked: boolean) => {
-    const c = cardRef.current;
-    if (busyRef.current || idx >= total || !c) return;
-    lock(true);
-    pointer.current = null;
-    c.classList.remove("dragging");
-    const dir = liked ? 1 : -1;
-    let finished = false;
-    const done = () => {
-      if (finished) return;
-      finished = true;
-      c.removeEventListener("transitionend", onEnd);
-      clearTimeout(fallback);
-      const now = decisionsStore.getSnapshot().slice(0, idx);
-      setDecisions([...now, { index: idx, liked, ingredientId: ingredients[idx].id }]);
-      lock(false);
-    };
-    const onEnd = (e: TransitionEvent) => {
-      if (e.target === c && e.propertyName === "opacity") done();
-    };
-    c.addEventListener("transitionend", onEnd);
-    const fallback = setTimeout(done, reduced ? 0 : 380);
-    reveal(120);
-    c.style.transform = `translateX(${dir * FLY_X}px) rotate(${dir * FLY_DEG}deg)`;
-    c.style.opacity = "0";
-  };
-
-  const undo = () => {
-    if (busyRef.current || !idx) return;
-    enterFrom.current = decisions[idx - 1].liked ? 1 : -1;
-    setDecisions(decisions.slice(0, -1));
-    toast("이전 선택으로 돌아왔어요");
-    if (reduced) return;
-    lock(true);
-    setTimeout(() => lock(false), 300);
-  };
-
-  const restart = () => {
-    if (busyRef.current) return;
-    setDecisions([]);
-    toast("새로운 취향을 찾아보세요");
-  };
-
-  const removeIngredient = (id: string) => {
-    if (busyRef.current) return;
-    setDecisions(
-      decisions.map((d) =>
-        ingredients[d.index].id === id ? { ...d, liked: false } : d,
-      ),
-    );
-  };
-
-  /* ---- 카드 끌기 ---- */
-  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (busyRef.current || idx >= total || pointer.current) return;
-    if (
-      (e.target as HTMLElement).closest("button") ||
-      (e.pointerType === "mouse" && e.button !== 0)
-    )
-      return;
-    pointer.current = { id: e.pointerId, x: e.clientX, dx: 0 };
-    e.currentTarget.setPointerCapture(e.pointerId);
-    e.currentTarget.classList.add("dragging");
-  };
-
-  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    const p = pointer.current;
-    if (busyRef.current || !p || p.id !== e.pointerId) return;
-    p.dx = e.clientX - p.x;
-    const angle = Math.max(-FLY_DEG, Math.min(FLY_DEG, p.dx / 14));
-    e.currentTarget.style.transform = `translateX(${p.dx}px) rotate(${angle}deg)`;
-    reveal(p.dx);
-    setStamps(
-      p.dx > 0 ? Math.min(p.dx / 90, 1) : 0,
-      p.dx < 0 ? Math.min(-p.dx / 90, 1) : 0,
-    );
-  };
-
-  const endDrag = (e: React.PointerEvent<HTMLDivElement>, cancel = false) => {
-    const p = pointer.current;
-    if (!p || p.id !== e.pointerId) return;
-    pointer.current = null;
-    const c = e.currentTarget;
-    c.classList.remove("dragging");
-    if (!cancel && Math.abs(p.dx) > SWIPE_AT) {
-      choose(p.dx > 0);
-      return;
-    }
-    c.style.transform = "";
-    c.style.opacity = "1";
-    setStamps(0, 0);
-    reveal(0);
-  };
-
-  const onCardKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.target !== e.currentTarget) return;
-    if (e.key === "ArrowRight") {
-      e.preventDefault();
-      choose(true);
-    } else if (e.key === "ArrowLeft") {
-      e.preventDefault();
-      choose(false);
-    } else if (e.key === "Backspace") {
-      e.preventDefault();
-      undo();
-    }
-  };
 
   /* ---- 전체 삭제 (2단계 확인, 4초 뒤 자동 취소) ---- */
   const askClear = (v: boolean) => {
@@ -410,23 +165,18 @@ function BowlMatchBody({ingredients}:{ingredients:Ingredient[]}) {
       return;
     }
     setName(preset?.name ?? `나의 ${mainIngredient(list).name} 볼`);
-    setDressing(preset?.dressingKey ?? DRESSINGS.find((d) => d.available)?.id ?? "");
+    setDressing(
+      preset?.dressingKey ?? DRESSINGS.find((d) => d.available)?.id ?? "",
+    );
     setSavedNote("");
     setResultOpen(true);
   };
 
-  // 화면을 떠나면(다른 페이지로 이동해 숨겨질 때 포함) 모달을 닫아 둔다.
-  useEffect(() => {
-    const d = dialogRef.current;
-    if (!d || !resultOpen) return;
-    if (!d.open) d.showModal();
-    return () => d.close();
-  }, [resultOpen]);
-
   const loadRecipe = () => {
     if (busyRef.current || !savedRecipe) return;
     const list = ingredients.map((i, index) => ({
-      index,ingredientId:i.id,
+      index,
+      ingredientId: i.id,
       liked: savedRecipe.ingredients.includes(i.id),
     }));
     setDecisions(list);
@@ -454,10 +204,13 @@ function BowlMatchBody({ingredients}:{ingredients:Ingredient[]}) {
   };
 
   const addToCart = () => {
-    if(!DRESSINGS[dressing]?.available){toast("선택한 드레싱이 품절되었습니다. 다른 드레싱을 선택해주세요.");return;}
+    if (!DRESSINGS[dressing]?.available) {
+      toast("선택한 드레싱이 품절되었습니다. 다른 드레싱을 선택해주세요.");
+      return;
+    }
     addCustom({
       name: recipeName(),
-      ingredientIds: selected.map((i)=>i.id),
+      ingredientIds: selected.map((i) => i.id),
       ingredients: selected.map((i) => i.name),
       allergens: unique(selected.flatMap((i) => i.allergens)),
       dressing,
@@ -465,14 +218,22 @@ function BowlMatchBody({ingredients}:{ingredients:Ingredient[]}) {
       price,
       photo: similar.id,
     });
-    dialogRef.current?.close();
+    setResultOpen(false);
     open(makeBtn.current);
   };
 
-  const similar = PRODUCTS.find(p=>p?.id===matchProduct(selected.length?mainIngredient(selected).id:"")&&p.status==='active') ?? PRODUCTS.find(p=>p?.status==='active') ?? PRODUCTS.find(p=>p?.status!=='hidden')!;
+  const similar =
+    PRODUCTS.find(
+      (p) =>
+        p?.id ===
+          matchProduct(selected.length ? mainIngredient(selected).id : "") &&
+        p.status === "active",
+    ) ??
+    PRODUCTS.find((p) => p?.status === "active") ??
+    PRODUCTS.find((p) => p?.status !== "hidden")!;
   const resultAllergens = unique([
     ...selected.flatMap((i) => i.allergens),
-    ...DRESSINGS[dressing]?.allergens ?? [],
+    ...(DRESSINGS[dressing]?.allergens ?? []),
   ]);
 
   return (
@@ -571,7 +332,10 @@ function BowlMatchBody({ingredients}:{ingredients:Ingredient[]}) {
             disabled={busy || !idx}
             onClick={undo}
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 14 4 9l5-5" />
+              <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+            </svg>
           </button>
           <button
             type="button"
@@ -580,7 +344,9 @@ function BowlMatchBody({ingredients}:{ingredients:Ingredient[]}) {
             disabled={busy || !item}
             onClick={() => choose(false)}
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
           </button>
           <button
             type="button"
@@ -589,7 +355,9 @@ function BowlMatchBody({ingredients}:{ingredients:Ingredient[]}) {
             disabled={busy || !item}
             onClick={() => choose(true)}
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.2-9.4C1.6 7.6 3.9 4.5 7.2 4.5c2 0 3.6 1.1 4.8 2.9 1.2-1.8 2.8-2.9 4.8-2.9 3.3 0 5.6 3.1 4.4 6.6-1.7 4.8-9.2 9.4-9.2 9.4Z" /></svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 20.5s-7.5-4.6-9.2-9.4C1.6 7.6 3.9 4.5 7.2 4.5c2 0 3.6 1.1 4.8 2.9 1.2-1.8 2.8-2.9 4.8-2.9 3.3 0 5.6 3.1 4.4 6.6-1.7 4.8-9.2 9.4-9.2 9.4Z" />
+            </svg>
           </button>
           <button
             type="button"
@@ -598,7 +366,9 @@ function BowlMatchBody({ingredients}:{ingredients:Ingredient[]}) {
             disabled={busy || !selected.length}
             onClick={() => showResult()}
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m5 12.5 4.5 4.5L19 7.5" />
+            </svg>
           </button>
         </div>
         <p className="swipe-help">
@@ -735,111 +505,23 @@ function BowlMatchBody({ingredients}:{ingredients:Ingredient[]}) {
         </div>
       </aside>
 
-      <dialog
-        ref={dialogRef}
-        className="bm-result"
-        aria-labelledby="bmResultTitle"
-        onClose={() => setResultOpen(false)}
-      >
-        {resultOpen && selected.length > 0 && (
-          <>
-            <div className="dialog-top">
-              <span className="eyebrow">IT’S A BOWL MATCH!</span>
-              <button
-                type="button"
-                className="close"
-                aria-label="닫기"
-                onClick={() => dialogRef.current?.close()}
-              >
-                ×
-              </button>
-            </div>
-            <h2 id="bmResultTitle">이 한 그릇, 완전 내 취향.</h2>
-            <p>{selected.length}가지 재료로 만든 나만의 조합</p>
-            <Image
-              className="result-photo"
-              src={photoSrc(similar.id)}
-              alt="완성 샐러드 분위기 참고 사진"
-              width={1024}
-              height={1024}
-              sizes="220px"
-            />
-            <p className="result-note">
-              사진은 선택한 재료와 비슷한 조합의 참고 이미지입니다.
-            </p>
-            <div className="result-chips">
-              {selected.map((i) => (
-                <span key={i.id}>
-                  {i.emoji} {i.name}
-                </span>
-              ))}
-            </div>
-            <label className="field">
-              <span>내 샐러드 이름</span>
-              <input
-                maxLength={30}
-                placeholder="예: 오늘의 초록 한 그릇"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </label>
-            <label className="field">
-              <span>마지막으로, 드레싱</span>
-              <select
-                value={dressingId}
-                onChange={(e) => setDressing(e.target.value)}
-              >
-                {DRESSINGS.map((d) =>
-                  d.name ? (
-                    <option key={d.id} value={d.id} disabled={!d.available}>
-                      {d.name}
-                      {d.allergens.length ? ` (${d.allergens.join(", ")})` : ""}
-                      {d.available ? "" : " · 품절"}
-                    </option>
-                  ) : null,
-                )}
-              </select>
-            </label>
-            <div className="allergen-box">
-              주요 알레르기 재료:{" "}
-              {resultAllergens.join(", ") || "표기 대상 없음"}. 공용 조리
-              공간에서 우유, 대두, 밀, 계란, 견과류, 새우, 생선 등을 취급하며
-              교차 접촉이 발생할 수 있습니다.
-            </div>
-            <div className="result-price">
-              <span>내 볼 예상 금액</span>
-              <strong>{money(price)}</strong>
-            </div>
-            <button
-              type="button"
-              className="primary add-cart"
-              onClick={addToCart}
-            >
-              장바구니에 담기
-            </button>
-            <div className="dialog-buttons">
-              <button type="button" className="secondary" onClick={saveRecipe}>
-                {savedNote ? "저장 완료 ✓" : "내 조합 저장하기 ♡"}
-              </button>
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => dialogRef.current?.close()}
-              >
-                재료 다시 고르기
-              </button>
-            </div>
-            <Link
-              className="similar-link"
-              href={`/product/${similar.id}`}
-              onClick={() => dialogRef.current?.close()}
-            >
-              비슷한 메뉴 보기 · {similar.name} ↗
-            </Link>
-            {savedNote && <p className="result-note">{savedNote}</p>}
-          </>
-        )}
-      </dialog>
+      <BowlResultDialog
+        resultOpen={resultOpen}
+        selected={selected}
+        name={name}
+        dressing={dressingId}
+        dressings={DRESSINGS}
+        similar={similar}
+        photo={photoSrc(similar.id)}
+        price={price + (DRESSINGS[dressing]?.price ?? 0)}
+        savedNote={savedNote}
+        resultAllergens={resultAllergens}
+        onName={setName}
+        onDressing={setDressing}
+        onClosed={() => setResultOpen(false)}
+        onSave={saveRecipe}
+        onAdd={addToCart}
+      />
     </div>
   );
 }
