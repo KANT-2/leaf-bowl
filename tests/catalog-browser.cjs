@@ -94,6 +94,13 @@ const assert = require("assert/strict");
     .getByText(product.name, { exact: true })
     .waitFor();
   const drink = snapshot.catalog.products.find((p) => p.id === "drink-0");
+  const cart = page.getByRole("dialog", { name: "장바구니", exact: true });
+  const lemon = snapshot.catalog.products.find((p) => p.type === "dressing" && p.name === "레몬 올리브");
+  assert.equal(await cart.getByLabel("드레싱", { exact: true }).inputValue(), lemon.id);
+  await cart.getByRole("button", { name: /^오렌지 주스 .* 담기/ }).click();
+  const orange = snapshot.catalog.products.find((p) => p.type === "drink" && p.name === "오렌지 주스");
+  await page.waitForFunction((id) => JSON.parse(localStorage.getItem("bb-cart")).some((item) => item.kind === "drink" && item.drinkKey === id), orange.id);
+  assert.ok(await cart.getByRole("button", { name: /^오렌지 주스 .*지금 1잔/ }).count());
   drink.price = 4500;
   snapshot.revision++;
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
