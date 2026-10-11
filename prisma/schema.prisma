@@ -12,6 +12,10 @@
 //   - 트리거 `trg_order_status_transition` (허용된 주문 상태 순서)
 // 그래서 기존 DB 편입은 `prisma db pull` 로 baseline 을 잡고 SQL 은 migration 에 포함하는 방식을 따른다.
 //
+// 외래키: db/schema.sql 은 ON UPDATE 를 생략(= NO ACTION)하므로 모든 관계에 `onUpdate: NoAction` 을 명시했다 (Prisma 기본값은 Cascade).
+// 알려진 차이(동작은 같음): order_items.id·order_status_history.id 는 SQL 이 IDENTITY 인데 Prisma DDL 은 BIGSERIAL. 새 DB 를 이 스키마로 만들지 말고
+// db/schema.sql 로 만든 DB 를 `prisma db pull` 로 편입(baseline)한다.
+//
 // 이 파일은 DB 연결 없이 `prisma validate` 로 문법·관계를 검증했다. 마이그레이션 생성·적용과 Client 사용은 DB 준비 후.
 
 generator client {
@@ -47,7 +51,7 @@ model Session {
   expiresAt   DateTime @map("expires_at") @db.Timestamptz(6)
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  adminUser AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  adminUser AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([expiresAt], map: "idx_sessions_expires")
   @@map("sessions")
@@ -101,8 +105,8 @@ model OrderItem {
   unitPrice BigInt  @map("unit_price")
   quantity  Int
 
-  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
   @@index([orderId], map: "idx_order_items_order")
   @@map("order_items")
@@ -121,8 +125,8 @@ model OrderStatusHistory {
   reason      String?  @db.VarChar(200)
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  order     Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  adminUser AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+  order     Order      @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  adminUser AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
   @@index([orderId, createdAt], map: "idx_order_history_order")
   @@map("order_status_history")

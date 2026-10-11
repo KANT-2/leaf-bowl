@@ -426,9 +426,12 @@ DB 를 붙이기 전에 설계안(`docs/backend-design.md` "Prisma 구성과 데
 | 범위 | `AdminUser`, `Session`, `Order`, `OrderItem`, `OrderStatusHistory`, `Product`(주문 항목이 참조). 옵션 그룹·재료·리뷰·콘텐츠 등 나머지 카탈로그 테이블은 상품 API 통합(#72)·카탈로그 저장소 전환 때 같은 방식으로 추가한다 |
 | 이름 | 테이블·컬럼·인덱스 이름을 `db/schema.sql` 그대로 `@@map`·`@map`·`map:` 으로 맞췄다 (기존 DB 를 `db pull` 로 편입할 때 어긋나지 않게) |
 | 금액 | `BigInt` (JSON 응답에서는 십진 문자열), 옵션 스냅샷은 `Json`(`JSONB`) |
-| 검증 | Prisma 7.10.0 으로 `prisma validate` 통과, `prisma format --check` 통과, 임시 폴더에서 `prisma generate` 로 Client 생성 성공. DB 연결은 하지 않았다 |
+| 검증 | Prisma 7.10.0 으로 `prisma validate` 통과, `prisma format --check` 통과, 임시 폴더에서 `prisma generate` 로 Client 생성 성공, `prisma migrate diff --from-empty --to-schema --script` 로 생성되는 DDL 을 `db/schema.sql` 과 대조했다. DB 연결은 하지 않았다 |
+| 외래키 | `db/schema.sql` 은 `ON UPDATE` 를 생략(= `NO ACTION`)하는데 Prisma 기본값은 `Cascade` 라서, 5개 관계 모두 `onUpdate: NoAction` 을 명시했다. 생성 DDL 로 `ON DELETE CASCADE/SET NULL` + `ON UPDATE NO ACTION` 이 SQL 과 같음을 확인했다 |
 
 **Prisma 스키마로 표현할 수 없어서 마이그레이션 SQL 에 그대로 보존해야 하는 것**: CHECK 제약(상태 값, `total = subtotal + delivery_fee`, 취소 상태·시각 일치, 수량 1~99, 세션 종류와 관리자 계정 일치), 생성 컬럼과 복합 외래키 `(id, type)`, 부분 유니크 인덱스 `uq_product_dressings_default`, 뷰 `product_availability`·`bowl_match_ingredients`, 트리거 `trg_order_status_transition`. 이것들은 `db/schema.sql` 에 이미 있으므로 baseline 마이그레이션에 포함한다.
+
+**Prisma 가 새로 만든 DDL 과 `db/schema.sql` 의 알려진 차이(동작은 같다)**: ① `order_items.id`, `order_status_history.id` 는 SQL 이 `GENERATED ALWAYS AS IDENTITY` 인데 Prisma `autoincrement()` DDL 은 `BIGSERIAL` ② 시각 기본값 `CURRENT_TIMESTAMP`(SQL 은 `now()`, 같은 값) ③ CHECK 등은 위 목록. 그래서 **새 DB 를 Prisma 마이그레이션으로 처음부터 만들지 않고**, `db/schema.sql` 로 만든 DB 를 `prisma db pull` 로 편입(baseline)한다(이 경우 IDENTITY 는 `autoincrement()` 로 올바르게 읽힌다).
 
 **아직 하지 않은 것**: `package.json` 의존성(`prisma`, `@prisma/client`, `@prisma/adapter-pg`)과 `prisma.config.ts` 추가(설정 파일이라 정민님 담당), 마이그레이션 생성·적용, Client 를 쓰는 저장소 구현, CI 의 Prisma 검증 단계.
 

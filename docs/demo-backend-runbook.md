@@ -21,7 +21,7 @@ ADMIN_LOGIN_ID=admin ADMIN_PASSWORD=<발표용 비밀번호> npm run start   # h
 **주의: 쿠키 `Secure`**
 - `production` 에서는 세션 쿠키에 `Secure` 가 붙는다. 시연 주소가 **HTTPS 가 아니면**(예: `http://서버IP:3000`) 브라우저가 쿠키를 버려서 **로그인이 되지 않는다.**
 - `http://localhost` 는 브라우저가 예외로 받아 준다. 서버 주소로 시연하려면 HTTPS 를 쓰거나 `npm run dev` 로 띄운다(개발 모드는 `Secure` 가 붙지 않는다).
-- curl 은 쿠키 파일(`-c`, `-b`)로 직접 보내므로 영향이 없다.
+- **curl 도 같은 규칙을 따른다.** 쿠키 파일(`-c`, `-b`)은 `Secure` 플래그를 보존하고 HTTPS 에서만 보낸다(`localhost` 는 예외). 개발 서버에서 실측한 결과: `http://localhost:3000` 은 쿠키가 전달되어 `200`, `http://172.27.0.3:3000`(비-localhost HTTP)은 쿠키가 저장되지 않아 후속 요청이 `401` 이었다. 그래서 **아래 시연 스크립트는 서버와 같은 기기에서 `localhost` 로 실행하거나 HTTPS 주소로 실행**해야 한다. 쿠키의 `Secure` 를 끄거나 쿠키 파일을 고쳐서 우회하지 않는다.
 
 ## 2. 시연 순서 (13단계)
 
@@ -112,7 +112,7 @@ rm -rf $JAR
 
 ## 5. 시연 전 체크리스트
 
-- [ ] 시연 주소가 HTTPS 이거나 `localhost` 인가 (아니면 `npm run dev`)
+- [ ] 시연 주소(브라우저·curl 모두)가 HTTPS 이거나 `localhost` 인가 (비-localhost HTTP 이면 로그인·주문 조회가 401 이 된다. 브라우저 시연은 `npm run dev` 도 가능)
 - [ ] `ADMIN_LOGIN_ID`, `ADMIN_PASSWORD` 를 서버에 설정했고 시연자가 비밀번호를 알고 있는가
 - [ ] 서버를 방금 재시작해 이전 주문이 비어 있는가(원하면)
 - [ ] 받을 날짜는 내일, 시간대는 영업시간(10:00–21:00) 안의 한 시간 단위인가
