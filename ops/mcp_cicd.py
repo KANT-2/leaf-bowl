@@ -72,10 +72,10 @@ class Deployer:
         self.server = None
         self.build_process = None
         self.current = None
-        self.env = {**os.environ, "NEXT_TELEMETRY_DISABLED": "1", "GIT_TERMINAL_PROMPT": "0"}
+        self.env = {**os.environ, "NEXT_TELEMETRY_DISABLED": "1", "GIT_TERMINAL_PROMPT": "0", "TZ": "UTC"}
 
     def log(self, message):
-        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        now = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
         print(f"{now} [{self.branch}] {message}", flush=True)
 
     def git(self, *arguments):
@@ -110,7 +110,7 @@ class Deployer:
 
     def write_state(self, state):
         state = {**state, "branch": self.branch, "port": self.port,
-                 "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+                 "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")}
         temporary = self.state_file.with_suffix(".tmp")
         temporary.write_text(json.dumps(state, indent=2) + "\n")
         temporary.replace(self.state_file)

@@ -71,7 +71,7 @@ test("legacy cart indices migrate to original IDs and permanent deletion never c
 test("checkout rejects stale stock, low totals, missing address, invalid dates and expired slots", () => {
   const seed = customerSeed();
   const items = [{ ...cat(seed).defaultItem(0), qty: 2 }];
-  const now = new Date("2026-10-10T09:00:00").getTime();
+  const now = new Date("2026-10-10T09:00:00+09:00").getTime();
   const delivery = { address: "서울 중구", day: "2026-10-10", timeLabel: "10:00–11:00", hours: { days: "매일", open: 10, close: 21 } };
   assert.equal(checkoutIssue(items, cat(seed), delivery, now), "");
   seed.products.find((p) => p.customerId === 0).status = "soldout";

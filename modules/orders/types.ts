@@ -30,8 +30,9 @@ export interface OrderRecord {
   phone: string;
   address: string;
   addressDetail: string;
-  desiredDate: string;
-  desiredSlot: string;
+  /** UTC 예약 시각. 표시 날짜·시간대는 프론트에서 KST로 계산한다. */
+  desiredStartAt: Date;
+  desiredEndAt: Date;
   subtotal: bigint;
   deliveryFee: bigint;
   total: bigint;
@@ -51,8 +52,8 @@ export type NewOrder = Pick<
   | "phone"
   | "address"
   | "addressDetail"
-  | "desiredDate"
-  | "desiredSlot"
+  | "desiredStartAt"
+  | "desiredEndAt"
   | "subtotal"
   | "deliveryFee"
   | "total"

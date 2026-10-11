@@ -2,7 +2,7 @@
 
 import { useCustomerCatalog } from "./CustomerCatalogProvider";
 import ReviewPhotos from "./ReviewPhotos";
-import { dateStr, type Review } from "@/lib/reviews";
+import { reviewDisplayDate, type Review } from "@/lib/reviews";
 
 export default function ReviewCard({ review: r }: { review: Review }) {
   const { PRODUCTS } = useCustomerCatalog();
@@ -32,7 +32,7 @@ export default function ReviewCard({ review: r }: { review: Review }) {
         <span>
           {r.author}
           <small>
-            {r.date || dateStr(r.t)} · {r.mine ? "내가 작성" : r.sample ? "예시 리뷰" : "고객 리뷰"}
+            {reviewDisplayDate(r)} · {r.mine ? "내가 작성" : r.sample ? "예시 리뷰" : "고객 리뷰"}
           </small>
         </span>
       </div>

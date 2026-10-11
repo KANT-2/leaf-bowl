@@ -1,3 +1,5 @@
+import { utcTimestampSchema } from "@/lib/utc-timestamp";
+export { reviewDateTime } from "@/lib/time";
 import { exampleReviews } from './reviews';
 import { referenceIngredients } from './bowl-ingredients';
 import { z } from 'zod';
@@ -9,7 +11,7 @@ export const productSchema = z.object({ id, customerId: z.number().int().min(0).
 export const groupSchema = z.object({ id, name: z.string().trim().min(1).max(80), required: z.boolean(), multiple: z.boolean(), source: z.enum(['custom', 'drinks', 'dressings']), choices: z.array(z.object({ id, name: z.string().trim().min(1).max(80), price: z.number().int().min(0).max(1000000) })).max(80), deleted: z.boolean() });
 export const seasonPageSchema = z.object({ id, title: z.string().trim().min(1).max(200), description: z.string().max(600), image, productId: z.string().max(80), visible: z.boolean() });
 export const contentSchema = z.object({ heroTitle: z.string().trim().min(1).max(200), heroDescription: z.string().max(600), seasonTitle: z.string().trim().min(1).max(200), seasonDescription: z.string().max(600), seasonImage: image, seasonProductId: z.string().max(80), seasonVisible: z.boolean(), seasonPages: z.array(seasonPageSchema).max(20).optional() });
-export const reviewSchema = z.object({id,sample:z.boolean().optional(),productId:z.string().max(80).optional(),via:z.enum(['pickup','delivery']).optional(),title:z.string().max(200),body:z.string().min(1).max(10000),images:z.array(image.refine(value=>value!== '', '이미지를 확인해주세요.')).max(10).optional(),rating:z.number().int().min(1).max(5),menu:z.string().max(120),drinks:z.array(z.string().trim().min(1).max(80)).max(20).optional(),author:z.string().min(1).max(80),date:z.string().max(40),createdAt:z.string().datetime({offset:true}).optional(),deleted:z.boolean()});
+export const reviewSchema = z.object({id,sample:z.boolean().optional(),productId:z.string().max(80).optional(),via:z.enum(['pickup','delivery']).optional(),title:z.string().max(200),body:z.string().min(1).max(10000),images:z.array(image.refine(value=>value!== '', '이미지를 확인해주세요.')).max(10).optional(),rating:z.number().int().min(1).max(5),menu:z.string().max(120),drinks:z.array(z.string().trim().min(1).max(80)).max(20).optional(),author:z.string().min(1).max(80),date:z.string().max(40),createdAt:utcTimestampSchema.optional(),deleted:z.boolean()});
 export type Review = z.infer<typeof reviewSchema>;
 export const locationSchema = z.object({name:z.string().trim().min(1).max(100),address:z.string().trim().min(1).max(300),detailAddress:z.string().trim().max(200)});
 export type StoreLocation = z.infer<typeof locationSchema>;
@@ -52,13 +54,6 @@ export const money = (n: number) => n.toLocaleString('ko-KR') + '원';
 
 
 export function saladCategories(catalog: Catalog): string[] {return catalog.categories??[...new Set(['든든한 단백질','플랜트 베이스','새로운 조합',...catalog.products.filter(p=>p.type==='salad').map(p=>p.category)])];}
-
-export function reviewDateTime(review: Pick<Review,'date'|'createdAt'>): string {
-if(!review.createdAt)return review.date;
-const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(review.createdAt));
-const part=(name:string)=>parts.find(p=>p.type===name)?.value;
-return `${part('year')}.${part('month')}.${part('day')} ${part('hour')}:${part('minute')}`;
-}
 
 export function reviewMenuLabel(review: Pick<Review,'menu'|'drinks'>): string {
 const parts=review.menu.split(' · '),fulfillment=parts.length>1?parts.pop():undefined;

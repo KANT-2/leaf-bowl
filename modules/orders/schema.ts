@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ORDER_STATUSES } from "./status";
+import { deliveryWindowKST, deliveryWindowUTC, utcISOString } from "@/lib/delivery-time";
 
 const key = z.string().min(1).max(80).regex(/^[a-zA-Z0-9_-]+$/);
 
@@ -44,10 +45,27 @@ export const createOrderSchema = z
     desiredDate: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/)
-      .refine(isCalendarDate, "받을 날짜를 확인해주세요."),
-    desiredSlot: z.string().trim().min(1).max(30),
+      .refine(isCalendarDate, "받을 날짜를 확인해주세요.").optional(),
+    desiredSlot: z.string().trim().min(1).max(30).optional(),
+    desiredStartAt: z.string().max(30).optional(),
+    desiredEndAt: z.string().max(30).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((input, ctx) => {
+    const hasUTC = input.desiredStartAt !== undefined || input.desiredEndAt !== undefined;
+    const hasLegacy = input.desiredDate !== undefined || input.desiredSlot !== undefined;
+    const valid = hasUTC
+      ? !hasLegacy && input.desiredStartAt && input.desiredEndAt && deliveryWindowKST(input.desiredStartAt, input.desiredEndAt)
+      : input.desiredDate && input.desiredSlot && deliveryWindowUTC(input.desiredDate, input.desiredSlot);
+    if (!valid) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "받을 시간대를 확인해주세요. UTC 시작·종료 시각 또는 기존 날짜·시간대 한 쌍을 입력해주세요." });
+  })
+  .transform((input) => {
+    const window = input.desiredStartAt !== undefined
+      ? { desiredStartAt: utcISOString(input.desiredStartAt)!, desiredEndAt: utcISOString(input.desiredEndAt!)! }
+      : deliveryWindowUTC(input.desiredDate!, input.desiredSlot!)!;
+    const display = deliveryWindowKST(window.desiredStartAt, window.desiredEndAt)!;
+    return { ...input, ...window, desiredDate: display.day, desiredSlot: display.timeLabel };
+  });
 
 /** 재전송 식별키 (Idempotency-Key 헤더) */
 export const idempotencyKeySchema = z.string().min(8).max(80).regex(/^[a-zA-Z0-9_-]+$/);

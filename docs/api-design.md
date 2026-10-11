@@ -1,5 +1,7 @@
 # leaf & bowl API 명세 (경로 설계안)
 
+시간 처리: 모든 절대 시각은 UTC로 저장·응답하고 고객·관리자·미리보기 표시는 KST로 변환한다. 리뷰·매출·기존 기록 이관 규칙은 [시간 처리 규칙](time-policy.md)을 따른다.
+
 작성: 안형준 (백엔드) · 기준: main `3658fa9`, 백엔드 설계안(PR #45) · 상태: **검토 요청**
 
 각 API 를 **요청 메서드 / 요청 경로 / 요청 예시 / 응답 예시** 순서로 정리하고, 마지막 열 **구분**에 지금 코드와의 관계를 적는다.
@@ -142,8 +144,8 @@
 | POST | `/api/v1/session` | (없음) | `201` `{ "expiresAt": "2026-11-09T05:00:00.000Z" }` (세션 토큰은 쿠키로만 내려가고 본문에는 없다. 이미 유효한 세션 쿠키가 있으면 새로 만들지 않고 같은 형식으로 `200`) | 신규 (설계안) |
 | POST | `/api/v1/auth/login` | `{ loginId: String, password: String }` (본문) | `{ "ok": true }` (관리자 세션 쿠키 발급) | 신규 (설계안) |
 | POST | `/api/v1/auth/logout` | (없음) | `{ "ok": true }` | 신규 (설계안) |
-| POST | `/api/v1/orders` | `{ Idempotency-Key: String }` (헤더), `{ items: Object[], ordererName: String, phone: String, address: String, addressDetail?: String, desiredDate: String, desiredSlot: String }` (본문) | `201` `{ "id": "7c1d9f64-2b0a-4a56-9f0e-3c1a8e5b2d10", "status": "received", "subtotal": "21800", "deliveryFee": "3000", "total": "24800", "createdAt": "2026-10-09T05:30:00.000Z" }` (같은 키·같은 내용의 재전송은 기존 주문과 함께 `200`) | 신규 (설계안) |
-| GET | `/api/v1/orders/{id}` | `{ id: String }` (경로) | `{ "id": "7c1d9f64-2b0a-4a56-9f0e-3c1a8e5b2d10", "status": "received", "ordererName": "홍길동", "address": "서울 중구 세종대로 110", "addressDetail": "5층", "desiredDate": "2026-10-13", "desiredSlot": "12:00–13:00", "items": [{ "name": "레몬 치킨 아보카도", "options": "레몬 올리브 · 오렌지 주스", "unitPrice": "14900", "quantity": 1 }], "subtotal": "21800", "deliveryFee": "3000", "total": "24800", "createdAt": "2026-10-09T05:30:00.000Z" }` (본인 주문만, 그 외는 404) | 신규 (설계안) |
+| POST | `/api/v1/orders` | `{ Idempotency-Key: String }` (헤더), `{ items: Object[], ordererName: String, phone: String, address: String, addressDetail?: String, desiredStartAt: String, desiredEndAt: String }` (본문) | `201` `{ "id": "7c1d9f64-2b0a-4a56-9f0e-3c1a8e5b2d10", "status": "received", "subtotal": "21800", "deliveryFee": "3000", "total": "24800", "createdAt": "2026-10-09T05:30:00.000Z" }` (같은 키·같은 내용의 재전송은 기존 주문과 함께 `200`) | 신규 (설계안) |
+| GET | `/api/v1/orders/{id}` | `{ id: String }` (경로) | `{ "id": "7c1d9f64-2b0a-4a56-9f0e-3c1a8e5b2d10", "status": "received", "ordererName": "홍길동", "address": "서울 중구 세종대로 110", "addressDetail": "5층", "desiredStartAt": "2026-10-13T03:00:00.000Z", "desiredEndAt": "2026-10-13T04:00:00.000Z", "desiredDate": "2026-10-13", "desiredSlot": "12:00–13:00", "items": [{ "name": "레몬 치킨 아보카도", "options": "레몬 올리브 · 오렌지 주스", "unitPrice": "14900", "quantity": 1 }], "subtotal": "21800", "deliveryFee": "3000", "total": "24800", "createdAt": "2026-10-09T05:30:00.000Z" }` (본인 주문만, 그 외는 404) | 신규 (설계안) |
 | POST | `/api/v1/orders/{id}/cancel` | `{ id: String }` (경로), `{ reason?: String }` (본문) | `{ "id": "7c1d9f64-2b0a-4a56-9f0e-3c1a8e5b2d10", "status": "canceled", "canceledAt": "2026-10-09T05:40:00.000Z" }` (이미 취소된 주문의 재요청은 현재 결과를 그대로 반환) | 신규 (설계안) |
 | GET | `/api/v1/admin/orders` | `{ status?: String, limit?: Number, cursor?: String }` (쿼리) | `{ "items": [{ "id": "7c1d9f64-2b0a-4a56-9f0e-3c1a8e5b2d10", "status": "received", "version": 1, "ordererName": "홍길동", "total": "24800", "createdAt": "2026-10-09T05:30:00.000Z" }], "nextCursor": "eyJjIjoiMjAyNi0xMC0wOVQwNTozMDowMC4wMDBaIiwiaSI6IjdjMWQ5ZjY0In0" }` | 신규 (설계안) |
 | PATCH | `/api/v1/admin/orders/{id}/status` | `{ id: String }` (경로), `{ status: String, version: Number, reason?: String }` (본문) | `{ "id": "7c1d9f64-2b0a-4a56-9f0e-3c1a8e5b2d10", "status": "confirmed", "version": 2 }` (`version` 이 다르면 409) | 신규 (설계안) |
@@ -224,10 +226,16 @@
   "phone": "010-0000-0000",
   "address": "서울 중구 세종대로 110",
   "addressDetail": "5층",
-  "desiredDate": "2026-10-13",
-  "desiredSlot": "12:00–13:00"
+  "desiredStartAt": "2026-10-13T03:00:00.000Z",
+  "desiredEndAt": "2026-10-13T04:00:00.000Z"
 }
 ```
+
+배송 예약 시각은 `desiredStartAt`·`desiredEndAt` UTC ISO 문자열(`Z` 필수)로 전달·저장·응답한다. 위 예시는 KST `2026-10-13 12:00–13:00`이다. 프론트는 브라우저 시간대와 무관하게 KST 날짜·시간대로 변환하여 표시한다. 슬롯은 KST 정시 한 시간 범위이며 잘못된 달력 날짜·역전·오프셋/시간대 없는 문자열은 거부한다.
+
+기존 `desiredDate`·`desiredSlot` 한 쌍은 호환 입력으로만 받고 KST로 해석해 동일한 UTC 시각으로 정규화한다. UTC 필드와 혼용할 수 없다. 주문 상세의 기존 날짜·시간대 필드는 UTC 저장값에서 계산한 KST 호환 표시이며 저장소에는 보관하지 않는다. 같은 UTC 예약을 기존 형식으로 다시 보내도 동일한 요청으로 처리한다.
+
+결제 화면은 현재 체험 주문을 localStorage에 기록한다. 이 기록과 장바구니→결제 이동도 UTC 시작·종료 시각을 사용하며, 기존 KST 주문 기록/결제 주소는 읽기 호환을 유지한다. 실제 결제와 서버 주문 연동은 별도 작업이다.
 
 `PATCH /api/v1/admin/orders/{id}/status` 본문:
 

@@ -1,3 +1,4 @@
+import { normalizeReviewTime } from "@/lib/review-time";
 import legacyCatalog from "./imported-catalog.json";
 import { PRODUCTS, DRESSINGS, DRINKS } from "@/data/products";
 import { INGREDIENTS } from "@/lib/data/ingredients";
@@ -216,6 +217,6 @@ export function migrateCatalog(
         ...seed.ingredients?.find((s) => s.id === i.id),
         ...i,
       })) ?? seed.ingredients,
-    reviews: catalog.reviews ? reviews : seed.reviews,
+    reviews: (catalog.reviews ? reviews : seed.reviews)?.map(normalizeReviewTime),
   };
 }

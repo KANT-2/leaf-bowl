@@ -1,5 +1,7 @@
 # leaf & bowl DB 설계
 
+시간 처리: 모든 절대 시각은 UTC로 저장·응답하고 고객·관리자·미리보기 표시는 KST로 변환한다. 리뷰·매출·기존 기록 이관 규칙은 [시간 처리 규칙](time-policy.md)을 따른다.
+
 PostgreSQL · 정민님 원격 리눅스 서버에서 실행 · 작성: 안형준 (백엔드)
 
 ## 목표
@@ -273,8 +275,8 @@ erDiagram
     bigint total "subtotal + delivery_fee"
     varchar request_key "재전송 식별키"
     varchar request_hash "요청 내용 해시"
-    date desired_date
-    varchar desired_slot
+    timestamptz desired_start_at "UTC 배송 시작 시각"
+    timestamptz desired_end_at "UTC 배송 종료 시각"
   }
   order_items {
     bigint id PK
@@ -310,7 +312,7 @@ erDiagram
 
 | 설계안 | SQL |
 | --- | --- |
-| 주문 UUID, 상태, `version`, 주문자·연락처·주소·희망 시각, 상품 합계·배달비·총액 | `orders` 의 같은 이름 칸 (`total` 은 `subtotal + delivery_fee` 와 같아야 한다는 CHECK) |
+| 주문 UUID, 상태, `version`, 주문자·연락처·주소·UTC 배송 시작/종료 시각, 상품 합계·배달비·총액 | `orders` 의 같은 이름 칸 (`total` 은 `subtotal + delivery_fee` 와 같아야 한다는 CHECK) |
 | 고객 세션 ID 와 `requestKey` 복합 유일 | `UNIQUE (customer_session_id, request_key)` |
 | `requestHash` | `request_hash` (같은 키로 다른 내용을 보내면 서비스가 409) |
 | 금액은 원 단위, 합계는 BigInt | `BIGINT`. JSON 응답에서는 십진 문자열로 변환 |
@@ -382,3 +384,5 @@ DBeaver 에서는 SQL 편집기에 파일 내용을 붙여넣고 **스크립트 
 - [ ] 재료·메뉴별 드레싱: 위 '정해야 할 것' 5개, 관리자 화면의 재료·드레싱 선택 (서현님)
 - [ ] 주문·인증: 비회원 주문 조회 방식(세션이 만료되면 본인 주문을 어떻게 확인하나), 주문·개인정보 보관 기간, 배달 가능 조건 (설계안의 미정 사항)
 - [ ] 실제 PostgreSQL 서버에서 읽기·쓰기 잠금 동시성 시험
+
+배송 예약은 `desired_start_at`·`desired_end_at` TIMESTAMPTZ로 저장하고 API에서 UTC ISO (`Z`)로 직렬화한다. KST 날짜/시간대 문자열은 프론트 표시용으로 계산한다. 종료는 시작의 한 시간 뒤여야 한다. 현재 주문은 메모리 저장소를 사용하며 `db/schema.sql`은 DB 연결 전 설계이므로, 실제 운영 DB 마이그레이션을 실행한 것은 아니다.
