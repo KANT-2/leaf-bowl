@@ -10,7 +10,7 @@ import { useCustomerCatalog } from "./CustomerCatalogProvider";
 import type { DeliveryHours } from "@/lib/data/delivery";
 import { checkoutIssue } from "@/lib/checkout-validation";
 import { customerCatalog } from "@/lib/customer/catalog";
-import type { Snapshot } from "@/lib/admin/catalog";
+import { publicSnapshotSchema } from "@/lib/customer/snapshot";
 import { submitOrder, orderRequestKey, clearOrderRequestKey } from "@/lib/order-client";
 import { deliveryWindowKST, deliveryWindowUTC } from "@/lib/delivery-time";
 import { money } from "@/lib/products";
@@ -83,7 +83,7 @@ export default function CheckoutView({ hours }: { hours: DeliveryHours }) {
     try {
       const response = await fetch("/api/catalog", { cache: "no-store", signal: AbortSignal.timeout(15_000) });
       if (!response.ok) throw Error("메뉴 상태를 확인하지 못했습니다. 다시 시도해주세요.");
-      const snapshot: Snapshot = await response.json();
+      const snapshot = publicSnapshotSchema.parse(await response.json());
       const latest = customerCatalog(snapshot);
       const issue = checkoutIssue(items, latest, delivery);
       if (issue) { setError(issue); return; }

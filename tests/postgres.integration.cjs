@@ -55,6 +55,83 @@ beforeEach(async () => {
 });
 after(async () => { await reset(); await db.$disconnect(); await fs.rm(directory, { recursive: true, force: true }); });
 
+async function catalogVersions() {
+  return db.$queryRawUnsafe(`
+    SELECT 'product:' || id AS key, xmin::text AS version FROM products
+    UNION ALL SELECT 'group:' || id, xmin::text FROM option_groups
+    UNION ALL SELECT 'choice:' || group_id || ':' || id, xmin::text FROM option_choices
+    UNION ALL SELECT 'link:' || product_id || ':' || group_id, xmin::text FROM product_option_groups
+    UNION ALL SELECT 'ingredient:' || id, xmin::text FROM ingredients
+    UNION ALL SELECT 'review:' || id, xmin::text FROM reviews
+    UNION ALL SELECT 'image:' || review_id || ':' || position, xmin::text FROM review_images
+    UNION ALL SELECT 'drink:' || review_id || ':' || position, xmin::text FROM review_drinks
+    UNION ALL SELECT 'category:' || name, xmin::text FROM categories
+    UNION ALL SELECT 'content:' || id, xmin::text FROM site_content
+    UNION ALL SELECT 'page:' || id, xmin::text FROM season_pages
+    UNION ALL SELECT 'location:' || id, xmin::text FROM store_location
+    UNION ALL SELECT 'product-allergen:' || product_id || ':' || allergen_id, xmin::text FROM product_allergens
+    UNION ALL SELECT 'ingredient-allergen:' || ingredient_id || ':' || allergen_id, xmin::text FROM ingredient_allergens
+    ORDER BY key
+  `);
+}
+
+test('a product price edit preserves every unrelated catalog row and product timestamp', async () => {
+  const state = await readCatalog();
+  const before = await catalogVersions();
+  const timestamps = await db.product.findMany({ orderBy: { id: 'asc' }, select: { id: true, updatedAt: true } });
+  const product = state.catalog.products[0];
+  product.price += 100;
+  const result = await writeCatalog(state.catalog, state.revision);
+  assert.equal(result.revision, state.revision + 1);
+  const after = await catalogVersions();
+  assert.deepEqual(after.filter(row => row.key !== 'product:' + product.id), before.filter(row => row.key !== 'product:' + product.id));
+  const unchanged = await db.product.findMany({ where: { id: { not: product.id } }, orderBy: { id: 'asc' }, select: { id: true, updatedAt: true } });
+  assert.deepEqual(unchanged, timestamps.filter(row => row.id !== product.id));
+});
+
+test('review insertion and retry preserve all existing rows, including review photos and drinks', async () => {
+  const state = await readCatalog();
+  state.catalog.reviews[0].images = ['/images/hero-cutout.png'];
+  state.catalog.reviews[0].drinks = ['오렌지 주스'];
+  await writeCatalog(state.catalog, state.revision);
+  const before = await catalogVersions();
+  const input = { id: 'review-preserved', pid: 0, author: '테스트', stars: 5, title: '리뷰 제목', text: '충분히 긴 리뷰 본문입니다.', via: 'delivery', images: ['/images/hero-cutout.png'] };
+  const first = await appendCustomerReview(input);
+  const after = await catalogVersions();
+  for (const row of before) assert.deepEqual(after.find(next => next.key === row.key), row, row.key);
+  assert.equal((await readCatalog()).catalog.reviews[0].id, input.id);
+  assert.equal((await appendCustomerReview(input)).revision, first.revision);
+  assert.deepEqual(await catalogVersions(), after);
+  const edit = await readCatalog();
+  edit.catalog.products[0].price += 100;
+  await writeCatalog(edit.catalog, edit.revision);
+  assert.deepEqual((await catalogVersions()).filter(row => row.key.startsWith('review:') || row.key.startsWith('image:') || row.key.startsWith('drink:')), after.filter(row => row.key.startsWith('review:') || row.key.startsWith('image:') || row.key.startsWith('drink:')));
+});
+
+test('partial persistence handles option changes, allergen links, review removal and reordering', async () => {
+  const state = await readCatalog();
+  const removedReview = state.catalog.reviews[0];
+  state.catalog.reviews = state.catalog.reviews.slice(1).reverse();
+  state.catalog.groups.push({ id: 'extra-test', name: '테스트 옵션', source: 'custom', required: false, multiple: true, deleted: false, choices: [{ id: 'one', name: '첫 선택', price: 100 }, { id: 'two', name: '두 번째', price: 200 }] });
+  state.catalog.products[0].optionIds.push('extra-test');
+  state.catalog.products[0].allergens = '우유 · 대두';
+  state.catalog.ingredients[0].allergens = '우유';
+  state.catalog.content.heroTitle = '수정 제목';
+  const result = await writeCatalog(state.catalog, state.revision);
+  assert.deepEqual((await readCatalog()).catalog, result.catalog);
+  assert.equal(await db.review.count({ where: { id: removedReview.id } }), 0);
+  assert.ok(await db.deletedReviewId.findUnique({ where: { id: removedReview.id } }));
+  const links = await db.productAllergen.findMany({ where: { productId: state.catalog.products[0].id }, include: { allergen: true }, orderBy: { position: 'asc' } });
+  assert.deepEqual(links.map(row => row.allergen.name), ['우유', '대두']);
+  const edit = await readCatalog();
+  edit.catalog.groups.at(-1).choices.reverse();
+  edit.catalog.groups.at(-1).choices[0].price += 100;
+  edit.catalog.products[0].optionIds = edit.catalog.products[0].optionIds.filter(id => id !== 'extra-test');
+  edit.catalog.groups.at(-1).deleted = true;
+  const saved = await writeCatalog(edit.catalog, edit.revision);
+  assert.deepEqual((await readCatalog()).catalog, saved.catalog);
+});
+
 test('standalone SQL initializes every current default field and application setting', async () => {
   const state = await readCatalog();
   const expected = customerSeed();

@@ -1,4 +1,5 @@
 import type { CartItem } from "./storage";
+import { hasCustomIngredientIds, isCustom } from "./cart";
 import type { CustomerCatalog } from "./customer/catalog";
 import type { DeliveryHours } from "./data/delivery";
 import { kstSlotStart } from "./time";
@@ -10,6 +11,7 @@ export function checkoutIssue(items: CartItem[], catalog: Pick<CustomerCatalog, 
   address: string; day: string; timeLabel: string; hours: DeliveryHours;
 }, now = Date.now()): string {
   if (!items.length) return "담은 메뉴가 없어요.";
+  if (items.some(i => isCustom(i) && !hasCustomIngredientIds(i))) return "저장한 조합의 재료를 다시 선택해주세요.";
   if (items.some((i) => !catalog.itemAvailable(i))) return "품절되거나 삭제된 메뉴·옵션이 있어요. 장바구니를 확인해주세요.";
   const subtotal = items.reduce((sum, item) => sum + catalog.itemUnitPrice(item) * item.qty, 0);
   const minimum = catalog.pricingPolicy?.minDeliveryOrder ?? MIN_DELIVERY_ORDER;

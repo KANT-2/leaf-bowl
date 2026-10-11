@@ -1,5 +1,5 @@
 "use client";
-import { isDrink, itemKey, withChoice } from "@/lib/cart";
+import { hasCustomIngredientIds, isCustom, isDrink, itemKey, withChoice } from "@/lib/cart";
 import { drinkKey } from "@/lib/cart-identifiers";
 import { deliveryWindowUTC } from "@/lib/delivery-time";
 import type { DeliveryHours } from "@/lib/data/delivery";
@@ -33,6 +33,7 @@ export default function CartBody({ openedAt, hours, closeBtn }: BodyProps) {
   const router = useRouter();
   const { itemUnitPrice, itemAvailable, DRINKS } = cat;
   const { items, count, close, addDrink, addVariant } = useCart();
+  const needsIngredients = items.some(i => isCustom(i) && !hasCustomIngredientIds(i));
   const toast = useToast();
   // "다른 드레싱으로"를 누른 뒤 새 줄의 선택 칸으로 포커스를 옮기기 위한 위치
   const focusLine = useRef<number | null>(null);
@@ -95,7 +96,7 @@ export default function CartBody({ openedAt, hours, closeBtn }: BodyProps) {
   const submit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (unavailable) {
-      toast("품절되거나 삭제된 메뉴·옵션을 제거해주세요.");
+      toast(needsIngredients ? "저장한 조합의 재료를 다시 선택해주세요." : "품절되거나 삭제된 메뉴·옵션을 제거해주세요.");
       return;
     }
     if (!items.length || deliveryIssue) return;
@@ -274,8 +275,7 @@ export default function CartBody({ openedAt, hours, closeBtn }: BodyProps) {
         )}
         {unavailable && (
           <p className="order-issue" role="status">
-            품절되거나 제공이 종료된 메뉴·옵션이 있습니다. 해당 항목을
-            제거하거나 다시 선택해주세요.
+            {needsIngredients ? "저장한 조합의 재료를 다시 선택해주세요." : "품절되거나 제공이 종료된 메뉴·옵션이 있습니다. 해당 항목을 제거하거나 다시 선택해주세요."}
           </p>
         )}
         <button

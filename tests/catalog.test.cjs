@@ -17,6 +17,21 @@ const snapshot = (catalog) => ({
   revision: 1,
   updatedAt: new Date().toISOString(),
 });
+test("public snapshot validates redacted slots separately from writable admin catalog", () => {
+  const { publicSnapshot } = require("../lib/customer/catalog.ts");
+  const { publicSnapshotSchema } = require("../lib/customer/snapshot.ts");
+  const seed = customerSeed();
+  seed.products[1].status = "hidden";
+  seed.products[2].deleted = true;
+  const data = publicSnapshot(snapshot(seed));
+  assert.ok(publicSnapshotSchema.safeParse(data).success);
+  assert.equal(catalogSchema.safeParse(data.catalog).success, false);
+  assert.equal(data.catalog.products[1].customerId, seed.products[1].customerId);
+  assert.equal(customerCatalog(data).getProduct(1), undefined);
+  data.catalog.products[0].name = "";
+  assert.equal(publicSnapshotSchema.safeParse(data).success, false);
+  assert.equal(publicSnapshotSchema.safeParse(snapshot(seed)).success, false, "hidden content cannot pass the public response contract");
+});
 test("customer data seeds valid admin data without changing product URLs", () => {
   const seed = customerSeed();
   catalogSchema.parse(seed);

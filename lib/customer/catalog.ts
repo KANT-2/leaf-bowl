@@ -1,5 +1,6 @@
 import { reviewTimestamp } from "@/lib/review-time";
 import type { Snapshot } from "@/lib/admin/catalog";
+import type { PublicSnapshot } from "./snapshot";
 import type { Product } from "@/types/product";
 import * as referencePolicy from "@/lib/pricing-policy";
 import type { Ingredient } from "@/lib/data/ingredients";
@@ -16,7 +17,7 @@ const labels: Record<string, Product["category"]> = {
   "플랜트 베이스": "vegan",
   "새로운 조합": "new",
 };
-export function customerCatalog(snapshot: Snapshot) {
+export function customerCatalog(snapshot: PublicSnapshot) {
   const catalog = snapshot.catalog;
   const defaults = snapshot.defaults;
   const pricingPolicy = defaults?.pricingPolicy ?? referencePolicy.REFERENCE_PRICING_POLICY;
@@ -184,7 +185,7 @@ export type CustomerCatalog = ReturnType<typeof customerCatalog>;
 export { optionChoices } from "./options";
 
 /** Keep option slots stable while withholding hidden and deleted content. */
-export function publicSnapshot(snapshot: Snapshot): Snapshot {
+export function publicSnapshot(snapshot: Snapshot): PublicSnapshot {
   const catalog = snapshot.catalog;
   return {
     ...snapshot,

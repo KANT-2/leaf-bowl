@@ -1,8 +1,8 @@
-import type { Catalog } from "@/lib/admin/catalog";
+import type { PublicCatalog } from "./snapshot";
 import type { Product } from "@/types/product";
 import type { Ingredient } from "@/lib/data/ingredients";
 import type { CartItem } from "@/lib/storage";
-import { isCustom, isDrink } from "@/lib/cart";
+import { hasCustomIngredientIds, isCustom, isDrink } from "@/lib/cart";
 import { dressingKey, drinkKey, drinkKeys } from "@/lib/cart-identifiers";
 import { BASE_BOWL_PRICE } from "@/lib/match";
 import { optionChoices } from "./options";
@@ -10,7 +10,7 @@ import { optionChoices } from "./options";
 const split = (value: string) => value.split(/[,·]/).map((s) => s.trim()).filter(Boolean);
 interface CartOption { id: string; name: string; price: number; available: boolean; allergens?: string[] }
 
-export function createCartSelectors(catalog: Catalog, { PRODUCTS, DRESSINGS, DRINKS, ingredients, baseBowlPrice = BASE_BOWL_PRICE }: {
+export function createCartSelectors(catalog: PublicCatalog, { PRODUCTS, DRESSINGS, DRINKS, ingredients, baseBowlPrice = BASE_BOWL_PRICE }: {
   PRODUCTS: Product[]; DRESSINGS: CartOption[]; DRINKS: CartOption[]; ingredients: Ingredient[];
   baseBowlPrice?: number;
 }) {
@@ -34,8 +34,8 @@ export function createCartSelectors(catalog: Catalog, { PRODUCTS, DRESSINGS, DRI
     if (isCustom(i))
       return (
         !!dressingOf(i)?.available &&
-        (!i.ingredientIds ||
-          i.ingredientIds.every((id) => ingredients.some((x) => x.id === id)))
+        hasCustomIngredientIds(i) &&
+        i.ingredientIds.every((id) => ingredients.some((x) => x.id === id))
       );
     const p = salads.find((p) => p.customerId === i.id);
     if (!p || p.deleted || p.status !== "active") return false;

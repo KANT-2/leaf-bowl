@@ -2,9 +2,9 @@
 
 import { createContext, useCallback, useContext, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useCustomerCatalog } from "./CustomerCatalogProvider";
-import { dressingKey, drinkKey } from "@/lib/cart-identifiers";
+import { drinkKey } from "@/lib/cart-identifiers";
 import { createLocalStore } from "@/lib/local-store";
-import { isCustom, isDrink, itemKey, withChoice } from "@/lib/cart";
+import { isDrink, itemKey, withChoice } from "@/lib/cart";
 import { CART_KEY, loadCart, saveCart, type CartItem, type CustomItem, type MenuItem } from "@/lib/storage";
 
 const EMPTY: CartItem[] = [];
@@ -65,10 +65,10 @@ export default function CartProvider({ children }: { children: React.ReactNode }
 
   const addCustom = useCallback((item: Omit<CustomItem, "kind" | "qty">) => {
     const list = store.getSnapshot();
-    const identified = { ...item, dressingKey: item.dressingKey ?? DRESSINGS[item.dressing]?.id };
-    const at = list.findIndex((i) => isCustom(i) && i.name === item.name && dressingKey(i) === dressingKey(identified) && i.ingredients.join("|") === item.ingredients.join("|"));
+    const identified: CustomItem = { ...item, kind: "custom", qty: 1, dressingKey: item.dressingKey ?? DRESSINGS[item.dressing]?.id };
+    const at = list.findIndex((i) => itemKey(i) === itemKey(identified));
     if (at >= 0) store.set(list.map((i, n) => (n === at ? { ...i, qty: clampQty(i.qty + 1) } : i)));
-    else store.set([...list, { kind: "custom", ...identified, ingredients: [...item.ingredients], allergens: [...item.allergens], qty: 1 }]);
+    else store.set([...list, { ...identified, ingredients: [...item.ingredients], ingredientIds: item.ingredientIds && [...item.ingredientIds], allergens: [...item.allergens] }]);
   }, [DRESSINGS]);
 
   const addDrink = useCallback((drink: number) => {
