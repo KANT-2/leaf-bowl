@@ -32,6 +32,7 @@ const { priceOrder, deliveryFee } = require("../modules/orders/pricing.ts");
 const status = require("../modules/orders/status.ts");
 const schema = require("../modules/orders/schema.ts");
 const { requestHash } = require("../modules/orders/request-hash.ts");
+const delivery = require("../modules/orders/delivery.ts");
 const { AppError, errorBody } = require("../modules/shared/errors.ts");
 const { toJson } = require("../modules/shared/json.ts");
 const { encodeCursor, decodeCursor } = require("../modules/shared/cursor.ts");
@@ -260,4 +261,24 @@ test("pricing: 모든 연결 그룹의 필수·다중 선택과 고객 화면 �
   assert.throws(() => schema.orderItemSchema.parse({ ...input, dressingKey: "dressing-0" }));
   c.products.find((p) => p.id === selections[drinkGroup.id][0]).status = "soldout";
   throws400(() => priceOrder(c, [input]), /품절/);
+});
+
+test("delivery: 받을 날짜·시간대는 화면과 같은 규칙(14일 이내, 운영시간, 30분 이후)이고 서버 시간대와 무관하다", () => {
+  const hours = { days: "매일", open: 10, close: 21 };
+  const now = new Date("2026-10-10T03:00:00.000Z"); // 한국 시간 2026-10-10 12:00
+  const ok = (desiredDate, desiredSlot) => delivery.assertDeliverySlot({ desiredDate, desiredSlot }, hours, now);
+  const bad = (desiredDate, desiredSlot, re) =>
+    assert.throws(() => ok(desiredDate, desiredSlot), (e) => e instanceof AppError && e.status === 400 && re.test(e.message));
+  assert.equal(delivery.seoulDate(now), "2026-10-10");
+  assert.equal(delivery.seoulDate(new Date("2026-10-10T15:30:00.000Z")), "2026-10-11"); // UTC 로는 아직 10일이어도 한국은 다음 날
+  ok("2026-10-10", "13:00–14:00"); // 30분 넘게 남은 시간대
+  ok("2026-10-10", "20:00–21:00"); // 마지막 시간대
+  ok("2026-10-24", "10:00–11:00"); // 오늘 + 14일
+  bad("2026-10-10", "12:00–13:00", /시간대/); // 이미 시작
+  bad("2026-10-10", "09:00–10:00", /시간대/); // 영업 전
+  bad("2026-10-10", "21:00–22:00", /시간대/); // 마감 후
+  bad("2026-10-11", "13:00-14:00", /시간대/); // 화면이 만드는 표시(en dash)와 다름
+  bad("2026-10-09", "13:00–14:00", /날짜/); // 어제
+  bad("2026-10-25", "13:00–14:00", /날짜/); // 14일 초과
+  assert.deepEqual(delivery.slotLabels("2026-10-11", { days: "매일", open: 10, close: 12 }, now), ["10:00–11:00", "11:00–12:00"]);
 });

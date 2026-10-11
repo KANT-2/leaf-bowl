@@ -74,6 +74,11 @@ export interface StatusUpdate {
 
 export interface ListQuery {
   status?: OrderStatus;
+  /** 이 세션의 주문만 (고객 본인 목록). 없으면 전체 (관리자) */
+  customerSessionId?: string;
+  /** 접수 시각 범위: from 이상, to 미만 */
+  from?: Date;
+  to?: Date;
   /** 최대 개수. 다음 쪽이 있는지 보려고 서비스가 limit + 1 을 요청한다 */
   limit: number;
   after?: { createdAt: string; id: string };

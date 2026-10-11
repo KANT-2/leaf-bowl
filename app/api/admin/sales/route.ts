@@ -3,9 +3,12 @@ import { readCatalog } from '@/lib/admin/store';
 import { readSalesData } from '@/lib/admin/sales-store';
 import { buildSalesReport, salesPeriods, salesProductTypes, type SalesProductType, type SalesPeriod } from '@/lib/admin/sales';
 import { jsonError } from '@/lib/admin/server';
+import { adminGate } from '@/modules/identity/legacy-admin';
 
 export async function GET(request: Request) {
   await connection();
+  const denied = await adminGate(request);
+  if (denied) return denied;
   const params = new URL(request.url).searchParams;
   const period = params.get('period') ?? 'all';
   const productType = params.get('type') ?? 'salad';

@@ -54,7 +54,27 @@ export function adminListItemView(o: OrderRecord) {
     status: o.status,
     version: o.version,
     ordererName: o.ordererName,
+    desiredDate: o.desiredDate,
+    desiredSlot: o.desiredSlot,
     total: o.total,
     createdAt: o.createdAt.toISOString(),
+  };
+}
+
+/** 관리자 상세: 연락처와 처리 이력까지 포함한다 (관리자 세션에서만 내려간다) */
+export function adminDetailView(o: OrderRecord) {
+  return {
+    ...detailView(o),
+    version: o.version,
+    phone: o.phone,
+    cancelReason: o.cancelReason,
+    canceledAt: o.canceledAt?.toISOString() ?? null,
+    history: o.history.map((h) => ({
+      fromStatus: h.fromStatus,
+      toStatus: h.toStatus,
+      changedBy: h.changedBy,
+      reason: h.reason,
+      createdAt: h.createdAt.toISOString(),
+    })),
   };
 }

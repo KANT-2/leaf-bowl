@@ -45,8 +45,8 @@
 | 쿠키 | JavaScript 가 읽을 수 없고(`HttpOnly`) 운영 HTTPS 에서만 전달된다. 관리자·고객 쿠키를 구분한다 |
 | 쓰기 요청 | 같은 사이트에서 온 요청만 허용한다 (CSRF 방어), 로그인·주문·리뷰는 요청 횟수를 제한한다 |
 
-> ⚠️ **지금 `main` 의 관리자 API(`/api/admin/catalog`, `/api/admin/images`)에는 인증이 없다.** 다른 사이트에서 온 쓰기 요청(`Sec-Fetch-Site: cross-site`)만 403 으로 막고, 같은 사이트에서는 누구나 호출할 수 있다.
-> 위 로그인·세션이 연결되기 전에는 운영에 공개하지 않는다.
+> **기존 관리자 API 의 권한 검사**: `GET`·`PUT /api/admin/catalog`, `POST /api/admin/images`, `GET /api/admin/sales` 는 관리자 세션이 없으면 `401` 이다. 오류 모양은 기존 API 와 같은 `{ "error": "로그인이 필요합니다." }` 를 유지한다(화면의 오류 표시가 깨지지 않게). `/admin/preview` 는 로그인 화면으로 이동하고, `/admin` 은 로그인 쿠키가 없으면 로그인 화면으로 이동한다(보조 장치이며 실제 검사는 API 가 한다).
+> 고객 화면이 쓰는 `GET /api/catalog` 와 업로드 이미지 조회(`GET /api/admin/images/{key}`)는 공개다. `PATCH /api/admin/products/{id}` 는 상품 API 통합(#72)에서 교체한 뒤 같은 검사를 붙인다.
 
 ### 공통 에러 포맷
 
@@ -69,11 +69,18 @@
 | 404 | 없는 메뉴, 숨김·삭제된 메뉴, **다른 사람의 주문** (존재 여부도 알려주지 않는다) | `"상품을 찾을 수 없습니다."` |
 | 409 | 충돌: 관리자 저장 `revision` 이 다름, 주문 상태 `version` 이 다름, 같은 재전송 식별키로 다른 내용, 취소할 수 없는 상태 | `"다른 화면에서 데이터가 변경되었습니다. 최신 내용을 불러온 뒤 다시 저장해주세요."` |
 | 413 | 본문이 너무 큼 | `"저장할 데이터가 너무 큽니다."` |
-| 429 | 요청이 너무 많음 (로그인은 접속자·계정 단위, 주문은 세션 단위로 제한) | `"요청이 너무 많습니다. 잠시 후 다시 시도해주세요."` |
-| 503 | 저장소 오류 | `"잠시 후 다시 시도해주세요."` |
+| 429 | 요청이 너무 많음 (로그인은 계정 단위, 세션 발급은 전체 단위, 주문은 세션 단위. 요청자별 제한은 신뢰할 프록시를 설정한 경우에만 적용되며 환경변수 `TRUSTED_PROXY_HOPS` 로 알려 준다) | `"요청이 너무 많습니다. 잠시 후 다시 시도해주세요."` |
+| 503 | 저장소 오류, 또는 비회원 세션이 상한에 도달 | `"잠시 후 다시 시도해주세요."` |
 
-> **설계안이다.** 지금 코드는 에러를 `{ "error": "메시지" }` 로 내려준다 (`lib/admin/server.ts` 의 `jsonError`).
-> 이 포맷으로 정해지면 `jsonError` 한 곳을 `{ status, message }` 로 바꾸고, 화면에서 `error` 필드를 읽는 곳을 함께 고친다.
+**구현 현황**: 오류 모양은 API 묶음별로 다르다(현재 `main` 기준).
+
+| 묶음 | 오류 모양 | 비고 |
+| --- | --- | --- |
+| `/api/v1/*` 주문·인증 (구현됨) | `{ "status": 404, "message": "..." }` | 이 문서의 공통 포맷 (`modules/shared/errors.ts`) |
+| `GET /api/catalog`, `POST /api/reviews`, `/api/admin/catalog`, `/api/admin/images`, `/api/admin/sales`, 이 API 들의 `401`(관리자 로그인 필요) | `{ "error": "..." }` | 기존 화면이 `error` 필드를 읽으므로 **그대로 유지**한다 (`lib/admin/server.ts` 의 `jsonError`) |
+| `/api/products*`, `/api/home`, `PATCH /api/admin/products/{id}` | `{ "message": "..." }` (`status` 필드 없음) | 상품 API 통합(#72)에서 정리될 예정 (`types/api.ts`) |
+
+기존 API 를 `{ status, message }` 로 바꾸려면 `jsonError` 와 화면의 `error` 읽는 곳을 함께 고쳐야 하므로 이 문서에서는 바꾸지 않는다. 화면이 두 형식을 모두 읽는 방법은 별도 합의가 필요하다.
 
 ### 성공 상태 코드
 
@@ -142,10 +149,13 @@
 | POST | `/api/v1/session` | (없음) | `201` `{ "expiresAt": "2026-11-09T05:00:00.000Z" }` (세션 토큰은 쿠키로만 내려가고 본문에는 없다. 이미 유효한 세션 쿠키가 있으면 새로 만들지 않고 같은 형식으로 `200`) | 신규 (설계안) |
 | POST | `/api/v1/auth/login` | `{ loginId: String, password: String }` (본문) | `{ "ok": true }` (관리자 세션 쿠키 발급) | 신규 (설계안) |
 | POST | `/api/v1/auth/logout` | (없음) | `{ "ok": true }` | 신규 (설계안) |
+| GET | `/api/v1/auth/session` | (없음) | `{ "authenticated": true, "expiresAt": "2026-10-10T18:47:44.000Z" }` (관리자 로그인 상태 확인. 로그인하지 않았거나 만료되면 `401`) | 신규 |
 | POST | `/api/v1/orders` | `{ Idempotency-Key: String }` (헤더), `{ items: Object[], ordererName: String, phone: String, address: String, addressDetail?: String, desiredDate: String, desiredSlot: String }` (본문) | `201` `{ "id": "7c1d9f64-2b0a-4a56-9f0e-3c1a8e5b2d10", "status": "received", "subtotal": "21800", "deliveryFee": "3000", "total": "24800", "createdAt": "2026-10-09T05:30:00.000Z" }` (같은 키·같은 내용의 재전송은 기존 주문과 함께 `200`) | 신규 (설계안) |
+| GET | `/api/v1/orders` | `{ limit?: Number, cursor?: String }` (쿼리, `limit` 기본 20 · 최대 50) | `{ "items": [{ "id": "7c1d9f64-2b0a-4a56-9f0e-3c1a8e5b2d10", "status": "received", "ordererName": "홍길동", "address": "서울 중구 세종대로 110", "addressDetail": "5층", "desiredDate": "2026-10-13", "desiredSlot": "12:00–13:00", "items": [{ "name": "레몬 치킨 아보카도", "options": "레몬 올리브 · 오렌지 주스", "unitPrice": "14900", "quantity": 1 }], "subtotal": "21800", "deliveryFee": "3000", "total": "24800", "createdAt": "2026-10-09T05:30:00.000Z" }], "nextCursor": null }` (이 방문자 세션으로 접수한 주문만 최신순. 항목은 상세 조회와 같은 모양. 세션이 없으면 `401`) | 신규 |
 | GET | `/api/v1/orders/{id}` | `{ id: String }` (경로) | `{ "id": "7c1d9f64-2b0a-4a56-9f0e-3c1a8e5b2d10", "status": "received", "ordererName": "홍길동", "address": "서울 중구 세종대로 110", "addressDetail": "5층", "desiredDate": "2026-10-13", "desiredSlot": "12:00–13:00", "items": [{ "name": "레몬 치킨 아보카도", "options": "레몬 올리브 · 오렌지 주스", "unitPrice": "14900", "quantity": 1 }], "subtotal": "21800", "deliveryFee": "3000", "total": "24800", "createdAt": "2026-10-09T05:30:00.000Z" }` (본인 주문만, 그 외는 404) | 신규 (설계안) |
 | POST | `/api/v1/orders/{id}/cancel` | `{ id: String }` (경로), `{ reason?: String }` (본문) | `{ "id": "7c1d9f64-2b0a-4a56-9f0e-3c1a8e5b2d10", "status": "canceled", "canceledAt": "2026-10-09T05:40:00.000Z" }` (이미 취소된 주문의 재요청은 현재 결과를 그대로 반환) | 신규 (설계안) |
-| GET | `/api/v1/admin/orders` | `{ status?: String, limit?: Number, cursor?: String }` (쿼리) | `{ "items": [{ "id": "7c1d9f64-2b0a-4a56-9f0e-3c1a8e5b2d10", "status": "received", "version": 1, "ordererName": "홍길동", "total": "24800", "createdAt": "2026-10-09T05:30:00.000Z" }], "nextCursor": "eyJjIjoiMjAyNi0xMC0wOVQwNTozMDowMC4wMDBaIiwiaSI6IjdjMWQ5ZjY0In0" }` | 신규 (설계안) |
+| GET | `/api/v1/admin/orders` | `{ status?: String, from?: String, to?: String, limit?: Number, cursor?: String }` (쿼리. `from`·`to` 는 접수일 `YYYY-MM-DD`, 한국 시간 기준 양 끝 포함) | `{ "items": [{ "id": "7c1d9f64-2b0a-4a56-9f0e-3c1a8e5b2d10", "status": "received", "version": 1, "ordererName": "홍길동", "desiredDate": "2026-10-13", "desiredSlot": "12:00–13:00", "total": "24800", "createdAt": "2026-10-09T05:30:00.000Z" }], "nextCursor": "eyJjIjoiMjAyNi0xMC0wOVQwNTozMDowMC4wMDBaIiwiaSI6IjdjMWQ5ZjY0In0" }` | 신규 (설계안) |
+| GET | `/api/v1/admin/orders/{id}` | `{ id: String }` (경로) | `{ "id": "7c1d9f64-2b0a-4a56-9f0e-3c1a8e5b2d10", "status": "confirmed", "version": 2, "ordererName": "홍길동", "phone": "010-1234-5678", "address": "서울 중구 세종대로 110", "addressDetail": "5층", "desiredDate": "2026-10-13", "desiredSlot": "12:00–13:00", "items": [{ "name": "레몬 치킨 아보카도", "options": "레몬 올리브 · 오렌지 주스", "unitPrice": "14900", "quantity": 1 }], "subtotal": "21800", "deliveryFee": "3000", "total": "24800", "createdAt": "2026-10-09T05:30:00.000Z", "cancelReason": null, "canceledAt": null, "history": [{ "fromStatus": null, "toStatus": "received", "changedBy": "customer", "reason": null, "createdAt": "2026-10-09T05:30:00.000Z" }, { "fromStatus": "received", "toStatus": "confirmed", "changedBy": "admin", "reason": null, "createdAt": "2026-10-09T05:35:00.000Z" }] }` (연락처·처리 이력은 관리자 상세에만 포함. 없는 주문은 `404`) | 신규 |
 | PATCH | `/api/v1/admin/orders/{id}/status` | `{ id: String }` (경로), `{ status: String, version: Number, reason?: String }` (본문) | `{ "id": "7c1d9f64-2b0a-4a56-9f0e-3c1a8e5b2d10", "status": "confirmed", "version": 2 }` (`version` 이 다르면 409) | 신규 (설계안) |
 
 - **주문 상태**: `received`(접수) → `confirmed`(확인) → `preparing`(준비 중) → `delivering`(배달 중) → `completed`(완료). 취소(`canceled`)는 접수·확인에서만, 완료·취소 주문은 더 바꿀 수 없다. 허용되지 않은 순서는 409.
@@ -158,11 +168,11 @@
   | 내 취향 볼 | `{ ingredientKeys: String[], dressingKey?: String, quantity: Number }` (음료 불가) | 기본 볼 6,500원 + 고른 재료 + 드레싱 (화면의 `bowlPrice` 와 같다) |
   | 음료 단품 | `{ drinkKeys: [String], quantity: Number }` (음료 1개, 드레싱 불가) | 음료 가격 |
 
-- **서버가 확인하는 것**: 판매 중인 메뉴·옵션·재료인지(숨김·삭제는 존재하지 않는 값으로 보고 400, 품절은 품절 안내와 함께 400), 필수 드레싱 선택, 같은 음료·재료의 중복, 수량 1~99, 연락처 형식, 받을 날짜가 오늘(한국 시간) 이후인지, 최소 주문 금액 15,000원. 배달비는 상품 합계 30,000원 미만이면 3,000원, 이상이면 무료다.
+- **서버가 확인하는 것**: 판매 중인 메뉴·옵션·재료인지(숨김·삭제는 존재하지 않는 값으로 보고 400, 품절은 품절 안내와 함께 400), 필수 드레싱 선택, 같은 음료·재료의 중복, 수량 1~99, 연락처 형식, 받을 날짜가 오늘부터 14일 이내이고 받을 시간대가 운영시간(지금은 매일 10:00–21:00) 안의 한 시간 단위이며 지금부터 30분 이후에 시작하는지(한국 시간 기준, 화면과 같은 규칙이고 `desiredSlot` 은 화면이 만드는 `10:00–11:00` 표기여야 한다. 위반하면 `"받을 날짜를 다시 선택해주세요."` 또는 `"받을 시간대를 다시 선택해주세요."`), 최소 주문 금액 15,000원. 배달비는 상품 합계 30,000원 미만이면 3,000원, 이상이면 무료다.
 - **관리자 취소**: 별도 경로 없이 `PATCH /api/v1/admin/orders/{id}/status` 에 `{ status: "canceled", version, reason }` 을 보낸다. 사유·취소 시각·변경자가 이력에 남는다. 고객 취소(`/cancel`)는 접수·확인 상태에서만 가능하고, 관리자가 그 사이 상태를 바꿔 충돌하면 최신 상태를 다시 읽어 판단한다.
 - **재전송**: 통신 실패 후 다시 보낼 때 같은 `Idempotency-Key` 를 쓴다. 같은 내용이면 기존 주문을, 다른 내용이면 409 를 돌려준다.
 - **조회 권한**: 주문 번호만으로는 다른 사람의 주문·연락처·주소를 볼 수 없다. 연락처·주소는 허용된 상세 응답에만 포함한다.
-- 설계안의 경로 목록에는 **관리자 주문 상세 조회**(`GET /api/v1/admin/orders/{id}`)가 없다. 요구사항 BE-05 의 "관리자는 목록과 상세를 조회한다"에 맞춰 필요하면 이 경로를 추가한다.
+- 설계안의 경로 목록에 없는 **관리자 주문 상세**(`GET /api/v1/admin/orders/{id}`)와 목록의 **접수일 범위**(`from`·`to`)는 요구사항 BE-05 의 "관리자는 기간·상태별 목록과 상세를 조회한다"에 맞춰 추가했다. 고객의 **내 주문 목록**(`GET /api/v1/orders`)은 마이페이지 주문 내역에 필요해서 추가했다.
 - 고객 계정(회원)·결제는 설계안의 범위 밖이라 이 표에 없다.
 
 ## 4. 관리자 API
@@ -179,7 +189,7 @@
 
 ## 5. API 별 에러 응답 예시
 
-아래는 §1 의 설계 포맷(`status`, `message`)으로 적은 예시다.
+`/api/v1` 의 **주문·인증 API** 예시는 실제 구현의 응답이다. 아직 만들지 않은 고객 조회 경로(`/api/v1/products*` 등)와 `/api/v1/admin/products/{key}` 는 §1 의 설계 포맷(`status`, `message`)으로 적은 예시이고, 기존 `/api/admin/*` 는 실제로 `{ "error": "..." }` 를 내려준다(표에 그대로 적었다).
 
 | 요청 메서드 | 요청 경로 | 요청 예시 | 응답 예시 |
 | --- | --- | --- | --- |
@@ -193,11 +203,17 @@
 | GET | `/api/v1/orders/{id}` | 다른 사람의 주문 번호 | `{ "status": 404, "message": "주문을 찾을 수 없습니다." }` |
 | POST | `/api/v1/orders/{id}/cancel` | 준비 중인 주문 | `{ "status": 409, "message": "준비가 시작된 주문은 취소할 수 없습니다." }` |
 | PATCH | `/api/v1/admin/orders/{id}/status` | 오래된 `version` | `{ "status": 409, "message": "다른 관리자가 먼저 변경했습니다. 새로 고친 뒤 다시 시도해주세요." }` |
+| POST | `/api/v1/orders` | 이미 시작된 시간대 | `{ "status": 400, "message": "받을 시간대를 다시 선택해주세요." }` |
+| GET | `/api/v1/admin/orders` | `from` 이 `to` 보다 늦음 | `{ "status": 400, "message": "조회 기간을 확인해주세요." }` |
+| GET | `/api/v1/admin/orders/{id}` | 로그인하지 않음 | `{ "status": 401, "message": "로그인이 필요합니다." }` |
 | GET | `/api/v1/admin/orders` | 로그인하지 않음 | `{ "status": 401, "message": "로그인이 필요합니다." }` |
-| PUT | `/api/admin/catalog` | `revision` 이 오래된 값 | `{ "status": 409, "message": "다른 화면에서 데이터가 변경되었습니다. 최신 내용을 불러온 뒤 다시 저장해주세요." }` |
+| PUT | `/api/admin/catalog` | `revision` 이 오래된 값 | `{ "error": "다른 화면에서 데이터가 변경되었습니다. 최신 내용을 불러온 뒤 다시 저장해주세요." }` (`409`) |
 | PATCH | `/api/v1/admin/products/{key}` | `{ "price": -5 }` | `{ "status": 400, "message": "price 는 0 이상이어야 합니다." }` |
 | PATCH | `/api/v1/admin/products/{key}` | 다른 사이트에서 보낸 요청 | `{ "status": 403, "message": "허용되지 않은 요청입니다." }` |
-| POST | `/api/admin/images` | 6MB 파일 | `{ "status": 413, "message": "이미지는 5MB 이하로 올려주세요." }` |
+| POST | `/api/admin/images` | 6MB 파일 | `{ "error": "이미지는 5MB 이하로 올려주세요." }` (`413`) |
+| GET | `/api/admin/catalog` | 관리자 로그인 없음 | `{ "error": "로그인이 필요합니다." }` (`401`) |
+| POST | `/api/v1/session` | 같은 시간에 너무 많은 새 세션 요청 | `{ "status": 429, "message": "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." }` |
+| POST | `/api/v1/session` | 동시에 유효한 비회원 세션이 상한(10,000)에 도달 | `{ "status": 503, "message": "현재 접속이 많아 잠시 후 다시 시도해주세요." }` |
 
 ## 6. 요청 값 예시와 긴 응답 전체 예시
 
@@ -330,5 +346,5 @@
 
 - 2번은 화면(`ReviewsProvider`)의 호출 주소를 바꿔야 하고 리뷰 사진 PR(#28)이 같은 파일을 수정 중이라 **그 PR 머지 후에** 옮긴다.
 - 이 문서의 `ProductSummary` 에는 `type` 이 없다 (경로로 구분하므로). 구현 초안(#39)은 `type` 을 포함하고 `/api/v1` 이 아니므로 설계안 구조(`modules/`)로 다시 만든다.
-- 주문·인증 API(`/api/v1/session`, `auth`, `orders`, `admin/orders`)는 `feat/orders-core` 에서 **메모리 저장소로 먼저 구현**했다. 서버를 다시 시작하면 주문·세션이 사라지며, DB(Prisma)가 준비되면 저장소 계약(`modules/orders/repository.ts`)만 바꿔 끼운다.
+- 주문·인증 API(`/api/v1/session`, `auth`, `orders`, `admin/orders`)는 `feat/orders-core` 에서 **메모리 저장소로 먼저 구현**했다. 서버를 다시 시작하면 주문·세션이 사라진다. DB(Prisma)로 바꿀 때 route·service 의 업무 규칙은 그대로 두지만, 설계안의 트랜잭션(키 확인·가격 계산·저장을 한 트랜잭션에)을 표현하려면 저장소 계약을 바꿔야 한다. 제안은 `docs/db-design.md` 의 "저장소 트랜잭션 계약" 에 있다.
 - 관리자 주문 API 는 임시 계정(환경변수 `ADMIN_LOGIN_ID`, `ADMIN_PASSWORD`)으로 로그인한다. 설정하지 않으면 로그인할 수 없다.

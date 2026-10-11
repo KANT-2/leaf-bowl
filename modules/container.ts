@@ -6,15 +6,43 @@ import { createMemoryOrdersRepository } from "./orders/memory-repository";
 import { createOrdersService, type OrdersService } from "./orders/service";
 import { createRateLimiter, type RateLimiter } from "./shared/rate-limit";
 
+/**
+ * 요청 제한 묶음 (분당).
+ * - clientLogin·clientSession: 요청자별. TRUSTED_PROXY_HOPS 로 신뢰할 프록시를 알려 줬을 때만 적용된다 (clientKey).
+ * - account: 로그인 시도의 계정 단위. 접속자를 속여도 같은 계정이면 같은 칸이라 무차별 대입을 막는다.
+ * - globalSession: 비회원 세션 발급 전체 한도. 헤더를 매번 바꿔도 발급 속도가 이 값을 넘지 못한다.
+ */
+export interface Limits {
+  clientLogin: RateLimiter;
+  account: RateLimiter;
+  clientSession: RateLimiter;
+  globalSession: RateLimiter;
+  order: RateLimiter;
+}
+
+export function createLimits(
+  perMinute: { clientLogin?: number; account?: number; clientSession?: number; globalSession?: number; order?: number } = {},
+  now?: () => number,
+): Limits {
+  const make = (limit: number) => createRateLimiter(limit, 60_000, { now });
+  return {
+    clientLogin: make(perMinute.clientLogin ?? 10),
+    account: make(perMinute.account ?? 10),
+    clientSession: make(perMinute.clientSession ?? 30),
+    globalSession: make(perMinute.globalSession ?? 120),
+    order: make(perMinute.order ?? 20),
+  };
+}
+
 export interface Services {
   orders: OrdersService;
   identity: IdentityService;
-  limits: { login: RateLimiter; order: RateLimiter; session: RateLimiter };
+  limits: Limits;
 }
 
 /**
- * 서비스를 한곳에서 조립한다. DB 가 준비되면 이 파일에서 memory 저장소를 Prisma 저장소로 바꾸면 되고
- * route.ts 와 service.ts 는 그대로 둔다.
+ * 서비스를 한곳에서 조립한다. DB 로 바꿀 때 route.ts 와 업무 규칙(service.ts)은 그대로 쓰지만,
+ * 저장소 계약은 트랜잭션을 표현하도록 바꿔야 한다 (docs/db-design.md "저장소 트랜잭션 계약").
  *
  * 임시 관리자 계정: 환경변수 ADMIN_LOGIN_ID, ADMIN_PASSWORD 가 모두 있을 때만 만든다.
  * 기본 비밀번호는 없다 (설정하지 않으면 어떤 로그인도 실패한다).
@@ -41,11 +69,7 @@ export function createServices(): Services {
       getCatalog: async () => (await readCatalog()).catalog,
     }),
     identity: createIdentityService({ repository: identityRepository }),
-    limits: {
-      login: createRateLimiter(10, 60_000),
-      order: createRateLimiter(20, 60_000),
-      session: createRateLimiter(30, 60_000),
-    },
+    limits: createLimits(),
   };
 }
 
