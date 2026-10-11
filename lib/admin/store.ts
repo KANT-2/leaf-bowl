@@ -1,5 +1,6 @@
-import { mkdir, readFile, writeFile, rename, rm } from "node:fs/promises";
+import { readFile, writeFile, rename } from "node:fs/promises";
 import path from "node:path";
+import { withFileLock } from "./file-lock";
 import { customerSeed, migrateCatalog } from "./customer-seed";
 import { type Catalog, type Snapshot } from "./catalog";
 type StoredSnapshot = Snapshot & {
@@ -12,29 +13,7 @@ function publicSnapshot(state: StoredSnapshot): Snapshot {
 }
 export const dataDirectory = () =>
   process.env.ADMIN_DATA_DIR || path.resolve(process.cwd(), ".data/admin");
-async function withLock<T>(fn: () => Promise<T>): Promise<T> {
-  const directory = dataDirectory();
-  await mkdir(directory, { recursive: true });
-  const lock = path.join(directory, ".lock");
-  let acquired = false;
-  for (let attempt = 0; attempt < 100; attempt++) {
-    try {
-      await mkdir(lock);
-      acquired = true;
-      break;
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
-      await new Promise((r) => setTimeout(r, 50));
-    }
-  }
-  if (!acquired)
-    throw Error("다른 저장 작업이 진행 중입니다. 잠시 후 다시 시도해주세요.");
-  try {
-    return await fn();
-  } finally {
-    await rm(lock, { recursive: true, force: true });
-  }
-}
+const withLock = <T>(fn: () => Promise<T>) => withFileLock(dataDirectory(), fn);
 async function readState(): Promise<StoredSnapshot> {
   try {
     const snapshot: StoredSnapshot = JSON.parse(

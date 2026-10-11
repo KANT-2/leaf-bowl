@@ -15,6 +15,8 @@ export const orderItemSchema = z
     /** 메뉴의 고객 주소 번호 (/product/0 의 0). 내 취향 조합·음료 단품이면 없다 */
     productId: z.number().int().min(0).max(10000).optional(),
     dressingKey: key.optional(),
+    /** 관리자 정의 옵션도 그룹·선택의 고정 ID로 전달한다. 기존 필드와 함께 보내지 않는다. */
+    optionSelections: z.record(key, z.array(key).max(30)).refine((v) => Object.keys(v).length <= 30).optional(),
     drinkKeys: z.array(key).max(10).default([]),
     /** 내 취향 찾기로 고른 재료 */
     ingredientKeys: z.array(key).max(20).default([]),
@@ -26,6 +28,7 @@ export const orderItemSchema = z
       const menu = v.productId !== undefined;
       const custom = v.ingredientKeys.length > 0;
       const drinkOnly = !menu && !custom && v.drinkKeys.length === 1 && v.dressingKey === undefined;
+      if (v.optionSelections !== undefined && (!menu || v.dressingKey !== undefined || v.drinkKeys.length > 0)) return false;
       return (menu && !custom) || (custom && !menu) || drinkOnly;
     },
     { message: "메뉴, 재료 조합, 음료 단품 중 하나만 선택해주세요." },

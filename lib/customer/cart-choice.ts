@@ -1,5 +1,6 @@
 import type { CartItem } from "@/lib/storage";
 import { isCustom, isDrink } from "@/lib/cart";
+import { dressingKey } from "@/lib/cart-identifiers";
 import { optionChoices, type CustomerCatalog } from "./catalog";
 export interface ChoiceSlot {
   /** 옵션 그룹 id. null 이면 예전 방식(dressing 번호) 줄 */
@@ -43,13 +44,13 @@ export function choiceSlot(
       choices,
     };
   }
-  if (i.dressing < 0) return null;
+  if (!dressingKey(i)) return null;
   return {
     groupId: null,
     label: "드레싱",
-    value: String(i.dressing),
-    choices: cat.DRESSINGS.flatMap((d, index) =>
-      d.name ? [{ value: String(index), name: d.name, available: d.available }] : [],
+    value: dressingKey(i)!,
+    choices: cat.DRESSINGS.flatMap((d) =>
+      d.name ? [{ value: d.id, name: d.name, available: d.available }] : [],
     ),
   };
 }

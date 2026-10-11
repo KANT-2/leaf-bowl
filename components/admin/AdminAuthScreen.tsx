@@ -9,7 +9,7 @@ import { submitAdminAuth } from '@/lib/admin/auth-client';
 import './auth.css';
 
 export default function AdminAuthScreen({ mode }: { mode: 'login' | 'logout' }) {
-  const [email, setEmail] = useState('');
+  const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -25,7 +25,7 @@ export default function AdminAuthScreen({ mode }: { mode: 'login' | 'logout' }) 
     setBusy(true);
     setError('');
     try {
-      await submitAdminAuth(mode, login ? { email: email.trim(), password } : undefined);
+      await submitAdminAuth(mode, login ? { loginId: loginId.trim(), password } : undefined);
       setPassword('');
       if (login) {
         // Full navigation discards any previously cached administrator page and credentials.
@@ -60,8 +60,8 @@ export default function AdminAuthScreen({ mode }: { mode: 'login' | 'logout' }) 
         {complete ? <div className="admin-auth-actions"><Button asChild size="lg"><Link href="/admin/login" prefetch={false}>다시 로그인</Link></Button><Link href="/" className="admin-auth-back">고객 페이지로 이동</Link></div> : <form onSubmit={submit} aria-busy={busy}>
           <fieldset disabled={busy} className="admin-auth-fields">
             {login && <>
-              <label className="field" htmlFor="admin-email">이메일<Input id="admin-email" name="email" type="email" autoComplete="username" required maxLength={254} placeholder="admin@example.com" value={email} onChange={e => setEmail(e.target.value)} /></label>
-              <label className="field" htmlFor="admin-password">비밀번호<div className="admin-auth-password"><Input id="admin-password" name="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" required maxLength={256} placeholder="비밀번호를 입력해주세요" value={password} onChange={e => setPassword(e.target.value)} /><button type="button" aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 보기'} aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></label>
+              <label className="field" htmlFor="admin-login-id">아이디<Input id="admin-login-id" name="loginId" type="text" autoComplete="username" required maxLength={50} placeholder="관리자 아이디" value={loginId} onChange={e => setLoginId(e.target.value)} /></label>
+              <label className="field" htmlFor="admin-password">비밀번호<div className="admin-auth-password"><Input id="admin-password" name="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" required maxLength={200} placeholder="비밀번호를 입력해주세요" value={password} onChange={e => setPassword(e.target.value)} /><button type="button" aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 보기'} aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></label>
             </>}
             {error && <p className="admin-auth-error" role="alert">{error}</p>}
             <Button type="submit" size="lg" className="admin-auth-submit">{busy ? (login ? '로그인 중…' : '로그아웃 중…') : (login ? '로그인' : '로그아웃')}</Button>

@@ -1,5 +1,6 @@
 "use client";
 import { isDrink, itemKey, withChoice } from "@/lib/cart";
+import { drinkKey } from "@/lib/cart-identifiers";
 import type { DeliveryHours } from "@/lib/data/delivery";
 import {
   dateValue,
@@ -148,7 +149,7 @@ export default function CartBody({ openedAt, hours, closeBtn }: BodyProps) {
               {DRINKS.map((d, n) => {
                 if (!d.name) return null;
                 const inCart =
-                  items.find((i) => isDrink(i) && i.drink === n)?.qty ??
+                  items.find((i) => isDrink(i) && drinkKey(i) === d.id)?.qty ??
                   0;
                 return (
                   <button

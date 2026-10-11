@@ -50,14 +50,8 @@ export const OPTION_IMAGES: Record<string, string> = {
   "케일 그린 주스": "/images/options/drink-kale.png",
 };
 
-export const DELIVERY_FEE = 3000;
-// 체험용 예시 배달 정책
-export const MIN_DELIVERY_ORDER = 15000;
-export const FREE_DELIVERY_FROM = 30000;
+export { DELIVERY_FEE, MIN_DELIVERY_ORDER, FREE_DELIVERY_FROM, deliveryFee } from "./pricing-policy";
 
-export function deliveryFee(subtotal: number): number {
-  return subtotal >= FREE_DELIVERY_FROM ? 0 : DELIVERY_FEE;
-}
 // 내 취향 찾기(bowl match) 페이지
 export const MATCH_URL = "/match";
 

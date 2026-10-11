@@ -1,12 +1,10 @@
-import { BASE_BOWL_PRICE } from "@/lib/match";
-import type { Catalog, Snapshot } from "@/lib/admin/catalog";
+import type { Snapshot } from "@/lib/admin/catalog";
 import type { Product } from "@/types/product";
 import { NUTRITION, DRESSING_KCAL, DRINK_KCAL } from "@/lib/products";
 import { HERO_SLIDES } from "@/lib/data/hero";
 import type { Ingredient } from "@/lib/data/ingredients";
 import type { Review } from "@/lib/reviews";
-import type { CartItem } from "@/lib/storage";
-import { isCustom, isDrink } from "@/lib/cart";
+import { createCartSelectors } from "./cart-selectors";
 
 const split = (s: string) =>
   s
@@ -40,7 +38,7 @@ export function customerCatalog(snapshot: Snapshot) {
     };
   }
   const visibleProducts = PRODUCTS.filter((p) => p && p.status !== "hidden");
-  // Keep option indices stable; unavailable choices remain as disabled entries.
+  // 선택의 영속 식별자는 상품 ID이며 배열 번호는 화면 내부에서만 사용한다.
   const dressings = catalog.products.filter((p) => p.type === "dressing");
   const drinks = catalog.products.filter((p) => p.type === "drink");
   const DRESSINGS = dressings.map((p) => ({
@@ -132,130 +130,7 @@ export function customerCatalog(snapshot: Snapshot) {
   const getProduct = (id: number) => visibleProducts.find((p) => p.id === id);
   const productFromParam = (param: string) =>
     /^\d+$/.test(param) ? getProduct(Number(param)) : undefined;
-  const selectedOptions = (i: CartItem) =>
-    isCustom(i) || isDrink(i)
-      ? []
-      : Object.entries(i.optionSelections ?? {}).flatMap(([id, ids]) => {
-          const group = catalog.groups.find((g) => g.id === id && !g.deleted);
-          if (!group) return [];
-          const choices =
-            group.source === "custom"
-              ? group.choices
-              : optionChoices(catalog, group.source);
-          return choices.filter((c) => ids.includes(c.id));
-        });
-  const itemAvailable = (i: CartItem) => {
-    if (isDrink(i)) return !!DRINKS[i.drink]?.available;
-    if (isCustom(i))
-      return (
-        !!DRESSINGS[i.dressing]?.available &&
-        (!i.ingredientIds ||
-          i.ingredientIds.every((id) => ingredients.some((x) => x.id === id)))
-      );
-    const p = salads.find((p) => p.customerId === i.id);
-    if (!p || p.deleted || p.status !== "active") return false;
-    if (i.optionSelections) {
-      const groups = catalog.groups.filter(
-        (g) => !g.deleted && p.optionIds.includes(g.id),
-      );
-      return (
-        groups.every((g) => {
-          const choices =
-            g.source === "custom"
-              ? g.choices
-              : optionChoices(catalog, g.source);
-          const selected = i.optionSelections?.[g.id] ?? [];
-          return (
-            (!g.required || selected.length > 0) &&
-            (g.multiple || selected.length <= 1) &&
-            selected.every((id) => choices.some((c) => c.id === id))
-          );
-        }) &&
-        Object.keys(i.optionSelections).every((id) =>
-          groups.some((g) => g.id === id),
-        )
-      );
-    }
-    const groups=catalog.groups.filter(g=>!g.deleted&&p.optionIds.includes(g.id));
-    if(groups.some(g=>g.required&&(g.source==='custom'||(g.source==='dressings'&&i.dressing<0)||(g.source==='drinks'&&!i.drinks.length))))return false;
-    return (
-      (i.dressing < 0 || !!DRESSINGS[i.dressing]?.available) &&
-      i.drinks.every((d) => DRINKS[d]?.available)
-    );
-  };
-  const defaultItem = (id: number) => {
-    const product = salads.find((p) => p.customerId === id);
-    if (!product || product.deleted || product.status !== "active") return null;
-    const groups = catalog.groups.filter(
-      (g) => !g.deleted && product.optionIds.includes(g.id),
-    );
-    const optionSelections: Record<string, string[]> = {};
-    for (const group of groups) {
-      const choices =
-        group.source === "custom"
-          ? group.choices
-          : optionChoices(catalog, group.source);
-      if (group.required && !choices.length) return null;
-      optionSelections[group.id] = group.required ? [choices[0].id] : [];
-    }
-    return {
-      id,
-      dressing: -1,
-      drinks: [] as number[],
-      qty: 1,
-      optionSelections,
-    };
-  };
-  const itemUnitPrice = (i: CartItem) =>
-    isDrink(i)
-      ? (DRINKS[i.drink]?.price ?? 0)
-      : isCustom(i)
-      ? (i.ingredientIds
-          ? BASE_BOWL_PRICE +
-            ingredients
-              .filter((x) => i.ingredientIds?.includes(x.id))
-              .reduce((n, x) => n + x.price, 0)
-          : i.price) + (DRESSINGS[i.dressing]?.price ?? 0)
-      : i.optionSelections
-        ? (PRODUCTS[i.id]?.price ?? 0) +
-          selectedOptions(i).reduce((n, c) => n + c.price, 0)
-        : unitPrice(i.id, i.drinks) +
-          (DRESSINGS[i.dressing]?.price ?? 0) +
-          (i.extraPrice ?? 0);
-  const itemName = (i: CartItem) =>
-    isDrink(i) ? (DRINKS[i.drink]?.name || "판매 종료 음료") : isCustom(i) ? i.name : (PRODUCTS[i.id]?.name ?? "삭제된 메뉴");
-  const itemOptions = (i: CartItem) =>
-    isDrink(i)
-      ? "음료"
-      : !isCustom(i) && i.optionSelections
-      ? selectedOptions(i)
-          .map((c) => c.name)
-          .join(" · ")
-      : [
-          ...(isCustom(i) ? ["커스텀 볼", ...(i.ingredientIds?i.ingredientIds.map(id=>ingredients.find(x=>x.id===id)?.name??"제공 종료 재료"):i.ingredients)] : []),
-          DRESSINGS[i.dressing]?.name,
-          ...(!isCustom(i) ? i.drinks.map((d) => DRINKS[d]?.name) : []),
-          ...(!isCustom(i) ? (i.extraOptions ?? []) : []),
-        ]
-          .filter(Boolean)
-          .join(" · ");
-  const itemAllergens = (i: CartItem): string[] =>
-    isDrink(i)
-      ? []
-      : isCustom(i)
-      ? [...i.allergens, ...(DRESSINGS[i.dressing]?.allergens ?? [])]
-      : i.optionSelections
-        ? [
-            ...new Set([
-              ...(PRODUCTS[i.id]?.allergens ?? []),
-              ...selectedOptions(i).flatMap((c) =>
-                "allergens" in c && typeof c.allergens === "string"
-                  ? split(c.allergens)
-                  : [],
-              ),
-            ]),
-          ]
-        : allergensOf(i.id, i.dressing);
+  const { itemAvailable, defaultItem, itemUnitPrice, itemName, itemOptions, itemAllergens } = createCartSelectors(catalog, { PRODUCTS, DRESSINGS, DRINKS, ingredients });
   return {
     catalog,
     revision: snapshot.revision,
@@ -296,17 +171,7 @@ export function customerCatalog(snapshot: Snapshot) {
   };
 }
 export type CustomerCatalog = ReturnType<typeof customerCatalog>;
-export function optionChoices(
-  catalog: Catalog,
-  source: "drinks" | "dressings",
-) {
-  return catalog.products.filter(
-    (p) =>
-      p.type === (source === "drinks" ? "drink" : "dressing") &&
-      !p.deleted &&
-      p.status === "active",
-  );
-}
+export { optionChoices } from "./options";
 
 /** Keep option slots stable while withholding hidden and deleted content. */
 export function publicSnapshot(snapshot: Snapshot): Snapshot {

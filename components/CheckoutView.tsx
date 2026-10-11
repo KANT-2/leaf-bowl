@@ -2,11 +2,15 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Breadcrumb from "./Breadcrumb";
 import PageHeading from "./PageHeading";
 import { useCart } from "./CartProvider";
 import { useCustomerCatalog } from "./CustomerCatalogProvider";
+import type { DeliveryHours } from "@/lib/data/delivery";
+import { checkoutIssue } from "@/lib/checkout-validation";
+import { customerCatalog } from "@/lib/customer/catalog";
+import type { Snapshot } from "@/lib/admin/catalog";
 import { recordOrder } from "@/lib/orders";
 import { deliveryFee, money } from "@/lib/products";
 import { CardIcon, KakaoPayMark, TossMark } from "./icons/BrandMarks";
@@ -30,10 +34,11 @@ const formatExpiry = (v: string) => {
   return digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
 };
 
-export default function CheckoutView() {
+export default function CheckoutView({ hours }: { hours: DeliveryHours }) {
   const params = useSearchParams();
-  const { items, clear } = useCart();
-  const { itemName, itemOptions, itemUnitPrice } = useCustomerCatalog();
+  const { items, clear, open } = useCart();
+  const catalog = useCustomerCatalog();
+  const { itemName, itemOptions, itemUnitPrice } = catalog;
 
   const address = params.get("address") ?? "";
   const day = params.get("day") ?? "";
@@ -43,6 +48,9 @@ export default function CheckoutView() {
   const [cardNumber, setCardNumber] = useState("");
   const [cardExpiry, setCardExpiry] = useState("");
   const [cardCvc, setCardCvc] = useState("");
+  const [paying, setPaying] = useState(false);
+  const [error, setError] = useState("");
+  const pending = useRef(false);
   const [done, setDone] = useState(false);
   const [doneTotal, setDoneTotal] = useState(0);
 
@@ -54,25 +62,42 @@ export default function CheckoutView() {
     cardNumber.replace(/\s/g, "").length >= 14 &&
     /^\d{2}\/\d{2}$/.test(cardExpiry) &&
     /^\d{3}$/.test(cardCvc);
-  const canPay = items.length > 0 && (method !== "card" || cardValid);
+  const delivery = { address, day, timeLabel, hours };
+  // 시간은 확정 동작에서도 다시 확인한다. 초기 렌더에서는 시각 의존 검사 없이 상태만 표시한다.
+  const unavailable = items.some((i) => !catalog.itemAvailable(i));
+  const canPay = items.length > 0 && !unavailable && !paying && (method !== "card" || cardValid);
 
-  const pay = () => {
-    if (!canPay) return;
-    recordOrder({
-      day,
-      timeLabel,
-      address,
-      total,
-      items: items.map((i) => ({
-        name: itemName(i),
-        options: itemOptions(i),
-        qty: i.qty,
-        unitPrice: itemUnitPrice(i),
-      })),
-    });
-    setDoneTotal(total);
-    clear();
-    setDone(true);
+  const pay = async () => {
+    if (!canPay || pending.current) return;
+    pending.current = true;
+    setPaying(true);
+    setError("");
+    try {
+      const response = await fetch("/api/catalog", { cache: "no-store", signal: AbortSignal.timeout(15_000) });
+      if (!response.ok) throw Error("메뉴 상태를 확인하지 못했습니다. 다시 시도해주세요.");
+      const snapshot: Snapshot = await response.json();
+      const latest = customerCatalog(snapshot);
+      const issue = checkoutIssue(items, latest, delivery);
+      if (issue) { setError(issue); return; }
+      const latestSubtotal = items.reduce((sum, item) => sum + latest.itemUnitPrice(item) * item.qty, 0);
+      const latestTotal = latestSubtotal + deliveryFee(latestSubtotal);
+      if (latestTotal !== total) {
+        setError("메뉴 금액이 변경되었어요. 장바구니에서 금액을 확인해주세요.");
+        return;
+      }
+      recordOrder({
+        day, timeLabel, address, total: latestTotal,
+        items: items.map((item) => ({ name: latest.itemName(item), options: latest.itemOptions(item), qty: item.qty, unitPrice: latest.itemUnitPrice(item) })),
+      });
+      setDoneTotal(latestTotal);
+      clear();
+      setDone(true);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "주문을 확인하지 못했습니다. 다시 시도해주세요.");
+    } finally {
+      pending.current = false;
+      setPaying(false);
+    }
   };
 
   if (done) {
@@ -118,6 +143,7 @@ export default function CheckoutView() {
       <PageHeading>결제</PageHeading>
       <p className="auth-note">체험용 결제 화면입니다. 실제로 청구되지 않아요.</p>
 
+      {(error || unavailable) && <div role="alert"><p>{error || "품절되거나 삭제된 메뉴·옵션이 있어요."}</p><button type="button" className="ghost-btn" onClick={(e) => open(e.currentTarget)}>장바구니 확인</button></div>}
       <section className="surface mypage-section">
         <h2>주문 내용</h2>
         <ul className="order-item-lines checkout-lines">

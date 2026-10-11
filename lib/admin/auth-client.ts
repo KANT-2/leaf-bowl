@@ -1,5 +1,5 @@
-/** Frontend adapter for the planned backend identity endpoints. No client-side session is created. */
-export async function submitAdminAuth(action: 'login' | 'logout', credentials?: { email: string; password: string }) {
+/** Frontend adapter for the backend identity endpoints. No client-side session is created. */
+export async function submitAdminAuth(action: 'login' | 'logout', credentials?: { loginId: string; password: string }) {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), 15000);
   try {
@@ -15,7 +15,7 @@ export async function submitAdminAuth(action: 'login' | 'logout', credentials?: 
       throw new Error('관리자 인증 서비스가 아직 연결되지 않았습니다. 담당자에게 연결 상태를 확인해주세요.');
     }
     if (!response.ok) {
-      if (response.status === 401 && action === 'login') throw new Error('이메일 또는 비밀번호를 확인해주세요.');
+      if (response.status === 401 && action === 'login') throw new Error('아이디 또는 비밀번호를 확인해주세요.');
       if (response.status === 429) throw new Error('요청이 많습니다. 잠시 후 다시 시도해주세요.');
       if (response.status === 401 && action === 'logout') return; // The session is already absent or expired.
       throw new Error(action === 'login' ? '로그인하지 못했습니다. 잠시 후 다시 시도해주세요.' : '로그아웃하지 못했습니다. 다시 시도해주세요.');

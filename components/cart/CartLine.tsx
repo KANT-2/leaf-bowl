@@ -1,5 +1,6 @@
 "use client";
 import { isCustom, isDrink } from "@/lib/cart";
+import { drinkKey } from "@/lib/cart-identifiers";
 import {
   choiceSlot,
   withRo,
@@ -89,7 +90,7 @@ export default function CartLine({
   return (
     <div className="cart-item">
       {isDrink(item) ? (
-        <DrinkThumb src={DRINKS[item.drink]?.image} />
+        <DrinkThumb src={DRINKS.find((d) => d.id === drinkKey(item))?.image} />
       ) : (
         <FoodImage id={isCustom(item) ? item.photo : item.id} sizes="64px" />
       )}

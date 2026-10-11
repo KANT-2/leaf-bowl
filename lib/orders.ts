@@ -1,3 +1,4 @@
+import { readBrowserJSON as readJSON, writeBrowserJSON as writeJSON } from "./browser-json";
 /** 마이페이지 "주문 내역"용 mock 주문 기록. 실제 서버 주문 전까지 localStorage에만 저장한다. */
 import { createLocalStore } from "./local-store";
 
@@ -25,21 +26,7 @@ export interface OrderRecord {
 const ORDER_KEY = "bb-orders";
 const MAX_ORDERS = 50;
 
-function readJSON(key: string): unknown {
-  try {
-    return JSON.parse(localStorage.getItem(key) || "null");
-  } catch {
-    return null;
-  }
-}
 
-function writeJSON(key: string, value: unknown) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // 저장할 수 없으면 이번 화면에서만 유지한다.
-  }
-}
 
 function isOrderItem(v: unknown): v is OrderItemRecord {
   return (

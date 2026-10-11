@@ -1,3 +1,5 @@
+import { dressingKey, drinkKey, drinkKeys } from "./cart-identifiers";
+import { readBrowserJSON as readJSON, writeBrowserJSON as writeJSON } from "./browser-json";
 import type { Review } from "./reviews";
 
 export const CART_KEY = "bb-cart";
@@ -10,7 +12,9 @@ export interface MenuItem {
   extraOptions?: string[];
   id: number;
   dressing: number;
+  dressingKey?: string;
   drinks: number[];
+  drinkKeys?: string[];
   qty: number;
 }
 
@@ -24,6 +28,7 @@ export interface CustomItem {
   /** 재료 알레르기 (드레싱 알레르기는 dressing 으로 따로 계산) */
   allergens: string[];
   dressing: number;
+  dressingKey?: string;
   /** 1개 가격 (기본 볼 + 재료) */
   price: number;
   /** 참고 사진으로 쓸 PRODUCTS 번호 */
@@ -36,6 +41,7 @@ export interface DrinkItem {
   kind: "drink";
   /** 카탈로그 DRINKS 번호 */
   drink: number;
+  drinkKey?: string;
   qty: number;
 }
 
@@ -45,21 +51,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
 }
 
-function readJSON(key: string): unknown {
-  try {
-    return JSON.parse(localStorage.getItem(key) || "[]");
-  } catch {
-    return [];
-  }
-}
 
-function writeJSON(key: string, value: unknown) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // 저장 공간이 없거나 막혀 있으면 이번 세션 안에서만 유지한다.
-  }
-}
 
 const isProductId = (v: unknown): v is number =>
   typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 10000;
@@ -118,10 +110,13 @@ function isMenuItem(v: unknown): v is MenuItem {
 }
 
 export function loadCart(): CartItem[] {
-  const raw = readJSON(CART_KEY);
+  const raw = readJSON(CART_KEY, []);
   if (!Array.isArray(raw)) return [];
   const out: CartItem[] = [];
   for (const v of raw) {
+    if (!isRecord(v)) continue;
+    const validKey = (value: unknown) => value === undefined || (typeof value === "string" && value.length > 0 && value.length <= 80);
+    if (!validKey(v.dressingKey) || !validKey(v.drinkKey) || (v.drinkKeys !== undefined && !isStringList(v.drinkKeys, 30))) continue;
     if (isCustomItem(v)) {
       const { name, ingredients, allergens, dressing, price, photo, qty } = v;
       out.push({
@@ -137,24 +132,27 @@ export function loadCart(): CartItem[] {
         ingredients: [...ingredients],
         allergens: [...allergens],
         dressing,
+        dressingKey: dressingKey(v),
         price,
         photo,
         qty,
       });
     } else if (isRecord(v) && v.kind === "drink" && isProductId(v.drink) && isQty(v.qty)) {
-      out.push({ kind: "drink", drink: v.drink, qty: v.qty });
+      out.push({ kind: "drink", drink: v.drink, drinkKey: drinkKey(v as unknown as DrinkItem), qty: v.qty });
     } else if (isMenuItem(v)) {
       const { id, dressing, drinks, qty } = v;
       out.push({
         id,
         dressing,
+        dressingKey: dressingKey(v),
         drinks: [...drinks],
+        drinkKeys: drinkKeys(v),
         qty,
         optionSelections: isRecord(v.optionSelections)
           ? Object.fromEntries(
               Object.entries(v.optionSelections).filter(
                 (entry): entry is [string, string[]] =>
-                  isStringList(entry[1], 30),
+                  entry[0].length <= 80 && isStringList(entry[1], 30),
               ),
             )
           : undefined,
