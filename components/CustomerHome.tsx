@@ -1,5 +1,4 @@
 "use client";
-import CustomerSeasons from "./CustomerSeasons";
 import Link from "next/link";
 import HeroCarousel from "@/components/HeroCarousel";
 import MatchFloat from "@/components/MatchFloat";
@@ -30,8 +29,6 @@ export default function CustomerHome() {
           ))}
         </div>
       </section>
-
-      <CustomerSeasons />
 
       <section className="section reviews wrap" id="reviews" aria-labelledby="reviewsTitle">
         <ReviewRotator />
