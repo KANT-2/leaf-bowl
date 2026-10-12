@@ -1252,6 +1252,23 @@
   object-fit: contain;
   object-position: center;
 }
+/* PC·태블릿에서는 광고 이미지도 기존 배너 높이에 맞춰 칸을 꽉 채운다 (넘치는 위아래는 잘린다).
+   min/max-height 로 높이를 고정해 배너 컴포넌트의 height: auto 보다 우선한다. 휴대폰은 모바일 이미지를 그대로 보여준다. */
+@media (min-width: 601px) {
+  .hero-ad-slide img {
+    width: 100%;
+    min-height: 510px;
+    max-height: 510px;
+    object-fit: cover;
+    object-position: center;
+  }
+}
+@media (min-width: 601px) and (max-width: 900px) {
+  .hero-ad-slide img {
+    min-height: 450px;
+    max-height: 450px;
+  }
+}
 
 /* 이달의 이벤트 슬라이드: 기존 배너와 같은 배치에 이벤트 사진을 둥근 카드로 보여준다 */
 .hero-event .hero-event-date {
