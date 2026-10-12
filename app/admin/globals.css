@@ -1249,21 +1249,6 @@
   }
 }
 
-.delivery-filters,
-.delivery-hours {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: 8px;
-  margin-block: 16px;
-}
-.delivery-filters .field {
-  margin: 0;
-}
-.delivery-hours {
-  max-height: 160px;
-  overflow-y: auto;
-}
 .delivery-day {
   margin-top: 24px;
 }
