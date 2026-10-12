@@ -1911,3 +1911,37 @@
   color: #fff;
   border-color: var(--color-ink);
 }
+
+.delivery-list-labels,
+.delivery-order-compact {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(0, 2fr) minmax(0, 2fr);
+  gap: 20px;
+}
+.delivery-list-labels {
+  padding: 8px 12px;
+  background: var(--color-soft);
+  color: var(--color-subtle-text);
+  font-size: 13px;
+}
+.delivery-order-compact {
+  padding: 12px;
+  overflow-wrap: anywhere;
+}
+.delivery-order-compact ul {
+  margin: 4px 0;
+  padding: 0;
+  list-style: none;
+}
+.delivery-order-compact p {
+  margin: 3px 0;
+}
+@media (max-width: 640px) {
+  .delivery-list-labels {
+    display: none;
+  }
+  .delivery-order-compact {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}
