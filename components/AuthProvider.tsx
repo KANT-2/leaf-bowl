@@ -1,20 +1,16 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo, useSyncExternalStore } from "react";
-import { userStore, type Address, type AuthProvider as Provider, type UserProfile } from "@/lib/auth";
+import { userStore } from "@/infrastructure/browser/profile-store";
+import { type Address, type AuthProvider as Provider, type UserProfile } from "@/modules/profile/types";
 
-const addrId = () => "addr-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-
-const blankProfile = (input: { name: string; email: string; provider: Provider }): UserProfile => ({
-  loggedIn: true,
-  provider: input.provider,
-  name: input.name,
-  email: input.email,
-  phone: "",
-  addresses: [],
-  preferredCategories: [],
-  excludedAllergens: [],
-});
+import {
+  loginProfile,
+  addProfileAddress,
+  updateProfileAddress,
+  removeProfileAddress,
+  setDefaultProfileAddress,
+} from "@/modules/profile/operations";
 
 interface AuthContextValue {
   user: UserProfile | null;
@@ -33,7 +29,9 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used inside <AuthProvider>");
+  if (!ctx) {
+    throw new Error("useAuth must be used inside <AuthProvider>");
+  }
   return ctx;
 }
 
@@ -42,71 +40,61 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
   const login = useCallback((input: { name: string; email: string; provider: Provider }) => {
     const current = userStore.getSnapshot();
-    userStore.set(
-      current
-        ? { ...current, loggedIn: true, name: input.name, email: input.email, provider: input.provider }
-        : blankProfile(input),
-    );
+    userStore.set(loginProfile(current, input));
   }, []);
 
   const logout = useCallback(() => {
     const current = userStore.getSnapshot();
-    if (current) userStore.set({ ...current, loggedIn: false });
+    if (current) {
+      userStore.set({ ...current, loggedIn: false });
+    }
   }, []);
 
   const updateProfile = useCallback((patch: Partial<Pick<UserProfile, "name" | "email" | "phone">>) => {
     const current = userStore.getSnapshot();
-    if (current) userStore.set({ ...current, ...patch });
+    if (current) {
+      userStore.set({ ...current, ...patch });
+    }
   }, []);
 
   const addAddress = useCallback((input: Omit<Address, "id">) => {
     const current = userStore.getSnapshot();
-    if (!current) return;
-    const next: Address = { ...input, id: addrId() };
-    const addresses = next.isDefault
-      ? [...current.addresses.map((a) => ({ ...a, isDefault: false })), next]
-      : [...current.addresses, next];
-    userStore.set({ ...current, addresses });
+    if (!current) {
+      return;
+    }
+    userStore.set(addProfileAddress(current, { ...input, id: crypto.randomUUID() }));
   }, []);
 
   const updateAddress = useCallback((id: string, patch: Partial<Omit<Address, "id">>) => {
     const current = userStore.getSnapshot();
-    if (!current) return;
-    const makesDefault = patch.isDefault === true;
-    userStore.set({
-      ...current,
-      addresses: current.addresses.map((a) =>
-        a.id === id
-          ? { ...a, ...patch }
-          : makesDefault
-            ? { ...a, isDefault: false }
-            : a,
-      ),
-    });
+    if (!current) {
+      return;
+    }
+    userStore.set(updateProfileAddress(current, id, patch));
   }, []);
 
   const removeAddress = useCallback((id: string) => {
     const current = userStore.getSnapshot();
-    if (!current) return;
-    userStore.set({ ...current, addresses: current.addresses.filter((a) => a.id !== id) });
+    if (!current) {
+      return;
+    }
+    userStore.set(removeProfileAddress(current, id));
   }, []);
 
   const setDefaultAddress = useCallback((id: string) => {
     const current = userStore.getSnapshot();
-    if (!current) return;
-    userStore.set({
-      ...current,
-      addresses: current.addresses.map((a) => ({ ...a, isDefault: a.id === id })),
-    });
+    if (!current) {
+      return;
+    }
+    userStore.set(setDefaultProfileAddress(current, id));
   }, []);
 
-  const setPreferences = useCallback(
-    (patch: { preferredCategories?: string[]; excludedAllergens?: string[] }) => {
-      const current = userStore.getSnapshot();
-      if (current) userStore.set({ ...current, ...patch });
-    },
-    [],
-  );
+  const setPreferences = useCallback((patch: { preferredCategories?: string[]; excludedAllergens?: string[] }) => {
+    const current = userStore.getSnapshot();
+    if (current) {
+      userStore.set({ ...current, ...patch });
+    }
+  }, []);
 
   const value = useMemo(
     () => ({

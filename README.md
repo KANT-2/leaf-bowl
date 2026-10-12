@@ -25,7 +25,7 @@
 
 Next.js App Router 기반으로 고객 화면과 관리자 화면을 구성하고, 공통 카탈로그를 통해 저장한 변경 사항을 고객 화면에 반영합니다.
 
-> **체험 범위** · 로그인은 실제 인증 없이 동작하는 모의 로그인입니다. 결제는 실제 청구·주문 접수·배달이 없는 체험 기능이며, 초기 리뷰는 예시 데이터입니다. 관리자 화면과 API의 인증·권한 연동은 후속 작업입니다.
+> **체험 범위** · 로그인은 실제 인증 없이 동작하는 모의 로그인입니다. 결제 수단은 실제 청구가 없는 체험 기능이며, 주문 접수·조회와 관리자 인증은 PostgreSQL에 연결됩니다. 초기 리뷰는 예시 데이터입니다.
 
 ## 주요 기능
 
@@ -65,8 +65,9 @@ Next.js App Router 기반으로 고객 화면과 관리자 화면을 구성하�
 | 스타일 | Tailwind CSS 4 · 화면별 CSS |
 | 컴포넌트 | Radix UI · Lucide React · Sonner |
 | 데이터 검증 | Zod |
-| 현재 저장소 | 서버 JSON 파일 · 브라우저 localStorage · 일부 상품 API의 메모리 저장소 |
-| DB 전환 설계 | PostgreSQL 스키마·초기 데이터 SQL |
+| 서버 저장소 | PostgreSQL 18 · Prisma 7.10 (카탈로그·앱 설정·리뷰·주문·세션) |
+| 브라우저 저장소 | 장바구니·체험 프로필·취향 localStorage |
+| DB 변경 이력 | Prisma migrations · 기존 SQL 제약·뷰·트리거 보존 |
 | 검증·배포 | GitHub Actions `Frontend CI` · 개발 MCP 배포 스크립트 |
 
 ## 시작하기
@@ -78,19 +79,25 @@ CI와 동일한 **Node.js 22**, npm, Git을 준비합니다.
 ```bash
 git clone https://github.com/KANT-2/leaf-bowl.git
 cd leaf-bowl
+cp .env.example .env.local
+# PostgreSQL 전용 DB와 DATABASE_URL을 설정한다.
 npm ci
+npm run db:migrate
+npm run db:seed
 npm run dev
 ```
 
 브라우저에서 [http://localhost:3000](http://localhost:3000)을 엽니다. 관리자 화면은 [http://localhost:3000/admin](http://localhost:3000/admin)에서 확인할 수 있습니다.
 
-기본 실행에는 별도 환경 변수나 DB 설치가 필요하지 않습니다. 첫 카탈로그 조회 시 초기 데이터와 서버 저장 디렉터리가 자동으로 생성됩니다.
+PostgreSQL과 `DATABASE_URL`이 필요합니다. `db:seed`는 실행 원본 [db/seed.sql](db/seed.sql)로 비어 있는 카탈로그를 초기화하고 배너·배송시간·가격 정책·영양정보 등의 DB 설정을 넣습니다. 기존 편집과 주문은 보존합니다. 기존 JSON을 옮길 때는 seed보다 먼저 가져오기를 실행합니다. [DB 운영 가이드](docs/postgres.md)를 참고하세요.
 
 ### 저장 경로 설정
 
 | 환경 변수 | 기본값 | 용도 |
 | --- | --- | --- |
-| `ADMIN_DATA_DIR` | `.data/admin` | 카탈로그 JSON과 업로드 이미지의 저장 디렉터리 |
+| `DATABASE_URL` | 없음 | 앱 전용 PostgreSQL 연결 주소 |
+| `ADMIN_LOGIN_ID`, `ADMIN_PASSWORD` | 없음 | `db:seed`에서 만들 관리자 계정 |
+| `ADMIN_DATA_DIR` | `.data/admin` | 업로드 이미지의 영속 저장 디렉터리 |
 
 필요하면 저장소 루트의 `.env.local`에 경로를 지정합니다.
 
@@ -110,7 +117,10 @@ npm run start
 | 명령 | 설명 |
 | --- | --- |
 | `npm run dev` | 개발 서버 실행 |
-| `npm run lint` | ESLint 검사 |
+| `npm run lint` | ESLint 규칙 및 Prettier 스타일 검사 |
+| `npm run format` | 코드 포맷 수정 |
+| `npm run format:check` | 코드 포맷 검사 |
+| `npx eslint --fix` | 중괄호·함수 간 빈 줄 등 린트 자동 수정 |
 | `npm run build` | 운영 빌드 생성 |
 | `npm run start` | 생성된 운영 빌드로 서버 실행 |
 | `npx --no-install tsc --noEmit` | TypeScript 검사 |
@@ -148,34 +158,45 @@ leaf-bowl/
 │   ├── api/              # 카탈로그·상품·리뷰·이미지 API
 │   └── styles/           # 고객 화면별 스타일
 ├── components/           # 고객 컴포넌트·Provider·관리자 UI
-├── lib/
-│   ├── admin/            # 카탈로그 스키마·초기값·파일 저장소
-│   ├── customer/         # 고객용 카탈로그 변환·서버 조회
-│   └── …                 # 장바구니·리뷰·취향·모의 사용자/주문
-├── data/                 # 초기 상품 데이터
-├── types/                # 상품·API 타입
-├── public/               # 상품·재료 이미지와 미리보기 자산
-├── db/                   # PostgreSQL 스키마·초기 데이터
+├── modules/              # 카탈로그·주문·프로필·장바구니의 계약과 업무 규칙
+├── application/          # 트랜잭션 조합·서비스 생성·서버 조회
+├── infrastructure/       # PostgreSQL·HTTP·브라우저 저장소 어댑터
+├── features/             # 화면별 표시·입력·클라이언트 요청 로직
+├── seed/                 # SQL 초기화·명시적 JSON 이관 전용
+├── public/               # 상품·재료 이미지
+├── prisma/               # DB 모델·마이그레이션·seed
+├── db/                   # 기존 PostgreSQL 설계 SQL
 ├── tests/                # 카탈로그·브라우저 검증
 ├── docs/                 # 설계·연동 문서와 검증 스크린샷
 ├── ops/                  # 배포 스크립트·운영 문서·테스트
 └── .github/workflows/    # Frontend CI
 ```
 
+코드 스타일은 들여쓰기 2칸, 쌍따옴표, 세미콜론, 줄 폭 120자, LF로 통일합니다. `if`·`else`·`for`·`while`·`do` 본문에는 중괄호를 반드시 사용합니다. 인접한 함수 선언(화살표 함수·export 함수 포함)과 클래스 메서드 사이에는 빈 줄을 한 줄 두고, 연속 빈 줄 두 개 이상은 허용하지 않습니다. 긴 문자열·URL처럼 나누기 어려운 값은 120자를 넘을 수 있습니다.
+
+`npx eslint --fix`로 중괄호·함수 간 간격을 수정한 다음 `npm run format`으로 포맷을 정리합니다. `npm run lint`는 두 검사 모두 수행하며 스타일 위반도 기존 CI에서 실패합니다. 생성 코드·빌드 결과·배포 상태·사진/정적 자산·문서는 자동 포맷 대상에서 제외합니다. SQL·Prisma 스키마·Python은 Prettier 포맷 대상이 아닙니다.
+
+[모듈 경계와 데이터 흐름](docs/architecture.md)에 책임·의존성 규칙과 변경 시 확인할 항목을 정리했습니다. `npm run lint`와 `npm test`가 경계 위반·순환 의존성·클라이언트의 서버 코드 참조를 검사합니다.
+
+Tailwind 색상·글꼴 토큰은 `app/styles/theme.css`에서 공유합니다. 기본 스타일은 `base`, 화면별 CSS는 `components` 레이어에 두어 Tailwind 유틸리티로 크기·여백을 조정할 수 있게 합니다. 고객의 기존 리셋과 관리자 Preflight는 각 루트 레이아웃에서 유지합니다. 공통 컴포넌트의 변형과 화면이 요구하는 크기는 컴포넌트 클래스에서 지정합니다.
+
 ### 데이터는 어디에 저장되나요?
 
 | 데이터 | 현재 저장 위치 | 특징 |
 | --- | --- | --- |
-| 고객·관리자 공통 카탈로그와 리뷰 | 서버의 `catalog.json` | `lib/admin/store.ts`에서 조회·저장, `revision`으로 저장 충돌 확인 |
+| 고객·관리자 공통 카탈로그와 리뷰 | PostgreSQL | `application/catalog.ts`에서 조회·저장, 잠금·`revision`으로 저장 충돌 확인 |
+| 배너·배송시간·가격·영양·추천·편집 선택지 | PostgreSQL `app_settings` | 런타임 정적 기본값 없이 검증된 DB 설정 사용 |
+| 서버 주문·주문 항목·상태 이력 | PostgreSQL | 비회원 세션별 조회, 재전송·상태 변경 충돌 방지 |
+| 관리자 계정·관리자/비회원 세션 | PostgreSQL | 비밀번호·토큰 해시와 만료 시각 보존 |
 | 관리자 업로드 이미지 | 서버의 `images/` 디렉터리 | `ADMIN_DATA_DIR` 아래 보관, PNG·JPEG·WebP 및 파일당 5MB 제한 |
 | 장바구니 | localStorage · `bb-cart` | 브라우저에 보존하고 최신 카탈로그로 가격·판매 가능 여부 계산 |
 | 모의 사용자·프로필·배송지·취향 | localStorage · `bb-user` | 서버 계정 없이 현재 브라우저에 저장 |
-| 체험 주문 내역 | localStorage · `bb-orders` | 현재 브라우저에서 최근 50개까지 보관 |
+| 과거 체험 주문 내역 | localStorage · `bb-orders` | 이전 기록을 보존하며 새 DB 주문과 함께 표시 |
 | 저장한 bowl match 조합 | localStorage · `bm-recipe` | 저장한 조합을 보존하고 카드 진행 상태는 메모리에서 관리 |
 | 작성한 리뷰의 로컬 기록 | localStorage · `bb-user-reviews` | 서버 저장 리뷰와 연계해 내 리뷰 식별·기존 기록 이관에 사용 |
-| 개별 상품 조회·수정 API | `lib/products-repository.ts`의 메모리 목록 | 공통 카탈로그와 별도이며 서버 재시작 시 초기화 |
+| 개별 상품 조회·수정 API | PostgreSQL 공통 카탈로그 | 고객·관리자 화면 및 주문 가격과 같은 저장소 |
 
-PostgreSQL용 [`db/schema.sql`](db/schema.sql)과 [`db/seed.sql`](db/seed.sql)은 준비되어 있으며, **현재 앱의 저장소는 아직 PostgreSQL에 연결되어 있지 않습니다.** 전환 구조와 실행 방법은 [DB 설계 문서](docs/db-design.md)를 참고합니다.
+DB 구조는 [`prisma/schema.prisma`](prisma/schema.prisma), 변경 이력은 `prisma/migrations`에서 관리합니다. 기존 SQL의 CHECK·IDENTITY·뷰·트리거를 baseline에 보존했습니다. 실행과 기존 JSON 이관은 [DB 운영 가이드](docs/postgres.md)를 참고합니다.
 
 ### 구현된 API
 
@@ -186,11 +207,11 @@ PostgreSQL용 [`db/schema.sql`](db/schema.sql)과 [`db/seed.sql`](db/seed.sql)�
 | `POST` | `/api/reviews` | 고객 리뷰 작성 |
 | `POST` | `/api/admin/images` | 관리자 이미지 업로드 |
 | `GET` | `/api/admin/images/[key]` | 업로드 이미지 조회 |
-| `GET` | `/api/products` | 메모리 기반 상품 목록·분류별 조회 |
-| `GET` | `/api/products/[id]` | 메모리 기반 개별 상품 조회 |
-| `PATCH` | `/api/admin/products/[id]` | 메모리 기반 상품 일부 수정 |
+| `GET` | `/api/products` | 공통 DB 상품 목록·분류별 조회 |
+| `GET` | `/api/products/[id]` | 공통 DB 개별 상품 조회 |
+| `PATCH` | `/api/admin/products/[id]` | 관리자 인증 후 공통 DB 상품 일부 수정 |
 
-개별 상품 API는 공통 카탈로그와 아직 연동되지 않았습니다. 오류 응답도 카탈로그 계열의 `{ "error": "메시지" }`와 개별 상품 API의 `{ "message": "메시지" }`로 구분됩니다.
+개별 상품 API도 공통 카탈로그를 사용합니다. 오류 응답은 카탈로그 계열의 `{ "error": "메시지" }`와 개별 상품 API의 `{ "message": "메시지" }`로 구분됩니다.
 
 ### 변경 사항 검증
 
@@ -198,12 +219,15 @@ PostgreSQL용 [`db/schema.sql`](db/schema.sql)과 [`db/seed.sql`](db/seed.sql)�
 
 ```bash
 npm ci
+npm run db:validate
+npm test
+npm run test:db
 npm run lint
 npm run build
 npx --no-install tsc --noEmit
 ```
 
-카탈로그 저장·이관·옵션·리뷰를 수정할 때는 `node tests/catalog.test.cjs`를, CI/CD 스크립트를 수정할 때는 `python3 -m unittest discover -s ops -p 'test_*.py' -v`를 추가로 실행합니다. 브라우저 연동 확인 절차는 [관리자·고객 연동 문서](docs/admin-integration.md)에 정리되어 있습니다.
+카탈로그 저장·이관·옵션·리뷰를 수정할 때는 `npm test`와 `npm run test:db`를, CI/CD 스크립트를 수정할 때는 `python3 -m unittest discover -s ops -p 'test_*.py' -v`를 추가로 실행합니다. 브라우저 연동 확인 절차는 [관리자·고객 연동 문서](docs/admin-integration.md)에 정리되어 있습니다.
 
 ## 배포와 협업
 
@@ -225,7 +249,8 @@ GitHub Actions의 **Frontend CI**는 PR과 `main`·`production` push에서 의�
 | --- | --- |
 | [저장소 작업 지침](AGENTS.md) | 이슈·계획·브랜치·PR·코드리뷰 규칙 |
 | [관리자·고객 연동](docs/admin-integration.md) | 공통 카탈로그, 데이터 이관, 브라우저 검증 절차 |
-| [DB 설계](docs/db-design.md) | PostgreSQL ERD, 테이블 매핑, 저장소 전환 계획 |
+| [DB 설계](docs/db-design.md) | PostgreSQL ERD, 테이블 매핑, 트랜잭션 계약 |
+| [DB 운영](docs/postgres.md) | DB 설정·초기화·JSON 이관·테스트·배포 |
 | [배포·운영](ops/README.md) | 개발 MCP 배포, CI 게이트, 로그와 복구 |
 
 ---

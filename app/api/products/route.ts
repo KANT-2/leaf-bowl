@@ -1,7 +1,7 @@
 // GET /api/products            → 상품 전체 목록
 // GET /api/products?category=vegan → 해당 분류만 (protein · vegan · new · other)
 import type { NextRequest } from "next/server";
-import { CATEGORIES, findProducts, isCategory } from "@/lib/products-repository";
+import { CATEGORIES, findProducts, isCategory } from "@/application/products";
 import type { ApiError } from "@/types/api";
 
 export async function GET(request: NextRequest) {

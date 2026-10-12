@@ -14,13 +14,17 @@ export const loginSchema = z
 /** 비회원 세션이 필요한 API 의 진입점 검사 */
 export async function requireGuest(request: Request, identity: IdentityService): Promise<SessionRecord> {
   const session = await identity.resolve(readCookie(request, GUEST_COOKIE), "guest");
-  if (!session) throw new AppError(401, "세션이 없거나 만료되었습니다. 페이지를 새로 고쳐주세요.");
+  if (!session) {
+    throw new AppError(401, "세션이 없거나 만료되었습니다. 페이지를 새로 고쳐주세요.");
+  }
   return session;
 }
 
 /** 관리자 세션이 필요한 API 의 진입점 검사 */
 export async function requireAdmin(request: Request, identity: IdentityService): Promise<SessionRecord> {
   const session = await identity.resolve(readCookie(request, ADMIN_COOKIE), "admin");
-  if (!session?.adminUserId) throw new AppError(401, "로그인이 필요합니다.");
+  if (!session?.adminUserId) {
+    throw new AppError(401, "로그인이 필요합니다.");
+  }
   return session;
 }

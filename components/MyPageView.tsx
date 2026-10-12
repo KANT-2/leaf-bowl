@@ -26,10 +26,14 @@ export default function MyPageView() {
   const [tab, setTab] = useState<TabKey>("profile");
 
   useEffect(() => {
-    if (!isLoggedIn) router.replace("/login");
+    if (!isLoggedIn) {
+      router.replace("/login");
+    }
   }, [isLoggedIn, router]);
 
-  if (!isLoggedIn) return null;
+  if (!isLoggedIn) {
+    return null;
+  }
 
   return (
     <main className="wrap pv-wrap mypage-wrap">

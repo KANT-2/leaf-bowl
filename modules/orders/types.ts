@@ -5,6 +5,7 @@ export type ChangedBy = "customer" | "admin" | "system";
 
 export interface OrderItemRecord {
   productId: string | null;
+  productType?: "salad" | "drink" | "custom";
   name: string;
   options: PricedLine["options"];
   unitPrice: bigint;
@@ -30,8 +31,9 @@ export interface OrderRecord {
   phone: string;
   address: string;
   addressDetail: string;
-  desiredDate: string;
-  desiredSlot: string;
+  /** UTC 예약 시각. 표시 날짜·시간대는 프론트에서 KST로 계산한다. */
+  desiredStartAt: Date;
+  desiredEndAt: Date;
   subtotal: bigint;
   deliveryFee: bigint;
   total: bigint;
@@ -51,8 +53,8 @@ export type NewOrder = Pick<
   | "phone"
   | "address"
   | "addressDetail"
-  | "desiredDate"
-  | "desiredSlot"
+  | "desiredStartAt"
+  | "desiredEndAt"
   | "subtotal"
   | "deliveryFee"
   | "total"
@@ -74,6 +76,11 @@ export interface StatusUpdate {
 
 export interface ListQuery {
   status?: OrderStatus;
+  /** 이 세션의 주문만 (고객 본인 목록). 없으면 전체 (관리자) */
+  customerSessionId?: string;
+  /** 접수 시각 범위: from 이상, to 미만 */
+  from?: Date;
+  to?: Date;
   /** 최대 개수. 다음 쪽이 있는지 보려고 서비스가 limit + 1 을 요청한다 */
   limit: number;
   after?: { createdAt: string; id: string };

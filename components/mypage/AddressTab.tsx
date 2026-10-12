@@ -1,10 +1,11 @@
 "use client";
+import { useCustomerCatalog } from "../CustomerCatalogProvider";
 
 import { useState } from "react";
 import { useAuth } from "../AuthProvider";
 import { useToast } from "../ToastProvider";
 import AddressSearchModal from "./AddressSearchModal";
-import { DELIVERY_REQUEST_PRESETS, type Address } from "@/lib/auth";
+import { type Address } from "@/modules/profile/types";
 
 function AddressForm({
   initial,
@@ -17,14 +18,17 @@ function AddressForm({
   onCancel?: () => void;
   onDelete?: () => void;
 }) {
+  const { catalogConfig } = useCustomerCatalog();
   const [label, setLabel] = useState(initial?.label ?? "");
   const [recipientName, setRecipientName] = useState(initial?.recipientName ?? "");
   const [address, setAddress] = useState(initial?.address ?? "");
   const [detail, setDetail] = useState(initial?.detail ?? "");
   const [phone, setPhone] = useState(initial?.phone ?? "");
-  const [requestNote, setRequestNote] = useState(initial?.requestNote ?? DELIVERY_REQUEST_PRESETS[0]);
+  const [requestNote, setRequestNote] = useState(initial?.requestNote ?? catalogConfig.deliveryRequestPresets[0]);
   const [customNote, setCustomNote] = useState(
-    initial?.requestNote && !DELIVERY_REQUEST_PRESETS.includes(initial.requestNote) ? initial.requestNote : "",
+    initial?.requestNote && !catalogConfig.deliveryRequestPresets.includes(initial.requestNote)
+      ? initial.requestNote
+      : "",
   );
   const [isDefault, setIsDefault] = useState(initial?.isDefault ?? false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -37,7 +41,9 @@ function AddressForm({
         className="mypage-form address-form"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!recipientName.trim() || !address.trim()) return;
+          if (!recipientName.trim() || !address.trim()) {
+            return;
+          }
           onSubmit({
             label: label.trim() || "배송지",
             recipientName: recipientName.trim(),
@@ -55,12 +61,7 @@ function AddressForm({
         </label>
         <label className="field">
           <span>받는 사람</span>
-          <input
-            required
-            value={recipientName}
-            maxLength={30}
-            onChange={(e) => setRecipientName(e.target.value)}
-          />
+          <input required value={recipientName} maxLength={30} onChange={(e) => setRecipientName(e.target.value)} />
         </label>
         <label className="field">
           <span>주소</span>
@@ -81,17 +82,12 @@ function AddressForm({
         </label>
         <label className="field">
           <span>연락처</span>
-          <input
-            value={phone}
-            maxLength={20}
-            placeholder="010-0000-0000"
-            onChange={(e) => setPhone(e.target.value)}
-          />
+          <input value={phone} maxLength={20} placeholder="010-0000-0000" onChange={(e) => setPhone(e.target.value)} />
         </label>
         <label className="field">
           <span>배송 요청사항</span>
           <select value={requestNote} onChange={(e) => setRequestNote(e.target.value)}>
-            {DELIVERY_REQUEST_PRESETS.map((p) => (
+            {catalogConfig.deliveryRequestPresets.map((p) => (
               <option key={p} value={p}>
                 {p}
               </option>
@@ -144,7 +140,9 @@ export default function AddressTab() {
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  if (!user) return null;
+  if (!user) {
+    return null;
+  }
 
   return (
     <section className="surface mypage-section">
@@ -164,7 +162,10 @@ export default function AddressTab() {
       {adding && (
         <AddressForm
           onSubmit={(input) => {
-            addAddress({ ...input, isDefault: input.isDefault || user.addresses.length === 0 });
+            addAddress({
+              ...input,
+              isDefault: input.isDefault || user.addresses.length === 0,
+            });
             setAdding(false);
             toast("배송지를 추가했어요");
           }}

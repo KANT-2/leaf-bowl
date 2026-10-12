@@ -1,72 +1,326 @@
 /* ===== 제품 상세 ===== */
-.pv-wrap { padding-bottom: 30px; }
-.pv { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 56px; padding: 34px 0 20px; align-items: start; }
-.pv-photo { position: sticky; top: 20px; background: var(--color-pale); border-radius: 12px; overflow: hidden; }
-.pv-photo .food-image { padding: 7%; }
-.pv-photo .product-tag { left: 18px; top: 18px; }
-.pv-info { min-width: 0; }
-.pv-info h1 { font-size: 38px; line-height: 1.35; letter-spacing: -1.4px; margin: 12px 0 10px; color: var(--color-ink); outline: 0; }
-.pv-rate { display: inline-flex; align-items: center; gap: 10px; font-size: 14px; color: #637561; }
-.pv-rate b { color: var(--color-brand); font-size: 15px; }
-.pv-rate i { font-style: normal; margin-left: 2px; }
-.pv-rate:hover span { text-decoration: underline; }
-.pv-desc { font-size: 16px; color: #687863; line-height: 1.9; margin: 16px 0 8px; }
-.pv-price { display: block; font: 700 28px/1.4 Georgia, "Noto Sans KR", serif; color: var(--color-brand); margin: 6px 0 18px; }
-.pv-meta { display: grid; grid-template-columns: 56px 1fr; gap: 10px 14px; font-size: 13px; line-height: 1.7; margin: 0 0 6px; padding: 16px 0; border-top: 1px solid var(--color-line); border-bottom: 1px solid var(--color-line); }
-.pv-meta dt { color: var(--color-muted); }
-.pv-meta dd { margin: 0; color: var(--color-ink); }
-.pv-meta dd small { display: block; margin-top: 2px; font-size: 12px; color: var(--color-muted); }
-.pv-info h3 { font-size: 14px; margin: 24px 0 12px; }
-.pv-kcal { margin: 20px 0 0; font-size: 13px; color: #637561; }
-.pv-kcal b { color: var(--color-brand); font-size: 15px; }
-.pv-kcal span { display: block; font-size: 11px; color: var(--color-muted); }
-.pv-info .allergen-box { margin-top: 12px; }
-.option-list { display: flex; flex-wrap: wrap; gap: 8px; }
-.option-list label { border: 1px solid #d0dbcb; padding: 10px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; }
-.option-list label:has(input:checked) { border-color: #78905f; background: var(--color-soft); color: var(--color-brand); }
-.option-list label:has(input:focus-visible) { outline: 3px solid var(--color-focus); outline-offset: 2px; }
-.option-list input { accent-color: var(--color-brand); margin: 0 5px 0 0; }
-.drink-toggle { width: 100%; border: 1px dashed #b8c9ae; color: var(--color-brand); padding: 14px; border-radius: 7px; text-align: left; font-size: 12px; margin-top: 20px; }
-.drink-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
-.drink-list[hidden] { display: none; }
-.drink-list label { display: flex; align-items: center; gap: 6px; font-size: 12px; border: 1px solid var(--color-line); padding: 10px; border-radius: 6px; }
-.drink-list input { accent-color: var(--color-brand); }
-.drink-list span { margin-left: auto; }
-.dialog-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: 24px; gap: 15px; }
-.dialog-bottom > .primary { flex: 1; }
-.pv-buy { position: sticky; bottom: 0; background: var(--color-cream); padding: 16px 0; margin-top: 14px; z-index: 2; }
-.pvsec { padding-top: 56px; }
-.pvsec .section-title { margin-bottom: 22px; }
-.pvsec .section-title h2 { font-size: 26px; }
-.pv-reviews { align-items: stretch; }
-.pv-cta { margin: 26px 0 0; text-align: center; }
-.pv-cta .primary { gap: 20px; }
+.pv-wrap {
+  padding-bottom: 30px;
+}
+.pv {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 56px;
+  padding: 34px 0 20px;
+  align-items: start;
+}
+.pv-photo {
+  position: sticky;
+  top: 20px;
+  background: var(--color-pale);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.pv-photo .food-image {
+  padding: 7%;
+}
+.pv-photo .product-tag {
+  left: 18px;
+  top: 18px;
+}
+.pv-info {
+  min-width: 0;
+}
+.pv-info h1 {
+  font-size: 38px;
+  line-height: 1.35;
+  letter-spacing: -1.4px;
+  margin: 12px 0 10px;
+  color: var(--color-ink);
+  outline: 0;
+}
+.pv-rate {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: #637561;
+}
+.pv-rate b {
+  color: var(--color-brand);
+  font-size: 15px;
+}
+.pv-rate i {
+  font-style: normal;
+  margin-left: 2px;
+}
+.pv-rate:hover span {
+  text-decoration: underline;
+}
+.pv-desc {
+  font-size: 16px;
+  color: #687863;
+  line-height: 1.9;
+  margin: 16px 0 8px;
+}
+.pv-price {
+  display: block;
+  font:
+    700 28px/1.4 Georgia,
+    "Noto Sans KR",
+    serif;
+  color: var(--color-brand);
+  margin: 6px 0 18px;
+}
+.pv-meta {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 10px 14px;
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 0 0 6px;
+  padding: 16px 0;
+  border-top: 1px solid var(--color-line);
+  border-bottom: 1px solid var(--color-line);
+}
+.pv-meta dt {
+  color: var(--color-muted);
+}
+.pv-meta dd {
+  margin: 0;
+  color: var(--color-ink);
+}
+.pv-meta dd small {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+.pv-info h3 {
+  font-size: 14px;
+  margin: 24px 0 12px;
+}
+.pv-kcal {
+  margin: 20px 0 0;
+  font-size: 13px;
+  color: #637561;
+}
+.pv-kcal b {
+  color: var(--color-brand);
+  font-size: 15px;
+}
+.pv-kcal span {
+  display: block;
+  font-size: 11px;
+  color: var(--color-muted);
+}
+.pv-info .allergen-box {
+  margin-top: 12px;
+}
+.option-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.option-list label {
+  border: 1px solid #d0dbcb;
+  padding: 10px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.option-list label:has(input:checked) {
+  border-color: #78905f;
+  background: var(--color-soft);
+  color: var(--color-brand);
+}
+.option-list label:has(input:focus-visible) {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.option-list input {
+  accent-color: var(--color-brand);
+  margin: 0 5px 0 0;
+}
+.drink-toggle {
+  width: 100%;
+  border: 1px dashed #b8c9ae;
+  color: var(--color-brand);
+  padding: 14px;
+  border-radius: 7px;
+  text-align: left;
+  font-size: 12px;
+  margin-top: 20px;
+}
+.drink-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+.drink-list[hidden] {
+  display: none;
+}
+.drink-list label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  border: 1px solid var(--color-line);
+  padding: 10px;
+  border-radius: 6px;
+}
+.drink-list input {
+  accent-color: var(--color-brand);
+}
+.drink-list span {
+  margin-left: auto;
+}
+.dialog-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 24px;
+  gap: 15px;
+}
+.dialog-bottom > .primary {
+  flex: 1;
+}
+.pv-buy {
+  position: sticky;
+  bottom: 0;
+  background: var(--color-cream);
+  padding: 16px 0;
+  margin-top: 14px;
+  z-index: 2;
+}
+.pvsec {
+  padding-top: 56px;
+}
+.pvsec .section-title {
+  margin-bottom: 22px;
+}
+.pvsec .section-title h2 {
+  font-size: 26px;
+}
+.pv-reviews {
+  align-items: stretch;
+}
+.pv-cta {
+  margin: 26px 0 0;
+  text-align: center;
+}
+.pv-cta .primary {
+  gap: 20px;
+}
 
 @media (max-width: 1000px) {
-  .pv { gap: 34px; }
-  .pv-info h1 { font-size: 32px; }
+  .pv {
+    gap: 34px;
+  }
+  .pv-info h1 {
+    font-size: 32px;
+  }
 }
 @media (max-width: 700px) {
-  .pv { grid-template-columns: 1fr; gap: 22px; padding-top: 22px; }
-  .pv-photo { position: relative; top: auto; }
-  .pv-info h1 { font-size: 28px; }
-  .pv-price { font-size: 24px; }
-  .pv-buy { box-shadow: 0 -10px 14px -10px #00000018; }
+  .pv {
+    grid-template-columns: 1fr;
+    gap: 22px;
+    padding-top: 22px;
+  }
+  .pv-photo {
+    position: relative;
+    top: auto;
+  }
+  .pv-info h1 {
+    font-size: 28px;
+  }
+  .pv-price {
+    font-size: 24px;
+  }
+  .pv-buy {
+    box-shadow: 0 -10px 14px -10px #00000018;
+  }
 }
 @media (max-width: 600px) {
-  .pv-meta { grid-template-columns: 48px 1fr; }
-  .drink-list { grid-template-columns: 1fr; }
-  .dialog-bottom .primary { font-size: 11px; padding: 15px 12px; gap: 8px; }
+  .pv-meta {
+    grid-template-columns: 48px 1fr;
+  }
+  .drink-list {
+    grid-template-columns: 1fr;
+  }
+  .dialog-bottom .primary {
+    font-size: 11px;
+    padding: 15px 12px;
+    gap: 8px;
+  }
 }
 
 /* 드레싱·음료 옵션 사진 미리보기 (마우스를 쓰는 화면에서만) */
-.opt-preview { display: none; }
+.opt-preview {
+  display: none;
+}
 @media (hover: hover) and (pointer: fine) {
-  .option-list label, .drink-list label { position: relative; }
-  .opt-preview { display: block; position: absolute; left: 50%; bottom: calc(100% + 10px); z-index: 5; width: 150px; margin: 0; padding: 6px 6px 8px; background: #fff; border: 1px solid var(--color-line); border-radius: 10px; box-shadow: 0 12px 30px rgba(25, 75, 56, .18); text-align: center; pointer-events: none; opacity: 0; visibility: hidden; transform: translate(-50%, 6px); transition: opacity .18s ease, transform .18s ease, visibility 0s linear .18s; }
-  .drink-list .opt-preview { margin-left: 0; }
-  .opt-preview::after { content: ""; position: absolute; left: 50%; top: 100%; width: 10px; height: 10px; background: #fff; border-right: 1px solid var(--color-line); border-bottom: 1px solid var(--color-line); transform: translate(-50%, -5px) rotate(45deg); }
-  .opt-preview img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 6px; }
-  .opt-preview em { display: block; margin-top: 6px; font-style: normal; font-size: 12px; line-height: 1.4; color: var(--color-ink); }
-  :is(.option-list, .drink-list) label:is(:hover, :has(input:focus-visible)) .opt-preview { opacity: 1; visibility: visible; transform: translate(-50%, 0); transition: opacity .18s ease, transform .18s ease, visibility 0s; }
+  .option-list label,
+  .drink-list label {
+    position: relative;
+  }
+  .opt-preview {
+    display: block;
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 10px);
+    z-index: 5;
+    width: 150px;
+    margin: 0;
+    padding: 6px 6px 8px;
+    background: #fff;
+    border: 1px solid var(--color-line);
+    border-radius: 10px;
+    box-shadow: 0 12px 30px rgba(25, 75, 56, 0.18);
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transform: translate(-50%, 6px);
+    transition:
+      opacity 0.18s ease,
+      transform 0.18s ease,
+      visibility 0s linear 0.18s;
+  }
+  .drink-list .opt-preview {
+    margin-left: 0;
+  }
+  .opt-preview::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    width: 10px;
+    height: 10px;
+    background: #fff;
+    border-right: 1px solid var(--color-line);
+    border-bottom: 1px solid var(--color-line);
+    transform: translate(-50%, -5px) rotate(45deg);
+  }
+  .opt-preview img {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: 6px;
+  }
+  .opt-preview em {
+    display: block;
+    margin-top: 6px;
+    font-style: normal;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--color-ink);
+  }
+  :is(.option-list, .drink-list) label:is(:hover, :has(input:focus-visible)) .opt-preview {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(-50%, 0);
+    transition:
+      opacity 0.18s ease,
+      transform 0.18s ease,
+      visibility 0s;
+  }
 }

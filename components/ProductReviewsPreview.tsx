@@ -4,7 +4,7 @@ import Link from "next/link";
 import ReviewCard from "./ReviewCard";
 import { useReviewWrite } from "./ReviewWrite";
 import { useReviews } from "./ReviewsProvider";
-import { newest } from "@/lib/reviews";
+import { newest } from "@/modules/reviews/model";
 
 export default function ProductReviewsPreview({ id }: { id: number }) {
   const list = useReviews().reviewsFor(id);

@@ -1,8 +1,9 @@
 "use client";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { Ingredient } from "@/lib/data/ingredients";
-import { decisionsStore, type Decision } from "@/lib/match";
-import { useReducedMotion } from "@/lib/hooks";
+import { type Ingredient } from "@/modules/bowl/ingredient";
+import { decisionsStore } from "@/infrastructure/browser/bowl-store";
+import { type Decision } from "@/modules/bowl/model";
+import { useReducedMotion } from "@/features/shared/hooks";
 
 /** 카드를 넘길 때 옆으로 날아가는 거리(px)와 기울기(도) */
 const FLY_X = 420;
@@ -18,11 +19,7 @@ function instant(el: HTMLElement, fn: () => void) {
   el.style.transition = "";
 }
 
-export function useSwipeDeck(
-  ingredients: Ingredient[],
-  decisions: Decision[],
-  toast: (message: string) => void,
-) {
+export function useSwipeDeck(ingredients: Ingredient[], decisions: Decision[], toast: (message: string) => void) {
   const idx = decisions.length;
   const total = ingredients.length;
   const reduced = useReducedMotion();
@@ -55,7 +52,9 @@ export function useSwipeDeck(
   /** 뒤 카드(다음 재료)를 끈 거리만큼 앞으로 당겨 보여준다. */
   const reveal = (distance: number) => {
     const n = nextRef.current;
-    if (!n) return;
+    if (!n) {
+      return;
+    }
     const p = Math.min(Math.abs(distance) / 120, 1);
     n.style.transform = `translateY(${8 * (1 - p)}px) scale(${0.965 + 0.035 * p})`;
     n.style.filter = `brightness(${0.97 + 0.03 * p})`;
@@ -63,12 +62,8 @@ export function useSwipeDeck(
 
   const setStamps = (yes: number, no: number) => {
     const c = cardRef.current;
-    c?.querySelectorAll<HTMLElement>(".yes-stamp").forEach(
-      (s) => (s.style.opacity = String(yes)),
-    );
-    c?.querySelectorAll<HTMLElement>(".no-stamp").forEach(
-      (s) => (s.style.opacity = String(no)),
-    );
+    c?.querySelectorAll<HTMLElement>(".yes-stamp").forEach((s) => (s.style.opacity = String(yes)));
+    c?.querySelectorAll<HTMLElement>(".no-stamp").forEach((s) => (s.style.opacity = String(no)));
   };
 
   // 카드가 바뀌면 끌던 위치를 즉시 원래대로 돌리고, 되돌리기였다면 넘어간 쪽에서 들어오게 한다.
@@ -76,14 +71,17 @@ export function useSwipeDeck(
     const c = cardRef.current;
     const n = nextRef.current;
     pointer.current = null;
-    if (c)
+    if (c) {
       instant(c, () => {
         c.style.transform = "";
         c.style.opacity = "1";
         c.classList.remove("dragging");
       });
+    }
     setStamps(0, 0);
-    if (n) instant(n, () => reveal(0));
+    if (n) {
+      instant(n, () => reveal(0));
+    }
     const dir = enterFrom.current;
     enterFrom.current = 0;
     if (dir && c && !reduced) {
@@ -100,27 +98,31 @@ export function useSwipeDeck(
 
   const choose = (liked: boolean) => {
     const c = cardRef.current;
-    if (busyRef.current || idx >= total || !c) return;
+    if (busyRef.current || idx >= total || !c) {
+      return;
+    }
     lock(true);
     pointer.current = null;
     c.classList.remove("dragging");
     const dir = liked ? 1 : -1;
     let finished = false;
     const done = () => {
-      if (finished) return;
+      if (finished) {
+        return;
+      }
       finished = true;
       active.current = null;
       c.removeEventListener("transitionend", onEnd);
       clearTimeout(fallback);
       const now = decisionsStore.getSnapshot().slice(0, idx);
-      setDecisions([
-        ...now,
-        { index: idx, liked, ingredientId: ingredients[idx].id },
-      ]);
+      setDecisions([...now, { index: idx, liked, ingredientId: ingredients[idx].id }]);
       lock(false);
     };
+
     const onEnd = (e: TransitionEvent) => {
-      if (e.target === c && e.propertyName === "opacity") done();
+      if (e.target === c && e.propertyName === "opacity") {
+        done();
+      }
     };
     c.addEventListener("transitionend", onEnd);
     const fallback = setTimeout(done, reduced ? 0 : 380);
@@ -135,11 +137,15 @@ export function useSwipeDeck(
   };
 
   const undo = () => {
-    if (busyRef.current || !idx) return;
+    if (busyRef.current || !idx) {
+      return;
+    }
     enterFrom.current = decisions[idx - 1].liked ? 1 : -1;
     setDecisions(decisions.slice(0, -1));
     toast("이전 선택으로 돌아왔어요");
-    if (reduced) return;
+    if (reduced) {
+      return;
+    }
     lock(true);
     const timer = setTimeout(() => {
       active.current = null;
@@ -149,28 +155,28 @@ export function useSwipeDeck(
   };
 
   const restart = () => {
-    if (busyRef.current) return;
+    if (busyRef.current) {
+      return;
+    }
     setDecisions([]);
     toast("새로운 취향을 찾아보세요");
   };
 
   const removeIngredient = (id: string) => {
-    if (busyRef.current) return;
-    setDecisions(
-      decisions.map((d) =>
-        ingredients[d.index].id === id ? { ...d, liked: false } : d,
-      ),
-    );
+    if (busyRef.current) {
+      return;
+    }
+    setDecisions(decisions.map((d) => (ingredients[d.index].id === id ? { ...d, liked: false } : d)));
   };
 
   /* ---- 카드 끌기 ---- */
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (busyRef.current || idx >= total || pointer.current) return;
-    if (
-      (e.target as HTMLElement).closest("button") ||
-      (e.pointerType === "mouse" && e.button !== 0)
-    )
+    if (busyRef.current || idx >= total || pointer.current) {
       return;
+    }
+    if ((e.target as HTMLElement).closest("button") || (e.pointerType === "mouse" && e.button !== 0)) {
+      return;
+    }
     pointer.current = { id: e.pointerId, x: e.clientX, dx: 0 };
     e.currentTarget.setPointerCapture(e.pointerId);
     e.currentTarget.classList.add("dragging");
@@ -178,20 +184,21 @@ export function useSwipeDeck(
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const p = pointer.current;
-    if (busyRef.current || !p || p.id !== e.pointerId) return;
+    if (busyRef.current || !p || p.id !== e.pointerId) {
+      return;
+    }
     p.dx = e.clientX - p.x;
     const angle = Math.max(-FLY_DEG, Math.min(FLY_DEG, p.dx / 14));
     e.currentTarget.style.transform = `translateX(${p.dx}px) rotate(${angle}deg)`;
     reveal(p.dx);
-    setStamps(
-      p.dx > 0 ? Math.min(p.dx / 90, 1) : 0,
-      p.dx < 0 ? Math.min(-p.dx / 90, 1) : 0,
-    );
+    setStamps(p.dx > 0 ? Math.min(p.dx / 90, 1) : 0, p.dx < 0 ? Math.min(-p.dx / 90, 1) : 0);
   };
 
   const endDrag = (e: React.PointerEvent<HTMLDivElement>, cancel = false) => {
     const p = pointer.current;
-    if (!p || p.id !== e.pointerId) return;
+    if (!p || p.id !== e.pointerId) {
+      return;
+    }
     pointer.current = null;
     const c = e.currentTarget;
     c.classList.remove("dragging");
@@ -206,7 +213,9 @@ export function useSwipeDeck(
   };
 
   const onCardKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.target !== e.currentTarget) return;
+    if (e.target !== e.currentTarget) {
+      return;
+    }
     if (e.key === "ArrowRight") {
       e.preventDefault();
       choose(true);

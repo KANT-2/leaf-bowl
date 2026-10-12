@@ -1,4 +1,7 @@
 import type { ListQuery, NewOrder, OrderRecord, StatusUpdate } from "./types";
+import { type Catalog } from "@/modules/catalog/schema";
+import type { PricingPolicy } from "@/modules/settings/schema";
+import type { DeliveryHours } from "@/modules/delivery/hours";
 
 /** 같은 (고객 세션, 재전송 식별키) 로 이미 주문이 있을 때. DB 에서는 유일 제약 위반(P2002) 에 해당한다. */
 export class DuplicateRequestError extends Error {
@@ -8,12 +11,18 @@ export class DuplicateRequestError extends Error {
   }
 }
 
-/**
- * 저장소 계약. 지금은 memory-repository.ts 가 구현하고,
- * DB 가 준비되면 같은 계약을 Prisma 로 구현해 container.ts 에서 바꿔 끼운다.
- * create 는 주문·항목·접수 이력을 한 번에(한 트랜잭션처럼) 저장해야 한다.
- */
+export interface OrdersTransaction {
+  findByRequest(customerSessionId: string, requestKey: string): Promise<OrderRecord | null>;
+  /** Catalog prices cannot change until this transaction commits. */
+  getCatalog(): Promise<Catalog>;
+  getPricingPolicy(): Promise<PricingPolicy>;
+  getDeliveryHours(): Promise<DeliveryHours>;
+  create(order: NewOrder): Promise<OrderRecord>;
+}
+
+/** PostgreSQL in the app; the memory adapter is retained for isolated unit tests. */
 export interface OrdersRepository {
+  transaction<T>(work: (tx: OrdersTransaction) => Promise<T>): Promise<T>;
   findByRequest(customerSessionId: string, requestKey: string): Promise<OrderRecord | null>;
   findById(id: string): Promise<OrderRecord | null>;
   /** @throws DuplicateRequestError */

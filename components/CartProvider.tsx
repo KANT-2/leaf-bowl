@@ -2,10 +2,10 @@
 
 import { createContext, useCallback, useContext, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useCustomerCatalog } from "./CustomerCatalogProvider";
-import { dressingKey, drinkKey } from "@/lib/cart-identifiers";
-import { createLocalStore } from "@/lib/local-store";
-import { isCustom, isDrink, itemKey, withChoice } from "@/lib/cart";
-import { CART_KEY, loadCart, saveCart, type CartItem, type CustomItem, type MenuItem } from "@/lib/storage";
+import { createLocalStore } from "@/infrastructure/browser/local-store";
+import { addCartItem, changeCartChoice, addCartVariant, updateCartQuantity } from "@/modules/cart/operations";
+import { CART_KEY, loadCart, saveCart } from "@/infrastructure/browser/cart-storage";
+import { type CartItem, type CustomItem, type MenuItem } from "@/modules/cart/types";
 
 const EMPTY: CartItem[] = [];
 const store = createLocalStore<CartItem[]>(CART_KEY, loadCart, saveCart, EMPTY);
@@ -40,12 +40,11 @@ const CartContext = createContext<CartContextValue | null>(null);
 
 export function useCart(): CartContextValue {
   const ctx = useContext(CartContext);
-  if (!ctx) throw new Error("useCart must be used inside <CartProvider>");
+  if (!ctx) {
+    throw new Error("useCart must be used inside <CartProvider>");
+  }
   return ctx;
 }
-
-const clampQty = (n: number) => Math.max(1, Math.min(99, n));
-
 
 export default function CartProvider({ children }: { children: React.ReactNode }) {
   const { DRESSINGS, DRINKS } = useCustomerCatalog();
@@ -54,62 +53,65 @@ export default function CartProvider({ children }: { children: React.ReactNode }
   const [openedAt, setOpenedAt] = useState<number | null>(null);
   const opener = useRef<HTMLElement | null>(null);
 
-  const add = useCallback((item: MenuItem) => {
-    const drinks = [...item.drinks].sort((a, b) => a - b);
-    const identified = { ...item, drinks, dressingKey: item.dressingKey ?? DRESSINGS[item.dressing]?.id, drinkKeys: item.drinkKeys ?? drinks.map((n) => DRINKS[n]?.id ?? `missing-drink-${n}`) };
-    const list = store.getSnapshot();
-    const at = list.findIndex((i) => itemKey(i) === itemKey(identified));
-    if (at >= 0) store.set(list.map((i, n) => (n === at ? { ...i, qty: clampQty(i.qty + item.qty) } : i)));
-    else store.set([...list, { ...identified, qty: clampQty(item.qty) }]);
-  }, [DRESSINGS, DRINKS]);
+  const add = useCallback(
+    (item: MenuItem) => {
+      const drinks = [...item.drinks].sort((a, b) => a - b);
+      const identified = {
+        ...item,
+        drinks,
+        dressingKey: item.dressingKey ?? DRESSINGS[item.dressing]?.id,
+        drinkKeys: item.drinkKeys ?? drinks.map((n) => DRINKS[n]?.id ?? `missing-drink-${n}`),
+      };
+      store.set(addCartItem(store.getSnapshot(), identified));
+    },
+    [DRESSINGS, DRINKS],
+  );
 
-  const addCustom = useCallback((item: Omit<CustomItem, "kind" | "qty">) => {
-    const list = store.getSnapshot();
-    const identified = { ...item, dressingKey: item.dressingKey ?? DRESSINGS[item.dressing]?.id };
-    const at = list.findIndex((i) => isCustom(i) && i.name === item.name && dressingKey(i) === dressingKey(identified) && i.ingredients.join("|") === item.ingredients.join("|"));
-    if (at >= 0) store.set(list.map((i, n) => (n === at ? { ...i, qty: clampQty(i.qty + 1) } : i)));
-    else store.set([...list, { kind: "custom", ...identified, ingredients: [...item.ingredients], allergens: [...item.allergens], qty: 1 }]);
-  }, [DRESSINGS]);
+  const addCustom = useCallback(
+    (item: Omit<CustomItem, "kind" | "qty">) => {
+      const identified: CustomItem = {
+        ...item,
+        kind: "custom",
+        qty: 1,
+        dressingKey: item.dressingKey ?? DRESSINGS[item.dressing]?.id,
+      };
+      store.set(addCartItem(store.getSnapshot(), identified));
+    },
+    [DRESSINGS],
+  );
 
-  const addDrink = useCallback((drink: number) => {
-    const list = store.getSnapshot();
-    const key = DRINKS[drink]?.id;
-    if (!key || !DRINKS[drink].available) return;
-    const at = list.findIndex((i) => isDrink(i) && drinkKey(i) === key);
-    if (at >= 0) store.set(list.map((i, n) => (n === at ? { ...i, qty: clampQty(i.qty + 1) } : i)));
-    else store.set([...list, { kind: "drink", drink, drinkKey: key, qty: 1 }]);
-  }, [DRINKS]);
+  const addDrink = useCallback(
+    (drink: number) => {
+      const selected = DRINKS[drink];
+      if (!selected?.available) {
+        return;
+      }
+      store.set(
+        addCartItem(store.getSnapshot(), {
+          kind: "drink",
+          drink,
+          drinkKey: selected.id,
+          qty: 1,
+        }),
+      );
+    },
+    [DRINKS],
+  );
 
   const changeChoice = useCallback((index: number, groupId: string | null, value: string) => {
-    const list = store.getSnapshot();
-    const cur = list[index];
-    if (!cur || isDrink(cur)) return false;
-    const next = withChoice(cur, groupId, value);
-    const same = list.findIndex((i, n) => n !== index && itemKey(i) === itemKey(next));
-    if (same < 0) {
-      store.set(list.map((i, n) => (n === index ? next : i)));
-      return false;
-    }
-    store.set(list.flatMap((i, n) => (n === index ? [] : n === same ? [{ ...i, qty: clampQty(i.qty + cur.qty) }] : [i])));
-    return true;
+    const result = changeCartChoice(store.getSnapshot(), index, groupId, value);
+    store.set(result.items);
+    return result.merged;
   }, []);
 
   const addVariant = useCallback((index: number, groupId: string | null, value: string) => {
-    const list = store.getSnapshot();
-    const cur = list[index];
-    if (!cur || isDrink(cur)) return -1;
-    const next = { ...withChoice(cur, groupId, value), qty: 1 };
-    const same = list.findIndex((i) => itemKey(i) === itemKey(next));
-    if (same >= 0) {
-      store.set(list.map((i, n) => (n === same ? { ...i, qty: clampQty(i.qty + 1) } : i)));
-      return same;
-    }
-    store.set([...list.slice(0, index + 1), next, ...list.slice(index + 1)]);
-    return index + 1;
+    const result = addCartVariant(store.getSnapshot(), index, groupId, value);
+    store.set(result.items);
+    return result.index;
   }, []);
 
   const update = useCallback((index: number, qty: number) => {
-    store.set(store.getSnapshot().map((i, n) => (n === index ? { ...i, qty: clampQty(qty) } : i)));
+    store.set(updateCartQuantity(store.getSnapshot(), index, qty));
   }, []);
 
   const remove = useCallback((index: number) => {
@@ -128,14 +130,46 @@ export default function CartProvider({ children }: { children: React.ReactNode }
     setIsOpen(false);
     const el = opener.current;
     opener.current = null;
-    if (returnFocus && el && el.isConnected) el.focus({ preventScroll: true });
+    if (returnFocus && el && el.isConnected) {
+      el.focus({ preventScroll: true });
+    }
   }, []);
 
   const count = items.reduce((n, i) => n + i.qty, 0);
 
   const value = useMemo(
-    () => ({ items, count, add, addCustom, addDrink, update, changeChoice, addVariant, remove, clear, isOpen, openedAt, open, close }),
-    [items, count, add, addCustom, addDrink, update, changeChoice, addVariant, remove, clear, isOpen, openedAt, open, close],
+    () => ({
+      items,
+      count,
+      add,
+      addCustom,
+      addDrink,
+      update,
+      changeChoice,
+      addVariant,
+      remove,
+      clear,
+      isOpen,
+      openedAt,
+      open,
+      close,
+    }),
+    [
+      items,
+      count,
+      add,
+      addCustom,
+      addDrink,
+      update,
+      changeChoice,
+      addVariant,
+      remove,
+      clear,
+      isOpen,
+      openedAt,
+      open,
+      close,
+    ],
   );
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

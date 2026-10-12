@@ -18,7 +18,9 @@ export default function PageHeading({ children }: { children: React.ReactNode })
       }, 0);
       return () => clearTimeout(t);
     }
-    if (location.hash !== "#write") ref.current?.focus({ preventScroll: true });
+    if (location.hash !== "#write") {
+      ref.current?.focus({ preventScroll: true });
+    }
   }, []);
   return (
     <h1 ref={ref} tabIndex={-1}>

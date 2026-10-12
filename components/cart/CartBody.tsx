@@ -1,18 +1,10 @@
 "use client";
-import { isDrink, itemKey, withChoice } from "@/lib/cart";
-import { drinkKey } from "@/lib/cart-identifiers";
-import type { DeliveryHours } from "@/lib/data/delivery";
-import {
-  dateValue,
-  isAtLeast30MinAhead,
-  timeOptions,
-} from "@/lib/delivery-slots";
-import {
-  FREE_DELIVERY_FROM,
-  MIN_DELIVERY_ORDER,
-  deliveryFee,
-  money,
-} from "@/lib/products";
+import { hasCustomIngredientIds, isCustom, isDrink, itemKey, withChoice } from "@/modules/cart/identity";
+import { drinkKey } from "@/modules/cart/identifiers";
+import { deliveryWindowUTC } from "@/modules/delivery/time";
+import { type DeliveryHours } from "@/modules/delivery/hours";
+import { dateValue, isAtLeast30MinAhead, timeOptions } from "@/modules/delivery/slots";
+import { money } from "@/modules/shared/format";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -21,7 +13,7 @@ import { useCart } from "../CartProvider";
 import { useCustomerCatalog } from "../CustomerCatalogProvider";
 import { useToast } from "../ToastProvider";
 
-import { type ChoiceSlot } from "@/lib/customer/cart-choice";
+import { type ChoiceSlot } from "@/features/cart/choice";
 import CartLine from "./CartLine";
 interface BodyProps {
   openedAt: number;
@@ -31,9 +23,13 @@ interface BodyProps {
 
 export default function CartBody({ openedAt, hours, closeBtn }: BodyProps) {
   const cat = useCustomerCatalog();
+  const { deliveryFee } = cat;
+  const MIN_DELIVERY_ORDER = cat.pricingPolicy.minDeliveryOrder;
+  const FREE_DELIVERY_FROM = cat.pricingPolicy.freeDeliveryFrom;
   const router = useRouter();
   const { itemUnitPrice, itemAvailable, DRINKS } = cat;
   const { items, count, close, addDrink, addVariant } = useCart();
+  const needsIngredients = items.some((i) => isCustom(i) && !hasCustomIngredientIds(i));
   const toast = useToast();
   // "다른 드레싱으로"를 누른 뒤 새 줄의 선택 칸으로 포커스를 옮기기 위한 위치
   const focusLine = useRef<number | null>(null);
@@ -42,15 +38,9 @@ export default function CartBody({ openedAt, hours, closeBtn }: BodyProps) {
   const addOther = (index: number, slot: ChoiceSlot) => {
     const cur = items[index];
     const taken = new Set(items.map(itemKey));
-    const pick = slot.choices.find(
-      (c) =>
-        c.available &&
-        !taken.has(itemKey(withChoice(cur, slot.groupId, c.value))),
-    );
+    const pick = slot.choices.find((c) => c.available && !taken.has(itemKey(withChoice(cur, slot.groupId, c.value))));
     if (!pick) {
-      toast(
-        `고를 수 있는 ${slot.label}이(가) 모두 담겨 있어요. 수량을 늘려주세요`,
-      );
+      toast(`고를 수 있는 ${slot.label}이(가) 모두 담겨 있어요. 수량을 늘려주세요`);
       return;
     }
     focusLine.current = addVariant(index, slot.groupId, pick.value);
@@ -58,7 +48,9 @@ export default function CartBody({ openedAt, hours, closeBtn }: BodyProps) {
 
   useEffect(() => {
     const at = focusLine.current;
-    if (at === null) return;
+    if (at === null) {
+      return;
+    }
     focusLine.current = null;
     document.getElementById(`choice-${at}`)?.focus();
   }, [items]);
@@ -78,8 +70,7 @@ export default function CartBody({ openedAt, hours, closeBtn }: BodyProps) {
   // 날짜·시간대는 드로어를 연 시각 기준으로 계산하고, 고른 값이 범위를 벗어나면 기본값으로 돌린다.
   const minDate = dateValue(openedAt, 0);
   const maxDate = dateValue(openedAt, 14);
-  const day =
-    date >= minDate && date <= maxDate ? date : dateValue(openedAt, 1);
+  const day = date >= minDate && date <= maxDate ? date : dateValue(openedAt, 1);
   const options = timeOptions(day, openedAt, hours);
   const slot = options.find((o) => o.value === time) ?? options[0];
 
@@ -96,10 +87,14 @@ export default function CartBody({ openedAt, hours, closeBtn }: BodyProps) {
   const submit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (unavailable) {
-      toast("품절되거나 삭제된 메뉴·옵션을 제거해주세요.");
+      toast(
+        needsIngredients ? "저장한 조합의 재료를 다시 선택해주세요." : "품절되거나 삭제된 메뉴·옵션을 제거해주세요.",
+      );
       return;
     }
-    if (!items.length || deliveryIssue) return;
+    if (!items.length || deliveryIssue) {
+      return;
+    }
     if (!slot) {
       toast("받을 시간대를 선택해주세요");
       return;
@@ -108,9 +103,12 @@ export default function CartBody({ openedAt, hours, closeBtn }: BodyProps) {
       toast("현재 시간 이후의 시간대를 선택해주세요");
       return;
     }
-    router.push(
-      `/checkout?${new URLSearchParams({ address, day, time: slot.label }).toString()}`,
-    );
+    const delivery = deliveryWindowUTC(day, slot.label);
+    if (!delivery) {
+      toast("받을 시간대를 다시 선택해주세요");
+      return;
+    }
+    router.push(`/checkout?${new URLSearchParams({ address, ...delivery }).toString()}`);
     close(false);
   };
 
@@ -118,13 +116,7 @@ export default function CartBody({ openedAt, hours, closeBtn }: BodyProps) {
     <>
       <div className="dialog-top">
         <span className="eyebrow">YOUR FRESH PICKS</span>
-        <button
-          ref={closeBtn}
-          type="button"
-          className="close"
-          aria-label="닫기"
-          onClick={() => close()}
-        >
+        <button ref={closeBtn} type="button" className="close" aria-label="닫기" onClick={() => close()}>
           ×
         </button>
       </div>
@@ -134,23 +126,16 @@ export default function CartBody({ openedAt, hours, closeBtn }: BodyProps) {
       {items.length ? (
         <div>
           {items.map((i, n) => (
-            <CartLine
-              key={itemKey(i)}
-              item={i}
-              index={n}
-              cat={cat}
-              closeBtn={closeBtn}
-              onOther={addOther}
-            />
+            <CartLine key={itemKey(i)} item={i} index={n} cat={cat} closeBtn={closeBtn} onOther={addOther} />
           ))}
           <section className="cart-drinks" aria-labelledby="cartDrinksTitle">
             <h3 id="cartDrinksTitle">함께 마시기</h3>
             <div className="cart-drink-list">
               {DRINKS.map((d, n) => {
-                if (!d.name) return null;
-                const inCart =
-                  items.find((i) => isDrink(i) && drinkKey(i) === d.id)?.qty ??
-                  0;
+                if (!d.name) {
+                  return null;
+                }
+                const inCart = items.find((i) => isDrink(i) && drinkKey(i) === d.id)?.qty ?? 0;
                 return (
                   <button
                     key={d.id}
@@ -200,8 +185,7 @@ export default function CartBody({ openedAt, hours, closeBtn }: BodyProps) {
             onChange={(e) => setAddress(e.target.value)}
           />
           <small className="field-hint">
-            최소 주문 {money(MIN_DELIVERY_ORDER)} · {money(FREE_DELIVERY_FROM)}{" "}
-            이상 무료배달
+            최소 주문 {money(MIN_DELIVERY_ORDER)} · {money(FREE_DELIVERY_FROM)} 이상 무료배달
           </small>
         </label>
         <div className="two-fields">
@@ -218,11 +202,7 @@ export default function CartBody({ openedAt, hours, closeBtn }: BodyProps) {
           </label>
           <label className="field">
             <span>시간대</span>
-            <select
-              required
-              value={slot?.value ?? ""}
-              onChange={(e) => setTime(e.target.value)}
-            >
+            <select required value={slot?.value ?? ""} onChange={(e) => setTime(e.target.value)}>
               {options.length ? (
                 options.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -230,9 +210,7 @@ export default function CartBody({ openedAt, hours, closeBtn }: BodyProps) {
                   </option>
                 ))
               ) : (
-                <option value="">
-                  오늘은 마감되었어요. 다른 날짜를 선택해주세요.
-                </option>
+                <option value="">오늘은 마감되었어요. 다른 날짜를 선택해주세요.</option>
               )}
             </select>
           </label>
@@ -247,9 +225,7 @@ export default function CartBody({ openedAt, hours, closeBtn }: BodyProps) {
             <span>{fee === 0 && items.length ? "무료" : money(fee)}</span>
           </div>
           {items.length > 0 && fee > 0 && (
-            <p className="free-hint">
-              {money(FREE_DELIVERY_FROM - subtotal)} 더 담으면 무료배달이에요.
-            </p>
+            <p className="free-hint">{money(FREE_DELIVERY_FROM - subtotal)} 더 담으면 무료배달이에요.</p>
           )}
           <div className="total">
             <span>합계</span>
@@ -257,15 +233,10 @@ export default function CartBody({ openedAt, hours, closeBtn }: BodyProps) {
           </div>
         </div>
         <label className="check-label">
-          <input
-            type="checkbox"
-            required
-            checked={ack}
-            onChange={(e) => setAck(e.target.checked)}
-          />
+          <input type="checkbox" required checked={ack} onChange={(e) => setAck(e.target.checked)} />
           <span>
-            메뉴와 선택한 드레싱의 알레르기 정보를 확인했어요. 공용 조리
-            공간에서 교차 접촉이 발생할 수 있음을 이해했어요.
+            메뉴와 선택한 드레싱의 알레르기 정보를 확인했어요. 공용 조리 공간에서 교차 접촉이 발생할 수 있음을
+            이해했어요.
           </span>
         </label>
         {deliveryIssue && (
@@ -275,15 +246,12 @@ export default function CartBody({ openedAt, hours, closeBtn }: BodyProps) {
         )}
         {unavailable && (
           <p className="order-issue" role="status">
-            품절되거나 제공이 종료된 메뉴·옵션이 있습니다. 해당 항목을
-            제거하거나 다시 선택해주세요.
+            {needsIngredients
+              ? "저장한 조합의 재료를 다시 선택해주세요."
+              : "품절되거나 제공이 종료된 메뉴·옵션이 있습니다. 해당 항목을 제거하거나 다시 선택해주세요."}
           </p>
         )}
-        <button
-          className="primary full"
-          type="submit"
-          disabled={!items.length || !!deliveryIssue || unavailable}
-        >
+        <button className="primary full" type="submit" disabled={!items.length || !!deliveryIssue || unavailable}>
           결제하러 가기 →
         </button>
       </form>

@@ -2,12 +2,12 @@
 import Link from "next/link";
 import FoodImage from "./FoodImage";
 import ReviewPhotos from "./ReviewPhotos";
-import {useCustomerCatalog} from "./CustomerCatalogProvider";
-import { dateStr, type Review } from "@/lib/reviews";
+import { useCustomerCatalog } from "./CustomerCatalogProvider";
+import { reviewDisplayDate, type Review } from "@/modules/reviews/model";
 
 /** 리뷰 목록의 한 줄. showMenu 가 true 면(전체 리뷰) 어떤 메뉴의 리뷰인지 사진과 이름을 붙인다. */
 export default function ReviewItem({ review: r, showMenu }: { review: Review; showMenu: boolean }) {
-  const {getProduct}=useCustomerCatalog();
+  const { getProduct } = useCustomerCatalog();
   const p = getProduct(r.pid);
   return (
     <li className={`rv-item${r.mine ? " is-mine" : ""}`}>
@@ -18,7 +18,7 @@ export default function ReviewItem({ review: r, showMenu }: { review: Review; sh
             {"★".repeat(5 - r.stars)}
           </span>
         </span>
-        <time className="rv-date">{r.date || dateStr(r.t)}</time>
+        <time className="rv-date">{reviewDisplayDate(r)}</time>
       </div>
       <h3>{r.title}</h3>
       <p>{r.text}</p>

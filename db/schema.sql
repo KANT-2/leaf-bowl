@@ -1,5 +1,10 @@
+-- leaf & bowl 최신 전체 스키마. 신규 DB에서 직접 SQL 초기화할 때 사용한다.
+-- Prisma 관리 DB는 npm run db:migrate를 사용한다.
+-- psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f db/schema.sql
+BEGIN;
+-- 0001_baseline
 -- leaf & bowl DB 스키마 (PostgreSQL)
--- 관리자 카탈로그(lib/admin/catalog.ts 의 catalogSchema)를 그대로 옮긴 구조.
+-- 관리자 카탈로그(modules/catalog/schema.ts 의 catalogSchema)를 그대로 옮긴 구조.
 -- 지금 .data/admin/catalog.json 한 파일에 저장하는 내용을 테이블로 나눈다.
 -- 실행 순서: schema.sql → seed.sql
 -- 재료와 재료 기준 자동 품절은 맨 아래 '재료' 절에 있다.
@@ -277,8 +282,8 @@ CREATE TABLE orders (
   phone               VARCHAR(30)  NOT NULL,
   address             VARCHAR(300) NOT NULL,
   address_detail      VARCHAR(200) NOT NULL DEFAULT '',
-  desired_date        DATE         NOT NULL,            -- 받을 날짜
-  desired_slot        VARCHAR(30)  NOT NULL,            -- 받을 시간대 표시 (예: 10:00–11:00)
+  desired_start_at    TIMESTAMPTZ  NOT NULL,            -- UTC 배송 시작 시각. 화면은 KST로 표시
+  desired_end_at      TIMESTAMPTZ  NOT NULL,            -- UTC 배송 종료 시각
   subtotal            BIGINT       NOT NULL CHECK (subtotal >= 0),
   delivery_fee        BIGINT       NOT NULL CHECK (delivery_fee >= 0),
   total               BIGINT       NOT NULL,
@@ -289,6 +294,7 @@ CREATE TABLE orders (
   created_at          TIMESTAMPTZ  NOT NULL DEFAULT now(),
   updated_at          TIMESTAMPTZ  NOT NULL DEFAULT now(),
   CONSTRAINT chk_order_total   CHECK (total = subtotal + delivery_fee),
+  CONSTRAINT chk_order_window  CHECK (desired_end_at = desired_start_at + INTERVAL '1 hour'),
   CONSTRAINT chk_order_cancel  CHECK ((status = 'canceled') = (canceled_at IS NOT NULL)),
   -- 같은 방문자가 같은 키로 다시 보내도 주문은 한 건
   CONSTRAINT uq_order_request  UNIQUE (customer_session_id, request_key)
@@ -341,3 +347,45 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_order_status_transition
   BEFORE UPDATE OF status ON orders
   FOR EACH ROW EXECUTE FUNCTION enforce_order_status_transition();
+
+-- 0002_catalog_persistence
+ALTER TABLE catalog_meta ADD COLUMN next_customer_id INTEGER NOT NULL DEFAULT 12 CHECK (next_customer_id >= 12);
+ALTER TABLE catalog_meta ADD COLUMN has_season_pages BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE products ADD COLUMN allergens_text VARCHAR(400) NOT NULL DEFAULT '';
+ALTER TABLE products ADD COLUMN is_new BOOLEAN;
+ALTER TABLE ingredients ADD COLUMN allergens_text VARCHAR(400) NOT NULL DEFAULT '';
+ALTER TABLE ingredients ADD COLUMN origin VARCHAR(100);
+ALTER TABLE ingredients ADD COLUMN origin_detail VARCHAR(300);
+ALTER TABLE reviews ADD COLUMN via VARCHAR(10) CHECK (via IN ('pickup', 'delivery'));
+ALTER TABLE reviews ADD COLUMN original_product_id VARCHAR(80);
+
+CREATE TABLE deleted_review_ids (
+  id VARCHAR(80) PRIMARY KEY,
+  deleted_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE catalog_imports (
+  checksum VARCHAR(64) PRIMARY KEY,
+  imported_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Stable option/item order and sales reporting after restart.
+ALTER TABLE order_items ADD COLUMN position INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE order_items ADD COLUMN product_type VARCHAR(10) CHECK (product_type IN ('salad', 'drink', 'custom'));
+CREATE INDEX idx_orders_completed ON orders (updated_at DESC) WHERE status = 'completed';
+
+-- 0003_allergen_text
+-- The catalog accepts up to 400 characters of allergen text.
+ALTER TABLE allergens ALTER COLUMN name TYPE VARCHAR(400);
+
+-- Keep the ordered identifier after the catalog FK is set to NULL.
+ALTER TABLE order_items ADD COLUMN original_product_id VARCHAR(80);
+UPDATE order_items SET original_product_id = product_id;
+
+-- 0004_app_settings
+-- 기본 데이터 중 배너·운영시간·영양정보·가격 정책은 SQL로 초기화한다.
+CREATE TABLE app_settings (
+  key VARCHAR(80) PRIMARY KEY CHECK (key ~ '^[a-z_]+$'),
+  value JSONB NOT NULL CHECK (jsonb_typeof(value) IN ('object', 'array')),
+  updated_at TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+COMMIT;

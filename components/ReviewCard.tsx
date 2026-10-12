@@ -2,7 +2,7 @@
 
 import { useCustomerCatalog } from "./CustomerCatalogProvider";
 import ReviewPhotos from "./ReviewPhotos";
-import { dateStr, type Review } from "@/lib/reviews";
+import { reviewDisplayDate, type Review } from "@/modules/reviews/model";
 
 export default function ReviewCard({ review: r }: { review: Review }) {
   const { PRODUCTS } = useCustomerCatalog();
@@ -22,9 +22,7 @@ export default function ReviewCard({ review: r }: { review: Review }) {
       <h3>{r.title}</h3>
       <p>{r.text}</p>
       <ReviewPhotos photos={r.images} label={`${r.title} 리뷰 사진`} size={72} />
-      <span className="review-menu">
-        {PRODUCTS[r.pid]?.name ?? "삭제된 메뉴"}
-      </span>
+      <span className="review-menu">{PRODUCTS[r.pid]?.name ?? "삭제된 메뉴"}</span>
       <div className="review-author">
         <span className="review-avatar" aria-hidden="true">
           {[...r.author][0] || "익"}
@@ -32,7 +30,7 @@ export default function ReviewCard({ review: r }: { review: Review }) {
         <span>
           {r.author}
           <small>
-            {r.date || dateStr(r.t)} · {r.mine ? "내가 작성" : r.sample ? "예시 리뷰" : "고객 리뷰"}
+            {reviewDisplayDate(r)} · {r.mine ? "내가 작성" : r.sample ? "예시 리뷰" : "고객 리뷰"}
           </small>
         </span>
       </div>

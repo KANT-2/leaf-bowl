@@ -1,5 +1,5 @@
 "use client";
-import {useCustomerCatalog} from "./CustomerCatalogProvider";
+import { useCustomerCatalog } from "./CustomerCatalogProvider";
 import Link from "next/link";
 import Breadcrumb from "@/components/Breadcrumb";
 import FoodImage from "@/components/FoodImage";
@@ -9,14 +9,21 @@ import ProductDetail from "@/components/ProductDetail";
 import SoldOutCover from "@/components/SoldOutCover";
 import ProductRating from "@/components/ProductRating";
 import ProductReviewsPreview from "@/components/ProductReviewsPreview";
-import { formatDeliveryHours, type DeliveryHours } from "@/lib/data/delivery";
-import { DELIVERY_FEE, FREE_DELIVERY_FROM, money } from "@/lib/products";
+import { formatDeliveryHours, type DeliveryHours } from "@/modules/delivery/hours";
+import { money } from "@/modules/shared/format";
 
-export default function CustomerProductPage({id,hours}:{id:number;hours:DeliveryHours}) {
-  const {getProduct,visibleProducts:PRODUCTS,NUTRITION}=useCustomerCatalog();
-  const p=getProduct(id);
-  if(!p)return <main className="wrap"><p>이 메뉴는 현재 제공되지 않습니다.</p><Link href="/menu">전체 메뉴 보기</Link></main>;
-  const others=PRODUCTS.filter(o=>o.id!==p.id).slice(0,4);
+export default function CustomerProductPage({ id, hours }: { id: number; hours: DeliveryHours }) {
+  const { getProduct, visibleProducts: PRODUCTS, NUTRITION, pricingPolicy } = useCustomerCatalog();
+  const p = getProduct(id);
+  if (!p) {
+    return (
+      <main className="wrap">
+        <p>이 메뉴는 현재 제공되지 않습니다.</p>
+        <Link href="/menu">전체 메뉴 보기</Link>
+      </main>
+    );
+  }
+  const others = PRODUCTS.filter((o) => o.id !== p.id).slice(0, 4);
   return (
     <main className="wrap pv-wrap">
       <Breadcrumb items={[["홈", "/"], ["메뉴", "/menu"], [p.name]]} />
@@ -37,12 +44,17 @@ export default function CustomerProductPage({id,hours}:{id:number;hours:Delivery
             <dd>{p.ingredients}</dd>
             <dt>영양</dt>
             <dd>
-              {NUTRITION[p.id].kcal}kcal · 단백질 {NUTRITION[p.id].protein}g · {NUTRITION[p.id].weight}g
-              <small>체험용 예시 값 · 샐러드만 기준(드레싱{p.name.includes("세트") ? "·세트 음료" : ""} 제외)</small>
+              {NUTRITION[p.id]
+                ? `${NUTRITION[p.id]!.kcal}kcal · 단백질 ${NUTRITION[p.id]!.protein}g · ${NUTRITION[p.id]!.weight}g`
+                : "영양 정보 준비 중"}
+              <small>
+                체험용 예시 값 · 샐러드만 기준(드레싱
+                {p.name.includes("세트") ? "·세트 음료" : ""} 제외)
+              </small>
             </dd>
             <dt>배달</dt>
             <dd>
-              예약 배달 {money(DELIVERY_FEE)} ({money(FREE_DELIVERY_FROM)} 이상 무료)
+              예약 배달 {money(pricingPolicy.deliveryFee)} ({money(pricingPolicy.freeDeliveryFrom)} 이상 무료)
               <small>{formatDeliveryHours(hours)}</small>
             </dd>
           </dl>

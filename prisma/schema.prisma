@@ -1,0 +1,383 @@
+generator client {
+  provider        = "prisma-client"
+  output          = "../generated/prisma"
+  previewFeatures = ["partialIndexes"]
+  moduleFormat    = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model AppSetting {
+  key       String   @id @db.VarChar(80)
+  value     Json
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("app_settings")
+}
+
+model AdminUser {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  loginId            String               @unique @map("login_id") @db.VarChar(50)
+  passwordHash       String               @map("password_hash") @db.VarChar(255)
+  disabled           Boolean              @default(false)
+  createdAt          DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  orderStatusHistory OrderStatusHistory[]
+  sessions           Session[]
+
+  @@map("admin_users")
+}
+
+model Allergen {
+  id                  Int                  @id @default(autoincrement())
+  name                String               @unique @db.VarChar(400)
+  ingredientAllergens IngredientAllergen[]
+  productAllergens    ProductAllergen[]
+
+  @@map("allergens")
+}
+
+model CatalogImport {
+  checksum   String   @id @db.VarChar(64)
+  importedAt DateTime @default(now()) @map("imported_at") @db.Timestamptz(6)
+
+  @@map("catalog_imports")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model CatalogMeta {
+  id             Int      @id @default(1) @db.SmallInt
+  revision       Int
+  updatedAt      DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  nextCustomerId Int      @default(12) @map("next_customer_id")
+  hasSeasonPages Boolean  @default(false) @map("has_season_pages")
+
+  @@map("catalog_meta")
+}
+
+model Category {
+  name      String @id @db.VarChar(80)
+  sortOrder Int    @map("sort_order")
+
+  @@map("categories")
+}
+
+model DeletedReviewId {
+  id        String   @id @db.VarChar(80)
+  deletedAt DateTime @default(now()) @map("deleted_at") @db.Timestamptz(6)
+
+  @@map("deleted_review_ids")
+}
+
+model IngredientAllergen {
+  ingredientId String     @map("ingredient_id") @db.VarChar(80)
+  allergenId   Int        @map("allergen_id")
+  position     Int        @db.SmallInt
+  allergen     Allergen   @relation(fields: [allergenId], references: [id], onUpdate: NoAction)
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([ingredientId, allergenId])
+  @@map("ingredient_allergens")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model Ingredient {
+  id                  String               @id @db.VarChar(80)
+  name                String               @db.VarChar(80)
+  nameEn              String?              @map("name_en") @db.VarChar(100)
+  price               Int?
+  stage               String?              @db.VarChar(10)
+  color               String?              @db.VarChar(40)
+  description         String               @default("") @db.VarChar(600)
+  image               String               @default("") @db.VarChar(200)
+  category            String               @db.VarChar(80)
+  status              String               @default("active") @db.VarChar(10)
+  deleted             Boolean              @default(false)
+  inBowlMatch         Boolean              @default(true) @map("in_bowl_match")
+  sortOrder           Int                  @map("sort_order")
+  allergensText       String               @default("") @map("allergens_text") @db.VarChar(400)
+  origin              String?              @db.VarChar(100)
+  originDetail        String?              @map("origin_detail") @db.VarChar(300)
+  ingredientAllergens IngredientAllergen[]
+  productIngredients  ProductIngredient[]
+
+  @@map("ingredients")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model OptionChoice {
+  groupId   String      @map("group_id") @db.VarChar(80)
+  id        String      @db.VarChar(80)
+  name      String      @db.VarChar(80)
+  price     Int
+  sortOrder Int         @map("sort_order")
+  group     OptionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([groupId, id])
+  @@map("option_choices")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model OptionGroup {
+  id                  String               @id @db.VarChar(80)
+  name                String               @db.VarChar(80)
+  required            Boolean
+  multiple            Boolean
+  source              String               @db.VarChar(10)
+  deleted             Boolean              @default(false)
+  sortOrder           Int                  @map("sort_order")
+  choices             OptionChoice[]
+  productOptionGroups ProductOptionGroup[]
+
+  @@map("option_groups")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model OrderItem {
+  id                BigInt   @id @default(autoincrement())
+  orderId           String   @map("order_id") @db.Uuid
+  productId         String?  @map("product_id") @db.VarChar(80)
+  name              String   @db.VarChar(80)
+  options           Json     @default("{}")
+  unitPrice         BigInt   @map("unit_price")
+  quantity          Int
+  position          Int      @default(0)
+  productType       String?  @map("product_type") @db.VarChar(10)
+  originalProductId String?  @map("original_product_id") @db.VarChar(80)
+  order             Order    @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  product           Product? @relation(fields: [productId], references: [id], onUpdate: NoAction)
+
+  @@index([orderId], map: "idx_order_items_order")
+  @@map("order_items")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model OrderStatusHistory {
+  id          BigInt     @id @default(autoincrement())
+  orderId     String     @map("order_id") @db.Uuid
+  fromStatus  String?    @map("from_status") @db.VarChar(10)
+  toStatus    String     @map("to_status") @db.VarChar(10)
+  changedBy   String     @map("changed_by") @db.VarChar(10)
+  adminUserId String?    @map("admin_user_id") @db.Uuid
+  reason      String?    @db.VarChar(200)
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  admin       AdminUser? @relation(fields: [adminUserId], references: [id], onUpdate: NoAction)
+  order       Order      @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([orderId, createdAt], map: "idx_order_history_order")
+  @@map("order_status_history")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model Order {
+  id                String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customerSessionId String               @map("customer_session_id") @db.Uuid
+  status            String               @default("received") @db.VarChar(10)
+  version           Int                  @default(1)
+  ordererName       String               @map("orderer_name") @db.VarChar(50)
+  phone             String               @db.VarChar(30)
+  address           String               @db.VarChar(300)
+  addressDetail     String               @default("") @map("address_detail") @db.VarChar(200)
+  desiredStartAt    DateTime             @map("desired_start_at") @db.Timestamptz(6)
+  desiredEndAt      DateTime             @map("desired_end_at") @db.Timestamptz(6)
+  subtotal          BigInt
+  deliveryFee       BigInt               @map("delivery_fee")
+  total             BigInt
+  requestKey        String               @map("request_key") @db.VarChar(80)
+  requestHash       String               @map("request_hash") @db.VarChar(64)
+  cancelReason      String?              @map("cancel_reason") @db.VarChar(200)
+  canceledAt        DateTime?            @map("canceled_at") @db.Timestamptz(6)
+  createdAt         DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime             @default(now()) @map("updated_at") @db.Timestamptz(6)
+  items             OrderItem[]
+  history           OrderStatusHistory[]
+
+  @@unique([customerSessionId, requestKey], map: "uq_order_request")
+  @@index([updatedAt(sort: Desc)], map: "idx_orders_completed", where: raw("((status)::text = 'completed'::text)"))
+  @@index([status, createdAt(sort: Desc), id(sort: Desc)], map: "idx_orders_list")
+  @@index([customerSessionId, createdAt(sort: Desc)], map: "idx_orders_session")
+  @@map("orders")
+}
+
+model ProductAllergen {
+  productId  String   @map("product_id") @db.VarChar(80)
+  allergenId Int      @map("allergen_id")
+  position   Int      @db.SmallInt
+  allergen   Allergen @relation(fields: [allergenId], references: [id], onUpdate: NoAction)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([productId, allergenId])
+  @@map("product_allergens")
+}
+
+model ProductDressing {
+  productId                                                String   @unique(map: "uq_product_dressings_default", where: raw("is_default")) @map("product_id") @db.VarChar(80)
+  productType                                              String?  @default(dbgenerated("'salad'::character varying")) @map("product_type") @db.VarChar(10)
+  dressingId                                               String   @map("dressing_id") @db.VarChar(80)
+  dressingType                                             String?  @default(dbgenerated("'dressing'::character varying")) @map("dressing_type") @db.VarChar(10)
+  isDefault                                                Boolean  @default(false) @map("is_default")
+  sortOrder                                                Int      @map("sort_order")
+  productsProductDressingsDressingIdDressingTypetoproducts Product? @relation("product_dressings_dressing_id_dressing_typeToproducts", fields: [dressingId, dressingType], references: [id, type], onDelete: Cascade, onUpdate: NoAction)
+  productsProductDressingsProductIdProductTypetoproducts   Product? @relation("product_dressings_product_id_product_typeToproducts", fields: [productId, productType], references: [id, type], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([productId, dressingId])
+  @@map("product_dressings")
+}
+
+model ProductIngredient {
+  productId    String     @map("product_id") @db.VarChar(80)
+  productType  String?    @default(dbgenerated("'salad'::character varying")) @map("product_type") @db.VarChar(10)
+  ingredientId String     @map("ingredient_id") @db.VarChar(80)
+  isRequired   Boolean    @default(true) @map("is_required")
+  position     Int        @db.SmallInt
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onUpdate: NoAction)
+  product      Product?   @relation(fields: [productId, productType], references: [id, type], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([productId, ingredientId])
+  @@index([ingredientId], map: "idx_product_ingredients_ingredient")
+  @@map("product_ingredients")
+}
+
+model ProductOptionGroup {
+  productId String      @map("product_id") @db.VarChar(80)
+  groupId   String      @map("group_id") @db.VarChar(80)
+  sortOrder Int         @map("sort_order")
+  group     OptionGroup @relation(fields: [groupId], references: [id], onUpdate: NoAction)
+  product   Product     @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([productId, groupId])
+  @@map("product_option_groups")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model Product {
+  id                                                               String               @id @db.VarChar(80)
+  customerId                                                       Int?                 @unique @map("customer_id")
+  type                                                             String               @db.VarChar(10)
+  name                                                             String               @db.VarChar(80)
+  nameEn                                                           String?              @map("name_en") @db.VarChar(100)
+  price                                                            Int
+  description                                                      String               @default("") @db.VarChar(600)
+  ingredients                                                      String?              @db.VarChar(600)
+  category                                                         String               @db.VarChar(80)
+  status                                                           String               @default("active") @db.VarChar(10)
+  badge                                                            String               @default("") @db.VarChar(5)
+  image                                                            String               @default("") @db.VarChar(200)
+  deleted                                                          Boolean              @default(false)
+  sortOrder                                                        Int                  @map("sort_order")
+  createdAt                                                        DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                                                        DateTime             @default(now()) @map("updated_at") @db.Timestamptz(6)
+  allergensText                                                    String               @default("") @map("allergens_text") @db.VarChar(400)
+  isNew                                                            Boolean?             @map("is_new")
+  orderItems                                                       OrderItem[]
+  productAllergens                                                 ProductAllergen[]
+  productDressingsProductDressingsDressingIdDressingTypetoproducts ProductDressing[]    @relation("product_dressings_dressing_id_dressing_typeToproducts")
+  productDressingsProductDressingsProductIdProductTypetoproducts   ProductDressing[]    @relation("product_dressings_product_id_product_typeToproducts")
+  productIngredients                                               ProductIngredient[]
+  productOptionGroups                                              ProductOptionGroup[]
+  reviews                                                          Review[]
+  seasonPages                                                      SeasonPage[]
+  siteContent                                                      SiteContent[]
+
+  @@unique([id, type], map: "uq_products_id_type")
+  @@index([type, sortOrder], map: "idx_products_type")
+  @@map("products")
+}
+
+model ReviewDrink {
+  reviewId String @map("review_id") @db.VarChar(80)
+  position Int    @db.SmallInt
+  name     String @db.VarChar(80)
+  review   Review @relation(fields: [reviewId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([reviewId, position])
+  @@map("review_drinks")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model ReviewImage {
+  reviewId String @map("review_id") @db.VarChar(80)
+  position Int    @db.SmallInt
+  image    String @db.VarChar(200)
+  review   Review @relation(fields: [reviewId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([reviewId, position])
+  @@map("review_images")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model Review {
+  id                String        @id @db.VarChar(80)
+  productId         String?       @map("product_id") @db.VarChar(80)
+  isSample          Boolean?      @map("is_sample")
+  title             String        @default("") @db.VarChar(200)
+  body              String        @db.VarChar(10000)
+  rating            Int           @db.SmallInt
+  menu              String        @default("") @db.VarChar(120)
+  author            String        @db.VarChar(80)
+  dateLabel         String        @map("date_label") @db.VarChar(40)
+  createdAt         DateTime?     @map("created_at") @db.Timestamptz(6)
+  deleted           Boolean       @default(false)
+  sortOrder         Int           @map("sort_order")
+  via               String?       @db.VarChar(10)
+  originalProductId String?       @map("original_product_id") @db.VarChar(80)
+  drinks            ReviewDrink[]
+  images            ReviewImage[]
+  product           Product?      @relation(fields: [productId], references: [id], onUpdate: NoAction)
+
+  @@map("reviews")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model SeasonPage {
+  id          String   @id @db.VarChar(80)
+  title       String   @db.VarChar(200)
+  description String   @default("") @db.VarChar(600)
+  image       String   @default("") @db.VarChar(200)
+  productId   String?  @map("product_id") @db.VarChar(80)
+  visible     Boolean  @default(true)
+  sortOrder   Int      @map("sort_order")
+  product     Product? @relation(fields: [productId], references: [id], onUpdate: NoAction)
+
+  @@map("season_pages")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model Session {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tokenHash   String     @unique @map("token_hash") @db.VarChar(64)
+  kind        String     @db.VarChar(10)
+  adminUserId String?    @map("admin_user_id") @db.Uuid
+  expiresAt   DateTime   @map("expires_at") @db.Timestamptz(6)
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  admin       AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([expiresAt], map: "idx_sessions_expires")
+  @@map("sessions")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model SiteContent {
+  id                Int      @id @default(1) @db.SmallInt
+  heroTitle         String   @map("hero_title") @db.VarChar(200)
+  heroDescription   String   @default("") @map("hero_description") @db.VarChar(600)
+  seasonTitle       String   @map("season_title") @db.VarChar(200)
+  seasonDescription String   @default("") @map("season_description") @db.VarChar(600)
+  seasonImage       String   @default("") @map("season_image") @db.VarChar(200)
+  seasonProductId   String?  @map("season_product_id") @db.VarChar(80)
+  seasonVisible     Boolean  @default(true) @map("season_visible")
+  product           Product? @relation(fields: [seasonProductId], references: [id], onUpdate: NoAction)
+
+  @@map("site_content")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model StoreLocation {
+  id            Int    @id @default(1) @db.SmallInt
+  name          String @db.VarChar(100)
+  address       String @db.VarChar(300)
+  detailAddress String @default("") @map("detail_address") @db.VarChar(200)
+
+  @@map("store_location")
+}

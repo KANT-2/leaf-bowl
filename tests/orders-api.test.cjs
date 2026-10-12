@@ -2,14 +2,14 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 require("./register-typescript.cjs");
-const { customerSeed } = require("../lib/admin/customer-seed.ts");
-const { setServicesForTests, services } = require("../modules/container.ts");
+const { customerSeed } = require("../seed/legacy/catalog.ts");
+const { setServicesForTests, services, createLimits } = require("../application/container.ts");
+const { appDefaults } = require("./fixtures/settings.cjs");
 const { createOrdersService } = require("../modules/orders/service.ts");
-const { createMemoryOrdersRepository } = require("../modules/orders/memory-repository.ts");
+const { createMemoryOrdersRepository } = require("../tests/fixtures/memory-orders.ts");
 const { createIdentityService } = require("../modules/identity/service.ts");
 const { createMemoryIdentityRepository } = require("../modules/identity/repository.ts");
 const { hashPassword } = require("../modules/identity/crypto.ts");
-const { createRateLimiter } = require("../modules/shared/rate-limit.ts");
 
 const routes = {
   session: require("../app/api/v1/session/route.ts"),
@@ -32,16 +32,19 @@ async function setup() {
   const admin = { id: "admin-1", loginId: "admin", passwordHash: await hashPassword("test-password") };
   setServicesForTests({
     orders: createOrdersService({
-      repository: createMemoryOrdersRepository(clock),
-      getCatalog: async () => catalog,
+      repository: createMemoryOrdersRepository({
+        now: clock,
+        getCatalog: async () => catalog,
+        getPricingPolicy: async () => appDefaults().pricingPolicy,
+        getDeliveryHours: async () => appDefaults().deliveryHours,
+      }),
       now: () => new Date(FIXED_NOW),
     }),
-    identity: createIdentityService({ repository: createMemoryIdentityRepository([admin]), now: () => new Date(FIXED_NOW) }),
-    limits: {
-      login: createRateLimiter(5, 60_000),
-      order: createRateLimiter(100, 60_000),
-      session: createRateLimiter(100, 60_000),
-    },
+    identity: createIdentityService({
+      repository: createMemoryIdentityRepository([admin]),
+      now: () => new Date(FIXED_NOW),
+    }),
+    limits: createLimits({ account: 5, clientLogin: 100, order: 100, clientSession: 100, globalSession: 1000 }),
   });
   return catalog;
 }
@@ -53,8 +56,11 @@ function req(path, { method = "GET", cookie, body, headers = {} } = {}) {
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 }
+
 const cookieOf = (res) => res.headers.getSetCookie()[0].split(";")[0];
+
 const ctx = (id) => ({ params: Promise.resolve({ id }) });
+
 const json = (res) => res.json();
 
 async function guest() {
@@ -62,11 +68,15 @@ async function guest() {
   assert.equal(res.status, 201);
   return cookieOf(res);
 }
+
 async function adminCookie() {
-  const res = await routes.login.POST(req("/api/v1/auth/login", { method: "POST", body: { loginId: "admin", password: "test-password" } }));
+  const res = await routes.login.POST(
+    req("/api/v1/auth/login", { method: "POST", body: { loginId: "admin", password: "test-password" } }),
+  );
   assert.equal(res.status, 200);
   return cookieOf(res);
 }
+
 function orderBody(catalog, overrides = {}) {
   const dressing = catalog.products.find((p) => p.type === "dressing" && p.name === "발사믹").id;
   const orange = catalog.products.find((p) => p.type === "drink" && p.name === "오렌지 주스").id;
@@ -81,8 +91,55 @@ function orderBody(catalog, overrides = {}) {
     ...overrides,
   };
 }
+
 const place = (cookie, key, body) =>
   routes.orders.POST(req("/api/v1/orders", { method: "POST", cookie, body, headers: { "idempotency-key": key } }));
+
+test("배송 UTC 입력·저장·응답과 기존 KST 입력의 동등한 재전송", async () => {
+  const catalog = await setup();
+  const cookie = await guest();
+  const legacy = orderBody(catalog);
+  const utc = {
+    ...legacy,
+    desiredDate: undefined,
+    desiredSlot: undefined,
+    desiredStartAt: "2026-10-13T03:00:00.000Z",
+    desiredEndAt: "2026-10-13T04:00:00.000Z",
+  };
+  const response = await place(cookie, "utc-order-0001", utc);
+  assert.equal(response.status, 201);
+  const created = await json(response);
+  const detail = await json(await routes.order.GET(req(`/api/v1/orders/${created.id}`, { cookie }), ctx(created.id)));
+  assert.equal(detail.desiredStartAt, utc.desiredStartAt);
+  assert.equal(detail.desiredEndAt, utc.desiredEndAt);
+  assert.equal(detail.desiredDate, "2026-10-13");
+  assert.equal(detail.desiredSlot, "12:00–13:00");
+  const stored = (await services().orders.listOrders({ limit: 20 })).items[0];
+  assert.equal(stored.desiredStartAt.toISOString(), utc.desiredStartAt);
+  assert.equal(stored.desiredDate, undefined);
+  assert.equal(stored.desiredSlot, undefined);
+  const admin = await adminCookie();
+  const own = await json(await routes.orders.GET(req("/api/v1/orders", { cookie })));
+  const adminList = await json(await routes.adminOrders.GET(req("/api/v1/admin/orders", { cookie: admin })));
+  const adminDetail = await json(
+    await require("../app/api/v1/admin/orders/[id]/route.ts").GET(
+      req(`/api/v1/admin/orders/${created.id}`, { cookie: admin }),
+      ctx(created.id),
+    ),
+  );
+  for (const view of [own.items[0], adminList.items[0], adminDetail]) {
+    assert.equal(view.desiredStartAt, utc.desiredStartAt);
+    assert.equal(view.desiredEndAt, utc.desiredEndAt);
+    assert.equal(view.desiredDate, "2026-10-13");
+    assert.equal(view.desiredSlot, "12:00–13:00");
+  }
+  assert.ok(!("phone" in own.items[0]));
+  assert.equal((await place(cookie, "utc-order-0001", legacy)).status, 200);
+  assert.equal(
+    (await place(cookie, "utc-order-0002", { ...utc, desiredStartAt: "2026-10-13T12:00:00+09:00" })).status,
+    400,
+  );
+});
 
 test("고객 흐름: 세션 → 주문 → 재전송 → 조회 → 취소", async () => {
   const catalog = await setup();
@@ -127,12 +184,22 @@ test("고객 흐름: 세션 → 주문 → 재전송 → 조회 → 취소", asy
   // 다른 방문자는 볼 수도 취소할 수도 없다
   const other = await guest();
   assert.equal((await routes.order.GET(req(`/api/v1/orders/${c.id}`, { cookie: other }), ctx(c.id))).status, 404);
-  assert.equal((await routes.cancel.POST(req(`/api/v1/orders/${c.id}/cancel`, { method: "POST", cookie: other }), ctx(c.id))).status, 404);
+  assert.equal(
+    (await routes.cancel.POST(req(`/api/v1/orders/${c.id}/cancel`, { method: "POST", cookie: other }), ctx(c.id)))
+      .status,
+    404,
+  );
 
-  const cancel = await routes.cancel.POST(req(`/api/v1/orders/${c.id}/cancel`, { method: "POST", cookie, body: { reason: "단순 변심" } }), ctx(c.id));
+  const cancel = await routes.cancel.POST(
+    req(`/api/v1/orders/${c.id}/cancel`, { method: "POST", cookie, body: { reason: "단순 변심" } }),
+    ctx(c.id),
+  );
   assert.equal(cancel.status, 200);
   assert.equal((await json(cancel)).status, "canceled");
-  const cancelAgain = await routes.cancel.POST(req(`/api/v1/orders/${c.id}/cancel`, { method: "POST", cookie }), ctx(c.id));
+  const cancelAgain = await routes.cancel.POST(
+    req(`/api/v1/orders/${c.id}/cancel`, { method: "POST", cookie }),
+    ctx(c.id),
+  );
   assert.equal(cancelAgain.status, 200); // 재요청은 현재 결과 반환
 });
 
@@ -144,40 +211,83 @@ test("주문 생성 거부 사례", async () => {
     assert.equal(res.status, status);
     const b = await json(res);
     assert.equal(b.status, status);
-    if (re) assert.match(b.message, re);
+    if (re) {
+      assert.match(b.message, re);
+    }
   };
 
-  await expect(await routes.orders.POST(req("/api/v1/orders", { method: "POST", body: ok, headers: { "idempotency-key": "order-aaaa-0001" } })), 401);
-  await expect(await routes.orders.POST(req("/api/v1/orders", { method: "POST", cookie, body: ok })), 400, /Idempotency-Key/);
+  await expect(
+    await routes.orders.POST(
+      req("/api/v1/orders", { method: "POST", body: ok, headers: { "idempotency-key": "order-aaaa-0001" } }),
+    ),
+    401,
+  );
+  await expect(
+    await routes.orders.POST(req("/api/v1/orders", { method: "POST", cookie, body: ok })),
+    400,
+    /Idempotency-Key/,
+  );
   await expect(await place(cookie, "x", ok), 400);
   await expect(
-    await routes.orders.POST(req("/api/v1/orders", { method: "POST", cookie, body: ok, headers: { "idempotency-key": "order-aaaa-0002", "sec-fetch-site": "cross-site" } })),
+    await routes.orders.POST(
+      req("/api/v1/orders", {
+        method: "POST",
+        cookie,
+        body: ok,
+        headers: { "idempotency-key": "order-aaaa-0002", "sec-fetch-site": "cross-site" },
+      }),
+    ),
     403,
   );
   await expect(await place(cookie, "order-aaaa-0003", { ...ok, total: 1 }), 400);
   await expect(await place(cookie, "order-aaaa-0004", { ...ok, items: [{ ...ok.items[0], price: 1 }] }), 400);
-  await expect(await place(cookie, "order-aaaa-0005", { ...ok, desiredDate: "2026-10-09" }), 400, /오늘 이후/);
-  await expect(await place(cookie, "order-aaaa-0006", { ...ok, items: [{ ...ok.items[0], quantity: 1 }] }), 400, /최소 주문/);
+  await expect(await place(cookie, "order-aaaa-0005", { ...ok, desiredDate: "2026-10-09" }), 400, /받을 날짜/);
+  await expect(await place(cookie, "order-aaaa-0011", { ...ok, desiredDate: "2026-10-25" }), 400, /받을 날짜/); // 14일 초과
+  await expect(await place(cookie, "order-aaaa-0012", { ...ok, desiredSlot: "자정" }), 400, /시간대/);
+  await expect(await place(cookie, "order-aaaa-0013", { ...ok, desiredSlot: "21:00–22:00" }), 400, /시간대/); // 운영시간 밖
+  await expect(
+    await place(cookie, "order-aaaa-0006", { ...ok, items: [{ ...ok.items[0], quantity: 1 }] }),
+    400,
+    /최소 주문/,
+  );
   await expect(await place(cookie, "order-aaaa-0007", { ...ok, items: [{ ...ok.items[0], productId: 99 }] }), 400);
-  const bad = await routes.orders.POST(new Request(BASE + "/api/v1/orders", { method: "POST", headers: { cookie, "idempotency-key": "order-aaaa-0008" }, body: "{not json" }));
+  const bad = await routes.orders.POST(
+    new Request(BASE + "/api/v1/orders", {
+      method: "POST",
+      headers: { cookie, "idempotency-key": "order-aaaa-0008" },
+      body: "{not json",
+    }),
+  );
   await expect(bad, 400, /형식/);
-  const big = await routes.orders.POST(new Request(BASE + "/api/v1/orders", { method: "POST", headers: { cookie, "idempotency-key": "order-aaaa-0009" }, body: "x".repeat(40_000) }));
+  const big = await routes.orders.POST(
+    new Request(BASE + "/api/v1/orders", {
+      method: "POST",
+      headers: { cookie, "idempotency-key": "order-aaaa-0009" },
+      body: "x".repeat(40_000),
+    }),
+  );
   await expect(big, 413);
   assert.equal((await place(cookie, "order-aaaa-0010", ok)).status, 201); // 거부 사례들은 키를 소모하지 않았다
 });
 
 test("관리자: 로그인 실패·제한, 목록 쪽 나눔, 상태 변경", async () => {
   const catalog = await setup();
-  const wrong = await routes.login.POST(req("/api/v1/auth/login", { method: "POST", body: { loginId: "admin", password: "nope" } }));
+  const wrong = await routes.login.POST(
+    req("/api/v1/auth/login", { method: "POST", body: { loginId: "admin", password: "nope" } }),
+  );
   assert.equal(wrong.status, 401);
   assert.deepEqual(await json(wrong), { status: 401, message: "아이디 혹은 패스워드가 다릅니다" });
-  const unknown = await routes.login.POST(req("/api/v1/auth/login", { method: "POST", body: { loginId: "ghost", password: "nope" } }));
+  const unknown = await routes.login.POST(
+    req("/api/v1/auth/login", { method: "POST", body: { loginId: "ghost", password: "nope" } }),
+  );
   assert.deepEqual(await json(unknown), { status: 401, message: "아이디 혹은 패스워드가 다릅니다" }); // 아이디 존재 여부 비노출
 
   const admin = await adminCookie();
   const g = await guest();
   const ids = [];
-  for (let i = 0; i < 3; i++) ids.push((await json(await place(g, `order-list-000${i}`, orderBody(catalog)))).id);
+  for (let i = 0; i < 3; i++) {
+    ids.push((await json(await place(g, `order-list-000${i}`, orderBody(catalog)))).id);
+  }
 
   // 로그인하지 않았거나 비회원 쿠키면 접근 불가
   assert.equal((await routes.adminOrders.GET(req("/api/v1/admin/orders"))).status, 401);
@@ -186,34 +296,57 @@ test("관리자: 로그인 실패·제한, 목록 쪽 나눔, 상태 변경", as
   const page1 = await json(await routes.adminOrders.GET(req("/api/v1/admin/orders?limit=2", { cookie: admin })));
   assert.equal(page1.items.length, 2);
   assert.ok(page1.nextCursor);
-  assert.deepEqual(page1.items.map((o) => o.id), [ids[2], ids[1]]); // 최신순
-  const page2 = await json(await routes.adminOrders.GET(req(`/api/v1/admin/orders?limit=2&cursor=${page1.nextCursor}`, { cookie: admin })));
-  assert.deepEqual(page2.items.map((o) => o.id), [ids[0]]);
+  assert.deepEqual(
+    page1.items.map((o) => o.id),
+    [ids[2], ids[1]],
+  ); // 최신순
+  const page2 = await json(
+    await routes.adminOrders.GET(req(`/api/v1/admin/orders?limit=2&cursor=${page1.nextCursor}`, { cookie: admin })),
+  );
+  assert.deepEqual(
+    page2.items.map((o) => o.id),
+    [ids[0]],
+  );
   assert.equal(page2.nextCursor, null);
-  assert.equal((await routes.adminOrders.GET(req("/api/v1/admin/orders?cursor=broken", { cookie: admin }))).status, 400);
+  assert.equal(
+    (await routes.adminOrders.GET(req("/api/v1/admin/orders?cursor=broken", { cookie: admin }))).status,
+    400,
+  );
   assert.equal((await routes.adminOrders.GET(req("/api/v1/admin/orders?limit=100", { cookie: admin }))).status, 400);
   assert.equal((await routes.adminOrders.GET(req("/api/v1/admin/orders?status=nope", { cookie: admin }))).status, 400);
 
-  const patch = (id, cookie, body) => routes.adminStatus.PATCH(req(`/api/v1/admin/orders/${id}/status`, { method: "PATCH", cookie, body }), ctx(id));
+  const patch = (id, cookie, body) =>
+    routes.adminStatus.PATCH(req(`/api/v1/admin/orders/${id}/status`, { method: "PATCH", cookie, body }), ctx(id));
   const target = ids[0];
   assert.equal((await patch(target, g, { status: "confirmed", version: 1 })).status, 401);
   assert.equal((await patch("not-a-uuid", admin, { status: "confirmed", version: 1 })).status, 404);
   assert.equal((await patch(target, admin, { status: "preparing", version: 1 })).status, 409); // 순서 건너뜀
 
   // 같은 version 으로 동시에 바꾸면 한 명만 성공
-  const [a, b] = await Promise.all([patch(target, admin, { status: "confirmed", version: 1 }), patch(target, admin, { status: "canceled", version: 1 })]);
+  const [a, b] = await Promise.all([
+    patch(target, admin, { status: "confirmed", version: 1 }),
+    patch(target, admin, { status: "canceled", version: 1 }),
+  ]);
   assert.deepEqual([a.status, b.status].sort(), [200, 409]);
   const okRes = a.status === 200 ? a : b;
   const done = await json(okRes);
   assert.equal(done.version, 2);
 
-  const filtered = await json(await routes.adminOrders.GET(req(`/api/v1/admin/orders?status=${done.status}`, { cookie: admin })));
-  assert.deepEqual(filtered.items.map((o) => o.id), [target]);
+  const filtered = await json(
+    await routes.adminOrders.GET(req(`/api/v1/admin/orders?status=${done.status}`, { cookie: admin })),
+  );
+  assert.deepEqual(
+    filtered.items.map((o) => o.id),
+    [target],
+  );
 
   // 준비 중이 되면 고객은 취소할 수 없다
   if (done.status === "confirmed") {
     assert.equal((await patch(target, admin, { status: "preparing", version: 2 })).status, 200);
-    const late = await routes.cancel.POST(req(`/api/v1/orders/${target}/cancel`, { method: "POST", cookie: g }), ctx(target));
+    const late = await routes.cancel.POST(
+      req(`/api/v1/orders/${target}/cancel`, { method: "POST", cookie: g }),
+      ctx(target),
+    );
     assert.equal(late.status, 409);
   }
 
@@ -226,8 +359,17 @@ test("관리자: 로그인 실패·제한, 목록 쪽 나눔, 상태 변경", as
 
 test("로그인 요청 제한: 한도를 넘으면 429", async () => {
   await setup();
-  const attempt = () => routes.login.POST(req("/api/v1/auth/login", { method: "POST", body: { loginId: "admin", password: "bad" }, headers: { "x-forwarded-for": "1.2.3.4" } }));
-  for (let i = 0; i < 5; i++) assert.equal((await attempt()).status, 401);
+  const attempt = () =>
+    routes.login.POST(
+      req("/api/v1/auth/login", {
+        method: "POST",
+        body: { loginId: "admin", password: "bad" },
+        headers: { "x-forwarded-for": "1.2.3.4" },
+      }),
+    );
+  for (let i = 0; i < 5; i++) {
+    assert.equal((await attempt()).status, 401);
+  }
   assert.equal((await attempt()).status, 429);
 });
 
@@ -238,7 +380,14 @@ test("취소와 상태 변경이 겹치면 한쪽만 적용된다", async () => 
   const id = (await json(await place(g, "order-race-0001", orderBody(catalog)))).id;
   const [cancel, confirm] = await Promise.all([
     routes.cancel.POST(req(`/api/v1/orders/${id}/cancel`, { method: "POST", cookie: g }), ctx(id)),
-    routes.adminStatus.PATCH(req(`/api/v1/admin/orders/${id}/status`, { method: "PATCH", cookie: admin, body: { status: "confirmed", version: 1 } }), ctx(id)),
+    routes.adminStatus.PATCH(
+      req(`/api/v1/admin/orders/${id}/status`, {
+        method: "PATCH",
+        cookie: admin,
+        body: { status: "confirmed", version: 1 },
+      }),
+      ctx(id),
+    ),
   ]);
   const final = await json(await routes.order.GET(req(`/api/v1/orders/${id}`, { cookie: g }), ctx(id)));
   // 취소는 접수·확인 모두에서 가능하므로 어느 쪽이 먼저든 고객 취소는 성공하고 최종 상태는 취소다
@@ -257,7 +406,9 @@ test("회귀: 같은 키로 동시에 보낸 요청은 주문 한 건만 만든�
 
 test("회귀: 다른 Origin 에서 온 쓰기 요청은 거부", async () => {
   await setup();
-  const res = await routes.session.POST(req("/api/v1/session", { method: "POST", headers: { origin: "https://evil.example" } }));
+  const res = await routes.session.POST(
+    req("/api/v1/session", { method: "POST", headers: { origin: "https://evil.example" } }),
+  );
   assert.equal(res.status, 403);
 });
 
@@ -265,7 +416,13 @@ test("회귀: X-Forwarded-For 를 바꿔도 같은 계정의 로그인 시도는
   await setup();
   const statuses = [];
   for (let i = 0; i < 8; i++) {
-    const r = await routes.login.POST(req("/api/v1/auth/login", { method: "POST", body: { loginId: "admin", password: "bad" }, headers: { "x-forwarded-for": `9.9.9.${i}` } }));
+    const r = await routes.login.POST(
+      req("/api/v1/auth/login", {
+        method: "POST",
+        body: { loginId: "admin", password: "bad" },
+        headers: { "x-forwarded-for": `9.9.9.${i}` },
+      }),
+    );
     statuses.push(r.status);
   }
   assert.equal(statuses.filter((s) => s === 429).length, 3); // 한도 5 → 6번째부터 막힌다
@@ -296,25 +453,41 @@ test("관리자 취소는 사유·시각·변경자를 기록하고, 음료 단�
   const admin = await adminCookie();
   const id = (await json(await place(g, "order-cancel-0001", orderBody(catalog)))).id;
   const res = await routes.adminStatus.PATCH(
-    req(`/api/v1/admin/orders/${id}/status`, { method: "PATCH", cookie: admin, body: { status: "canceled", version: 1, reason: "재료 소진" } }),
+    req(`/api/v1/admin/orders/${id}/status`, {
+      method: "PATCH",
+      cookie: admin,
+      body: { status: "canceled", version: 1, reason: "재료 소진" },
+    }),
     ctx(id),
   );
   assert.equal(res.status, 200);
-  const record = await services().orders.getOrder((await services().orders.listOrders({ limit: 5 })).items[0].customerSessionId, id);
+  const record = await services().orders.getOrder(
+    (await services().orders.listOrders({ limit: 5 })).items[0].customerSessionId,
+    id,
+  );
   assert.equal(record.cancelReason, "재료 소진");
   assert.ok(record.canceledAt);
-  assert.deepEqual(record.history.map((h) => [h.fromStatus, h.toStatus, h.changedBy]), [[null, "received", "customer"], ["received", "canceled", "admin"]]);
+  assert.deepEqual(
+    record.history.map((h) => [h.fromStatus, h.toStatus, h.changedBy]),
+    [
+      [null, "received", "customer"],
+      ["received", "canceled", "admin"],
+    ],
+  );
 
   const orange = catalog.products.find((p) => p.type === "drink" && p.name === "오렌지 주스").id;
-  const drinks = await place(g, "order-drink-0001", orderBody(catalog, { items: [{ drinkKeys: [orange], quantity: 5 }] }));
+  const drinks = await place(
+    g,
+    "order-drink-0001",
+    orderBody(catalog, { items: [{ drinkKeys: [orange], quantity: 5 }] }),
+  );
   assert.equal(drinks.status, 201); // 4000원 x 5 = 20000, 배달비 3000
   assert.equal((await json(drinks)).total, "23000");
 });
 
-
 test("관리자 화면 어댑터로 실제 로그인·로그아웃 API 계약을 검증한다", async () => {
   await setup();
-  const { submitAdminAuth } = require("../lib/admin/auth-client.ts");
+  const { submitAdminAuth } = require("../features/admin/auth-client.ts");
   const originalFetch = global.fetch;
   const originalWindow = global.window;
   global.window = { setTimeout, clearTimeout };
@@ -326,11 +499,145 @@ test("관리자 화면 어댑터로 실제 로그인·로그아웃 API 계약을
     await submitAdminAuth("login", { loginId: "admin", password: "test-password" });
     await assert.rejects(submitAdminAuth("login", { loginId: "admin", password: "wrong" }), /아이디 또는 비밀번호/);
     await submitAdminAuth("logout");
-    global.fetch = async () => { throw new TypeError("offline"); };
-    await assert.rejects(submitAdminAuth("login", { loginId: "admin", password: "test-password" }), /서버에 연결할 수 없습니다/);
+    global.fetch = async () => {
+      throw new TypeError("offline");
+    };
+    await assert.rejects(
+      submitAdminAuth("login", { loginId: "admin", password: "test-password" }),
+      /서버에 연결할 수 없습니다/,
+    );
   } finally {
     global.fetch = originalFetch;
-    if (originalWindow === undefined) delete global.window;
-    else global.window = originalWindow;
+    if (originalWindow === undefined) {
+      delete global.window;
+    } else {
+      global.window = originalWindow;
+    }
   }
+});
+
+const adminRoutes = { detail: require("../app/api/v1/admin/orders/[id]/route.ts") };
+
+test("관리자 주문 상세와 접수일 범위 조회 (BE-05)", async () => {
+  const catalog = await setup();
+  const g = await guest();
+  const admin = await adminCookie();
+  const created = await json(await place(g, "order-detail-0001", orderBody(catalog)));
+  const id = created.id;
+  const detailReq = (cookie, target = id) =>
+    adminRoutes.detail.GET(req(`/api/v1/admin/orders/${target}`, { cookie }), ctx(target));
+
+  assert.equal((await detailReq(undefined)).status, 401);
+  assert.equal((await detailReq(g)).status, 401); // 비회원 쿠키로는 볼 수 없다
+  assert.equal((await detailReq(admin, "not-a-uuid")).status, 404);
+  assert.equal((await detailReq(admin, "7c1d9f64-2b0a-4a56-9f0e-3c1a8e5b2d10")).status, 404);
+
+  await routes.adminStatus.PATCH(
+    req(`/api/v1/admin/orders/${id}/status`, {
+      method: "PATCH",
+      cookie: admin,
+      body: { status: "confirmed", version: 1 },
+    }),
+    ctx(id),
+  );
+  const res = await detailReq(admin);
+  assert.equal(res.status, 200);
+  const d = await json(res);
+  assert.equal(d.phone, "010-1234-5678"); // 연락처는 관리자 상세에만
+  assert.equal(d.version, 2);
+  assert.equal(d.items[0].options, "발사믹 · 오렌지 주스");
+  assert.deepEqual(
+    d.history.map((h) => [h.fromStatus, h.toStatus, h.changedBy]),
+    [
+      [null, "received", "customer"],
+      ["received", "confirmed", "admin"],
+    ],
+  );
+  assert.ok(!("customerSessionId" in d) && !("requestHash" in d) && !("requestKey" in d));
+  assert.equal(typeof d.total, "string");
+  assert.equal(d.cancelReason, null);
+
+  // 기간 조회: 한국 시간 날짜, 양 끝 포함. 목록 항목에는 받을 날짜·시간대가 들어간다
+  const list = (qs) => routes.adminOrders.GET(req(`/api/v1/admin/orders${qs}`, { cookie: admin }));
+  const day = "2026-10-10"; // 테스트 시계: 한국 시간 2026-10-10 12:00 부터 1초씩
+  const hit = await json(await list(`?from=${day}&to=${day}`));
+  assert.equal(hit.items.length, 1);
+  assert.equal(hit.items[0].desiredDate, "2026-10-13");
+  assert.equal(hit.items[0].desiredSlot, "12:00–13:00");
+  assert.equal((await json(await list("?from=2000-01-01&to=2000-01-31"))).items.length, 0);
+  assert.equal((await json(await list("?from=2026-10-11"))).items.length, 0); // 다음 날부터는 없음
+  assert.equal((await json(await list("?to=2026-10-09"))).items.length, 0); // 전날까지는 없음
+  assert.equal((await json(await list("?to=2026-10-10"))).items.length, 1); // to 날짜는 그날 끝까지 포함
+  assert.equal((await json(await list(`?from=${day}`))).items.length, 1);
+  assert.equal((await list("?from=2026-10-12&to=2026-10-01")).status, 400); // 시작이 끝보다 늦음
+  assert.equal((await list("?from=2026-13-40")).status, 400);
+  assert.equal((await json(await list(`?status=confirmed&from=${day}`))).items.length, 1);
+  assert.equal((await json(await list(`?status=received&from=${day}`))).items.length, 0);
+});
+
+test("내 주문 목록 (마이페이지용): 본인 세션의 주문만 최신순, 쪽 나눔", async () => {
+  const catalog = await setup();
+  const a = await guest();
+  const b = await guest();
+  const ids = [];
+  for (let i = 0; i < 3; i++) {
+    ids.push((await json(await place(a, `own-list-000${i}`, orderBody(catalog)))).id);
+  }
+  await place(b, "own-list-other-0", orderBody(catalog));
+
+  const mine = (cookie, qs = "") => routes.orders.GET(req(`/api/v1/orders${qs}`, { cookie }));
+  assert.equal((await mine(undefined)).status, 401);
+  const page1 = await json(await mine(a, "?limit=2"));
+  assert.deepEqual(
+    page1.items.map((o) => o.id),
+    [ids[2], ids[1]],
+  );
+  assert.ok(page1.nextCursor);
+  const page2 = await json(await mine(a, `?limit=2&cursor=${page1.nextCursor}`));
+  assert.deepEqual(
+    page2.items.map((o) => o.id),
+    [ids[0]],
+  );
+  assert.equal(page2.nextCursor, null);
+  // 다른 방문자의 주문은 섞이지 않고, 연락처는 내려가지 않는다
+  assert.equal((await json(await mine(b))).items.length, 1);
+  const first = page1.items[0];
+  assert.equal(first.items[0].options, "발사믹 · 오렌지 주스");
+  assert.ok(!("phone" in first) && !("customerSessionId" in first));
+  assert.equal((await mine(a, "?limit=0")).status, 400);
+  assert.equal((await mine(a, "?cursor=broken")).status, 400);
+});
+
+test("재전송 해시: 옵션 선택 순서만 다르면 기존 주문을 돌려주고, 실제 선택·수량·항목 순서가 다르면 409", async () => {
+  const catalog = await setup();
+  const cookie = await guest();
+  const dressing = catalog.products.find((p) => p.type === "dressing").id;
+  const salad = (productId, drinks, quantity = 1) => ({
+    productId,
+    optionSelections: { dressing: [dressing], drinks },
+    quantity,
+  });
+
+  const order = (items) => orderBody(catalog, { items });
+  const first = await place(cookie, "hash-order-0001", order([salad(0, ["drink-1", "drink-2"])]));
+  assert.equal(first.status, 201);
+  const id = (await json(first)).id;
+
+  const reordered = await place(cookie, "hash-order-0001", order([salad(0, ["drink-2", "drink-1"])]));
+  assert.equal(reordered.status, 200); // 같은 선택 집합 → 기존 주문
+  assert.equal((await json(reordered)).id, id);
+
+  for (const [label, items] of [
+    ["다른 음료", [salad(0, ["drink-1", "drink-3"])]],
+    ["음료 하나 적음", [salad(0, ["drink-1"])]],
+    ["수량 다름", [salad(0, ["drink-1", "drink-2"], 2)]],
+  ]) {
+    assert.equal((await place(cookie, "hash-order-0001", order(items))).status, 409, label);
+  }
+
+  // 주문 항목의 순서는 정규화하지 않는다: 항목 순서를 바꾼 요청은 다른 요청으로 본다
+  const ab = [salad(0, ["drink-1"]), salad(3, ["drink-2"])];
+  assert.equal((await place(cookie, "hash-order-0002", order(ab))).status, 201);
+  assert.equal((await place(cookie, "hash-order-0002", order([ab[1], ab[0]]))).status, 409);
+  assert.equal((await place(cookie, "hash-order-0002", order(ab))).status, 200);
 });

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useCart } from "./CartProvider";
-import { MATCH_URL } from "@/lib/products";
+import { MATCH_URL } from "@/features/customer/routes";
 
 const KEY = "bb-match-collapsed";
 
@@ -17,8 +17,12 @@ const listeners = new Set<() => void>();
 function readCollapsed(): boolean {
   try {
     const v = sessionStorage.getItem(KEY);
-    if (v === "1") return true;
-    if (v === "0") return false;
+    if (v === "1") {
+      return true;
+    }
+    if (v === "0") {
+      return false;
+    }
   } catch {
     // 읽기 실패 시 메모리 값으로 동작한다.
   }
@@ -63,9 +67,13 @@ export default function MatchFloat() {
 
   // 푸터가 화면에 보이면 배너를 숨긴다.
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     const footer = document.querySelector("footer");
-    if (!footer || !("IntersectionObserver" in window)) return;
+    if (!footer || !("IntersectionObserver" in window)) {
+      return;
+    }
     const io = new IntersectionObserver((en) => setFooterVisible(en[0].isIntersecting));
     io.observe(footer);
     return () => io.disconnect();
@@ -75,11 +83,17 @@ export default function MatchFloat() {
   useEffect(() => {
     const target = moveFocus.current;
     moveFocus.current = null;
-    if (target === "tab") tabRef.current?.focus();
-    if (target === "start") startRef.current?.focus();
+    if (target === "tab") {
+      tabRef.current?.focus();
+    }
+    if (target === "start") {
+      startRef.current?.focus();
+    }
   }, [collapsed]);
 
-  if (!mounted) return null;
+  if (!mounted) {
+    return null;
+  }
 
   const toggle = (next: boolean) => {
     moveFocus.current = next ? "tab" : "start";
@@ -111,7 +125,13 @@ export default function MatchFloat() {
           ×
         </button>
       </div>
-      <button ref={tabRef} type="button" className="mf-tab" aria-label="내 취향 찾기 배너 펼치기" onClick={() => toggle(false)}>
+      <button
+        ref={tabRef}
+        type="button"
+        className="mf-tab"
+        aria-label="내 취향 찾기 배너 펼치기"
+        onClick={() => toggle(false)}
+      >
         <span aria-hidden="true">♡</span>
       </button>
     </aside>

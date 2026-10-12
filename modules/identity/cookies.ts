@@ -1,7 +1,9 @@
 export function readCookie(request: Request, name: string): string | undefined {
   for (const part of (request.headers.get("cookie") ?? "").split(";")) {
     const index = part.indexOf("=");
-    if (index > 0 && part.slice(0, index).trim() === name) return part.slice(index + 1).trim();
+    if (index > 0 && part.slice(0, index).trim() === name) {
+      return part.slice(index + 1).trim();
+    }
   }
   return undefined;
 }

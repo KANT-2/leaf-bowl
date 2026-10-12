@@ -9,10 +9,10 @@ import ReviewItem from "./ReviewItem";
 import { useReviewWrite } from "./ReviewWrite";
 import { useReviews } from "./ReviewsProvider";
 import StarRating from "./StarRating";
-import { useReducedMotion } from "@/lib/hooks";
-import {useCustomerCatalog} from "./CustomerCatalogProvider";
-import { money } from "@/lib/products";
-import { SORTERS, SORT_LABELS, statsOf, type SortKey } from "@/lib/reviews";
+import { useReducedMotion } from "@/features/shared/hooks";
+import { useCustomerCatalog } from "./CustomerCatalogProvider";
+import { money } from "@/modules/shared/format";
+import { SORTERS, SORT_LABELS, statsOf, type SortKey } from "@/modules/reviews/model";
 
 const PAGE = 10;
 
@@ -34,7 +34,7 @@ export default function ReviewsView({ pid }: { pid: number | null }) {
   const writeBtn = useRef<HTMLButtonElement>(null);
   const focusFrom = useRef<number | null>(null);
 
-  const {visibleProducts: PRODUCTS, getProduct}=useCustomerCatalog();
+  const { visibleProducts: PRODUCTS, getProduct } = useCustomerCatalog();
   const product = pid === null ? null : getProduct(pid);
   const all = pid === null ? allReviews : reviewsFor(pid);
   const s = statsOf(all);
@@ -49,7 +49,9 @@ export default function ReviewsView({ pid }: { pid: number | null }) {
   // "더 보기" 뒤에는 새로 나타난 첫 리뷰의 제목으로 포커스를 옮긴다.
   useEffect(() => {
     const from = focusFrom.current;
-    if (from === null) return;
+    if (from === null) {
+      return;
+    }
     focusFrom.current = null;
     const h = listRef.current?.children[from]?.querySelector("h3");
     if (h) {
@@ -70,7 +72,9 @@ export default function ReviewsView({ pid }: { pid: number | null }) {
 
   // 예전 "#write" 링크로 들어오면 리뷰 쓰기 모달을 바로 연다.
   useEffect(() => {
-    if (location.hash !== "#write") return;
+    if (location.hash !== "#write") {
+      return;
+    }
     const t = setTimeout(() => {
       history.replaceState(history.state, "", location.pathname);
       writeBtn.current?.click();
@@ -85,7 +89,15 @@ export default function ReviewsView({ pid }: { pid: number | null }) {
       <div className="rv-head">
         <div>
           <span className="eyebrow">CUSTOMER REVIEWS</span>
-          <PageHeading>{product ? <>{product.name} <span>리뷰</span></> : "고객 리뷰"}</PageHeading>
+          <PageHeading>
+            {product ? (
+              <>
+                {product.name} <span>리뷰</span>
+              </>
+            ) : (
+              "고객 리뷰"
+            )}
+          </PageHeading>
         </div>
         <button type="button" ref={writeBtn} className="primary rv-write-btn" onClick={write}>
           리뷰 쓰기
@@ -207,7 +219,10 @@ export default function ReviewsView({ pid }: { pid: number | null }) {
               setShown((n) => n + PAGE);
             }}
           >
-            리뷰 더 보기 <span>({visible.length} / {list.length})</span>
+            리뷰 더 보기{" "}
+            <span>
+              ({visible.length} / {list.length})
+            </span>
           </button>
         </div>
       )}
