@@ -6,6 +6,7 @@ export interface MenuItem {
   id: number;
   dressing: number;
   dressingKey?: string;
+  dressingKeys?: string[];
   drinks: number[];
   drinkKeys?: string[];
   qty: number;
@@ -22,6 +23,7 @@ export interface CustomItem {
   allergens: string[];
   dressing: number;
   dressingKey?: string;
+  dressingKeys?: string[];
   /** 1개 가격 (기본 볼 + 재료) */
   price: number;
   /** 참고 사진으로 쓸 PRODUCTS 번호 */

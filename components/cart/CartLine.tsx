@@ -1,7 +1,7 @@
 "use client";
 import { hasCustomIngredientIds, isCustom, isDrink } from "@/modules/cart/identity";
 import { drinkKey } from "@/modules/cart/identifiers";
-import { choiceSlot, withRo, type ChoiceSlot } from "@/features/cart/choice";
+import { choiceSlot, dressingSlot, withRo, type ChoiceSlot } from "@/features/cart/choice";
 import type { CustomerCatalog } from "@/modules/catalog/customer-view";
 import { money } from "@/modules/shared/format";
 import { type CartItem } from "@/modules/cart/types";
@@ -48,16 +48,22 @@ export default function CartLine({
   closeBtn: React.RefObject<HTMLButtonElement | null>;
   onOther: (index: number, slot: ChoiceSlot) => void;
 }) {
-  const { update, remove, close, changeChoice } = useCart();
+  const { update, remove, close, changeChoice, toggleDressing } = useCart();
   const toast = useToast();
   const { itemAllergens, itemName, itemOptions, itemUnitPrice, itemAvailable, DRINKS } = cat;
 
   const slot = choiceSlot(item, cat);
-  // 드롭다운에 보이는 선택은 옵션 줄에서 뺀다.
-  const picked = slot?.choices.find((c) => c.value === slot.value)?.name;
+  const dSlot = dressingSlot(item, cat);
+  // 드롭다운·드레싱 체크박스에 보이는 선택은 옵션 줄에서 뺀다.
+  const picked = new Set(
+    [
+      slot?.choices.find((c) => c.value === slot.value)?.name,
+      ...(dSlot?.selected.map((v) => dSlot.choices.find((c) => c.value === v)?.name) ?? []),
+    ].filter((x): x is string => !!x),
+  );
   const rest = itemOptions(item)
     .split(" · ")
-    .filter((x) => x && x !== picked)
+    .filter((x) => x && !picked.has(x))
     .join(" · ");
   const changeQty = (e: React.MouseEvent<HTMLButtonElement>, index: number, delta: number) => {
     const next = item.qty + delta;
@@ -93,6 +99,33 @@ export default function CartLine({
 
         <>
           {rest && <p>{rest}</p>}
+          {dSlot && (
+            <div className="cart-dressing cart-dressing-multi" role="group" aria-label={dSlot.label}>
+              <span className="cart-dressing-label">{dSlot.label}</span>
+              <div className="dressing-chip-list">
+                {dSlot.choices.map((c) => {
+                  const active = dSlot.selected.includes(c.value);
+                  return (
+                    <button
+                      key={c.value}
+                      type="button"
+                      className={`dressing-chip${active ? " is-on" : ""}`}
+                      aria-pressed={active}
+                      disabled={!c.available && !active}
+                      onClick={() => {
+                        if (toggleDressing(index, dSlot.groupId, c.value)) {
+                          toast("같은 구성이 있어 한 줄로 합쳤어요");
+                        }
+                      }}
+                    >
+                      {c.name}
+                      {c.available ? "" : " (품절)"}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           {slot && (
             <div className="cart-dressing">
               <label htmlFor={`choice-${index}`}>{slot.label}</label>

@@ -1,48 +1,73 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import Breadcrumb from "./Breadcrumb";
 import PageHeading from "./PageHeading";
+import { useAuth } from "./AuthProvider";
 import { useCart } from "./CartProvider";
 import { useCustomerCatalog } from "./CustomerCatalogProvider";
 import { type DeliveryHours } from "@/modules/delivery/hours";
+import { dateValue, timeOptions } from "@/modules/delivery/slots";
 import { checkoutIssue } from "@/features/checkout/validation";
 import { customerCatalog } from "@/modules/catalog/customer-view";
 import { publicSnapshotSchema } from "@/modules/catalog/public-schema";
 import { orderRequestKey } from "@/features/orders/client";
 import { preparePayment, paymentResultUrl, rememberPaymentCart } from "@/features/checkout/payment";
-import { openTossPayment, type PayMethod } from "@/features/checkout/toss";
-import { deliveryWindowKST, deliveryWindowUTC } from "@/modules/delivery/time";
+import { openTossPayment } from "@/features/checkout/toss";
+import { deliveryWindowUTC } from "@/modules/delivery/time";
+import { isCustom, isDrink } from "@/modules/cart/identity";
+import { type CartItem } from "@/modules/cart/types";
 import { money } from "@/modules/shared/format";
-import { CardIcon, KakaoPayMark, TossMark } from "./icons/BrandMarks";
-
-const PAY_METHODS: { key: PayMethod; label: string; className: string; icon: React.ReactNode }[] = [
-  { key: "toss", label: "토스페이", className: "pay-toss", icon: <TossMark /> },
-  { key: "kakaopay", label: "카카오페이", className: "pay-kakao", icon: <KakaoPayMark /> },
-  { key: "card", label: "신용·체크카드", className: "pay-card", icon: <CardIcon /> },
-];
+import { TossMark } from "./icons/BrandMarks";
 
 export default function CheckoutView({ hours, clientKey }: { hours: DeliveryHours; clientKey: string | null }) {
-  const params = useSearchParams();
   const router = useRouter();
   const { items, open } = useCart();
   const catalog = useCustomerCatalog();
-  const { itemName, itemOptions, itemUnitPrice, deliveryFee } = catalog;
+  const { itemName, itemOptions, itemUnitPrice, deliveryFee, photoSrc, DRINKS, catalogConfig } = catalog;
+  const { user } = useAuth();
 
-  const address = params.get("address") ?? "";
-  const hasUTC = params.has("desiredStartAt") || params.has("desiredEndAt");
-  const windowDisplay = hasUTC
-    ? deliveryWindowKST(params.get("desiredStartAt") ?? "", params.get("desiredEndAt") ?? "")
-    : { day: params.get("day") ?? "", timeLabel: params.get("time") ?? "" };
-  const day = windowDisplay?.day ?? "";
-  const timeLabel = windowDisplay?.timeLabel ?? "";
+  const savedAddresses = user?.addresses ?? [];
+  const defaultAddr = user?.addresses.find((a) => a.isDefault);
+  const defaultAddress = defaultAddr
+    ? `${defaultAddr.address}${defaultAddr.detail ? `, ${defaultAddr.detail}` : ""}`
+    : "";
+  const [addressInput, setAddressInput] = useState<string | null>(null);
+  const address = addressInput ?? defaultAddress;
 
-  const [method, setMethod] = useState<PayMethod>("toss");
+  // 날짜·시간대는 결제 화면을 연 시각 기준으로 계산하고, 고른 값이 범위를 벗어나면 기본값으로 돌린다.
+  const [openedAt] = useState(() => Date.now());
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+  const minDate = dateValue(openedAt, 0);
+  const maxDate = dateValue(openedAt, 14);
+  const day = date >= minDate && date <= maxDate ? date : dateValue(openedAt, 1);
+  const options = timeOptions(day, openedAt, hours);
+  const slot = options.find((o) => o.value === time) ?? options[0];
+  const timeLabel = slot?.label ?? "";
+
+  const [requestNote, setRequestNote] = useState(() => catalogConfig.deliveryRequestPresets[0] ?? "직접 입력");
+  const [customNote, setCustomNote] = useState("");
+  const isCustomNote = requestNote === "직접 입력";
+
   const [paying, setPaying] = useState(false);
   const [ordererName, setOrdererName] = useState("");
   const [phone, setPhone] = useState("");
+  const loadMyInfo = () => {
+    if (!user) {
+      return;
+    }
+    setOrdererName(user.name);
+    setPhone(user.phone);
+    const addr = defaultAddr ?? savedAddresses[0];
+    if (addr) {
+      setAddressInput(`${addr.address}${addr.detail ? `, ${addr.detail}` : ""}`);
+    }
+  };
+  const [agree, setAgree] = useState(false);
   const [error, setError] = useState("");
   const pending = useRef(false);
   const paymentController = useRef<AbortController | null>(null);
@@ -55,10 +80,21 @@ export default function CheckoutView({ hours, clientKey }: { hours: DeliveryHour
   const fee = items.length ? deliveryFee(subtotal) : 0;
   const total = subtotal + fee;
 
+  /** 장바구니 줄의 사진. 메뉴·내 취향 볼은 참고 사진, 음료는 음료 사진을 쓴다. */
+  const itemPhoto = (item: CartItem) => {
+    if (isDrink(item)) {
+      return DRINKS[item.drink]?.image || "/images/hero-cutout.png";
+    }
+    if (isCustom(item)) {
+      return photoSrc(item.photo);
+    }
+    return photoSrc(item.id);
+  };
+
   const delivery = { address, day, timeLabel, hours };
   // 시간은 확정 동작에서도 다시 확인한다. 초기 렌더에서는 시각 의존 검사 없이 상태만 표시한다.
   const unavailable = items.some((i) => !catalog.itemAvailable(i));
-  const canPay = items.length > 0 && !unavailable && !paying && clientKey !== null;
+  const canPay = items.length > 0 && !unavailable && !paying && clientKey !== null && agree;
 
   const pay = async () => {
     if (!canPay || pending.current) {
@@ -115,7 +151,7 @@ export default function CheckoutView({ hours, clientKey }: { hours: DeliveryHour
         toss,
         standard,
         anonymous: ANONYMOUS,
-        method,
+        method: "toss",
         signal: controller.signal,
         request: {
           amount: checkout.amount,
@@ -168,91 +204,176 @@ export default function CheckoutView({ hours, clientKey }: { hours: DeliveryHour
           </button>
         </div>
       )}
-      <section className="surface mypage-section">
-        <h2>주문 내용</h2>
-        <ul className="order-item-lines checkout-lines">
-          {items.map((i, idx) => (
-            <li key={idx}>
-              {itemName(i)}
-              {itemOptions(i) && <span> · {itemOptions(i)}</span>}
-              <span> × {i.qty}</span>
-              <strong>{money(itemUnitPrice(i) * i.qty)}</strong>
-            </li>
-          ))}
-        </ul>
-        <div className="totals">
-          <div>
-            <span>상품 금액</span>
-            <span>{money(subtotal)}</span>
-          </div>
-          <div>
-            <span>배달비</span>
-            <span>{fee === 0 ? "무료" : money(fee)}</span>
-          </div>
-          <div className="total">
-            <span>합계</span>
-            <span>{money(total)}</span>
-          </div>
-        </div>
-      </section>
+      <div className="checkout-grid">
+        <div className="checkout-main">
+          <section className="surface mypage-section">
+            <h2>배송 정보</h2>
+            <div className="mypage-form">
+              <label className="field">
+                <span>배달 주소</span>
+                {savedAddresses.length > 0 && (
+                  <div className="address-chips" role="group" aria-label="저장된 배송지에서 고르기">
+                    {savedAddresses.map((a) => {
+                      const full = `${a.address}${a.detail ? `, ${a.detail}` : ""}`;
+                      return (
+                        <button
+                          key={a.id}
+                          type="button"
+                          className={address === full ? "active" : ""}
+                          onClick={() => setAddressInput(full)}
+                        >
+                          {a.label || "배송지"}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <input
+                  required
+                  minLength={2}
+                  maxLength={150}
+                  placeholder="배달 주소를 입력해주세요"
+                  autoComplete="street-address"
+                  value={address}
+                  onChange={(event) => setAddressInput(event.target.value)}
+                />
+                <div className="map-mock" aria-hidden="true">
+                  <span>지도 영역 (주소 API 연동 예정)</span>
+                </div>
+              </label>
+              <div className="two-fields">
+                <label className="field">
+                  <span>받을 날짜</span>
+                  <input
+                    type="date"
+                    required
+                    min={minDate}
+                    max={maxDate}
+                    value={day}
+                    onChange={(event) => setDate(event.target.value)}
+                  />
+                </label>
+                <label className="field">
+                  <span>시간대</span>
+                  <select required value={slot?.value ?? ""} onChange={(event) => setTime(event.target.value)}>
+                    {options.length ? (
+                      options.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="">오늘은 마감되었어요. 다른 날짜를 선택해주세요.</option>
+                    )}
+                  </select>
+                </label>
+              </div>
+              <label className="field">
+                <span>배송 요청사항</span>
+                <select value={requestNote} onChange={(event) => setRequestNote(event.target.value)}>
+                  {catalogConfig.deliveryRequestPresets.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                  <option value="직접 입력">직접 입력</option>
+                </select>
+              </label>
+              {isCustomNote && (
+                <label className="field">
+                  <span>요청사항 직접 입력</span>
+                  <input maxLength={60} value={customNote} onChange={(event) => setCustomNote(event.target.value)} />
+                </label>
+              )}
+              <div className="checkout-section-head">
+                <h3>받는 사람 정보</h3>
+                {user && (user.name || user.phone) && (
+                  <button type="button" className="ghost-btn" onClick={loadMyInfo}>
+                    내 정보 불러오기
+                  </button>
+                )}
+              </div>
+              <label className="field">
+                <span>받는 분</span>
+                <input
+                  autoComplete="name"
+                  maxLength={50}
+                  value={ordererName}
+                  onChange={(event) => setOrdererName(event.target.value)}
+                />
+              </label>
+              <label className="field">
+                <span>연락처</span>
+                <input
+                  autoComplete="tel"
+                  inputMode="tel"
+                  maxLength={30}
+                  placeholder="010-1234-5678"
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                />
+              </label>
+            </div>
+          </section>
 
-      <section className="surface mypage-section">
-        <h2>배송 정보</h2>
-        <p className="meta">
-          {address} · {day} {timeLabel}
-        </p>
-        <div className="mypage-form">
-          <label className="field">
-            <span>받는 분</span>
-            <input
-              autoComplete="name"
-              maxLength={50}
-              value={ordererName}
-              onChange={(event) => setOrdererName(event.target.value)}
-            />
-          </label>
-          <label className="field">
-            <span>연락처</span>
-            <input
-              autoComplete="tel"
-              inputMode="tel"
-              maxLength={30}
-              placeholder="010-1234-5678"
-              value={phone}
-              onChange={(event) => setPhone(event.target.value)}
-            />
-          </label>
+          <section className="surface mypage-section">
+            <h2>결제 수단</h2>
+            <div className="pay-toss-panel">
+              <TossMark />
+              <div>
+                <p className="pay-toss-title">토스페이먼츠로 결제</p>
+                <p className="pay-toss-desc">카드·계좌이체·간편결제는 결제 창에서 바로 선택할 수 있어요.</p>
+              </div>
+            </div>
+            <p className="pay-redirect-note">결제하기를 누르면 토스페이먼츠 결제 창에서 안전하게 결제할 수 있어요.</p>
+          </section>
         </div>
-      </section>
 
-      <section className="surface mypage-section">
-        <h2>결제 수단</h2>
-        {standard ? (
-          <p>카드·토스페이·카카오페이는 결제 창에서 선택해주세요.</p>
-        ) : (
-          <div className="pay-methods" role="radiogroup" aria-label="결제 수단">
-            {PAY_METHODS.map((m) => (
-              <button
-                key={m.key}
-                type="button"
-                role="radio"
-                aria-checked={method === m.key}
-                aria-label={m.label}
-                className={`${m.className}${method === m.key ? " active" : ""}`}
-                onClick={() => setMethod(m.key)}
-              >
-                {m.icon}
-                {m.key === "card" && m.label}
-              </button>
+        <aside className="surface mypage-section checkout-summary">
+          <h2>주문 내역</h2>
+          <ul className="order-item-lines">
+            {items.map((item, idx) => (
+              <li key={idx} className="order-line">
+                <div className="order-line-image">
+                  <Image src={itemPhoto(item)} alt="" width={96} height={96} unoptimized />
+                </div>
+                <div className="order-line-info">
+                  <div>
+                    {itemName(item)}
+                    {itemOptions(item) && <span> · {itemOptions(item)}</span>}
+                    <span> × {item.qty}</span>
+                  </div>
+                </div>
+                <strong>{money(itemUnitPrice(item) * item.qty)}</strong>
+              </li>
             ))}
-          </div>
-        )}
-        <p className="pay-redirect-note">결제하기를 누르면 토스페이먼츠 결제 창에서 안전하게 결제할 수 있어요.</p>
-      </section>
+          </ul>
 
-      <button type="button" className="primary full form-btn checkout-pay-btn" disabled={!canPay} onClick={pay}>
-        {money(total)} 결제하기
-      </button>
+          <div className="totals">
+            <div>
+              <span>상품 금액</span>
+              <span>{money(subtotal)}</span>
+            </div>
+            <div>
+              <span>배달비</span>
+              <span>{fee === 0 ? "무료" : money(fee)}</span>
+            </div>
+            <div className="total">
+              <span>합계</span>
+              <span>{money(total)}</span>
+            </div>
+          </div>
+
+          <label className="checkout-agree">
+            <input type="checkbox" checked={agree} onChange={(event) => setAgree(event.target.checked)} />
+            주문 내용을 확인했으며 결제 진행에 동의합니다.
+          </label>
+
+          <button type="button" className="primary full form-btn checkout-pay-btn" disabled={!canPay} onClick={pay}>
+            {agree ? `${money(total)} 결제하기` : "약관에 동의해주세요"}
+          </button>
+        </aside>
+      </div>
     </main>
   );
 }

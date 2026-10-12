@@ -1,4 +1,4 @@
-import { isDrink, itemKey, withChoice } from "./identity";
+import { isDrink, itemKey, withChoice, withDressingToggle } from "./identity";
 import type { CartItem } from "./types";
 
 export function clampQuantity(value: number): number {
@@ -22,6 +22,27 @@ export function changeCartChoice(items: CartItem[], index: number, groupId: stri
     return { items, merged: false };
   }
   const next = withChoice(current, groupId, value);
+  const same = items.findIndex((item, at) => at !== index && itemKey(item) === itemKey(next));
+  if (same < 0) {
+    return {
+      items: items.map((item, at) => (at === index ? next : item)),
+      merged: false,
+    };
+  }
+  return {
+    items: items.flatMap((item, at) =>
+      at === index ? [] : at === same ? [{ ...item, qty: clampQuantity(item.qty + current.qty) }] : [item],
+    ),
+    merged: true,
+  };
+}
+
+export function toggleCartDressing(items: CartItem[], index: number, groupId: string | null, value: string) {
+  const current = items[index];
+  if (!current || isDrink(current)) {
+    return { items, merged: false };
+  }
+  const next = withDressingToggle(current, groupId, value);
   const same = items.findIndex((item, at) => at !== index && itemKey(item) === itemKey(next));
   if (same < 0) {
     return {
