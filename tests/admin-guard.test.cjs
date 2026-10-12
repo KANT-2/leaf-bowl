@@ -95,6 +95,19 @@ test("GET /api/v1/auth/session: 관리자 로그인 상태 확인, 로그아웃�
   assert.equal(await adminGate(req("/api/admin/catalog", { cookie: admin })).then((r) => r.status), 401);
 });
 
+test("event API rejects absent, guest and forged sessions, and cross-origin writes before persistence", async () => {
+  await setup();
+  const events = require("../app/api/admin/events/route.ts");
+  const guest = cookieOf(await guestRoute.POST(req("/api/v1/session", { method: "POST" })));
+  for (const cookie of [undefined, guest, "lb_admin=forged-token"]) {
+    assert.equal((await events.GET(req("/api/admin/events", { cookie }))).status, 401);
+    assert.equal((await events.PUT(req("/api/admin/events", { method: "PUT", cookie, body: {} }))).status, 401);
+  }
+  const foreign = req("/api/admin/events", { method: "PUT", cookie: await adminLogin(), body: {} });
+  foreign.headers.set("origin", "https://attacker.example");
+  assert.equal((await events.PUT(foreign)).status, 403);
+});
+
 test("proxy: /admin 은 쿠키가 없으면 로그인 화면으로, 다른 경로는 건드리지 않는다", () => {
   const call = (path, cookie) => proxy(new NextRequest(B + path, { headers: cookie ? { cookie } : {} }));
   const redirect = call("/admin");
