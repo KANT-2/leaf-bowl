@@ -1,10 +1,6 @@
 // 고객 API 응답 만들기. 카탈로그를 페이지별 응답 모양으로 바꾼다.
 // 설계: docs/api-design.md
-import type {
-  Catalog,
-  Product as CatalogProduct,
-  Review as CatalogReview,
-} from "@/modules/catalog/schema";
+import type { Catalog, Product as CatalogProduct, Review as CatalogReview } from "@/modules/catalog/schema";
 
 export type ProductType = CatalogProduct["type"];
 export const PRODUCT_TYPES: readonly ProductType[] = ["salad", "drink", "dressing"];
@@ -198,9 +194,18 @@ export function home(catalog: Catalog): Home {
     hero: { title: content.heroTitle, description: content.heroDescription },
     seasonPages: (content.seasonPages ?? [])
       .filter((s) => s.visible)
-      .map((s) => ({ title: s.title, description: s.description, image: s.image, productId: s.productId ? customerIdOf(s.productId) : null })),
+      .map((s) => ({
+        title: s.title,
+        description: s.description,
+        image: s.image,
+        productId: s.productId ? customerIdOf(s.productId) : null,
+      })),
     best: catalog.products.filter((p) => p.type === "salad" && p.badge === "BEST" && isVisible(p)).map(toSummary),
-    latestReviews: newestFirst((catalog.reviews ?? []).filter((r) => !r.deleted && (!r.productId || catalog.products.some((p) => p.id === r.productId && isVisible(p)))))
+    latestReviews: newestFirst(
+      (catalog.reviews ?? []).filter(
+        (r) => !r.deleted && (!r.productId || catalog.products.some((p) => p.id === r.productId && isVisible(p))),
+      ),
+    )
       .slice(0, 3)
       .map((r) => toReviewItem(catalog, r)),
   };
@@ -210,8 +215,12 @@ export function home(catalog: Catalog): Home {
 export function parsePaging(params: URLSearchParams): { page: number; size: number } | null {
   const page = params.get("page") ?? "1";
   const size = params.get("size") ?? "10";
-  if (!/^\d+$/.test(page) || !/^\d+$/.test(size)) return null;
+  if (!/^\d+$/.test(page) || !/^\d+$/.test(size)) {
+    return null;
+  }
   const p = Number(page);
   const s = Number(size);
-  return Number.isSafeInteger(p) && p >= 1 && Number.isSafeInteger(s) && s >= 1 && s <= 50 ? { page: p, size: s } : null;
+  return Number.isSafeInteger(p) && p >= 1 && Number.isSafeInteger(s) && s >= 1 && s <= 50
+    ? { page: p, size: s }
+    : null;
 }

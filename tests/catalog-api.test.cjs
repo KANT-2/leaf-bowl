@@ -19,6 +19,7 @@ after(() => {
   store.readCatalog = originalRead;
 });
 const ctx = (id) => ({ params: Promise.resolve({ id }) });
+
 const get = (url) => new Request("http://localhost" + url);
 
 test("customer product APIs read the catalog and hide hidden or unknown menus", async () => {
@@ -42,7 +43,10 @@ test("customer product APIs read the catalog and hide hidden or unknown menus", 
   assert.equal((await routes.detail.GET(get("/api/products/0"), ctx("0"))).status, 404);
   assert.equal((await routes.reviews.GET(get("/api/products/0/reviews"), ctx("0"))).status, 404);
   const after = await (await routes.list.GET(get("/api/products"))).json();
-  assert.equal(after.items.some((p) => p.id === 0), false);
+  assert.equal(
+    after.items.some((p) => p.id === 0),
+    false,
+  );
 });
 
 test("review and home APIs validate paging and return the page shape", async () => {
