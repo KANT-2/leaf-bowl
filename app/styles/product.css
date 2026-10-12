@@ -139,8 +139,8 @@
   accent-color: var(--color-brand);
   margin: 0 5px 0 0;
 }
-/* 데스크톱은 기존처럼 항상 펼쳐 보여준다. summary(드롭다운 버튼)는 모바일에서만 쓴다. */
-.option-picker summary {
+/* 데스크톱은 기존처럼 항상 펼쳐 보여준다. 드롭다운 버튼은 모바일에서만 쓴다. */
+.option-picker-trigger {
   display: none;
 }
 .opt-thumb {
@@ -252,19 +252,19 @@
     border-radius: 8px;
     overflow: hidden;
   }
-  .option-picker summary {
+  .option-picker-trigger {
     display: flex;
     align-items: center;
+    width: 100%;
     gap: 8px;
     padding: 10px 12px;
     cursor: pointer;
     font-size: 13px;
-    list-style: none;
+    border: 0;
+    background: none;
+    text-align: left;
   }
-  .option-picker summary::-webkit-details-marker {
-    display: none;
-  }
-  .option-picker:not([open]) .option-choices {
+  .option-picker:not(.open) .option-choices {
     display: none;
   }
   .opt-summary-text {
@@ -278,7 +278,7 @@
     color: var(--color-muted);
     transition: transform 0.15s ease;
   }
-  .option-picker[open] .opt-caret {
+  .option-picker.open .opt-caret {
     transform: rotate(180deg);
   }
   .option-choices {
