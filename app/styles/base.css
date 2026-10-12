@@ -167,14 +167,6 @@
     align-items: center;
     font-size: 12px;
     letter-spacing: 0.3px;
-    padding: 0 16px;
-  }
-  .announcement > * {
-    min-width: 0;
-    max-width: 100%;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
   .header {
     height: 94px;
