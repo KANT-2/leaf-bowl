@@ -1229,14 +1229,26 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  /* 본문(.wrap)과 같은 폭·여백으로 배너 둘레에 여백을 둔다 */
+  padding: 28px 36px;
   background: var(--color-cream);
 }
 .hero-ad-slide > section {
   width: 100%;
+  max-width: 1240px;
   min-width: 0;
   height: 100%;
   display: grid;
   align-items: center;
+  border-radius: 20px;
+}
+@media (max-width: 600px) {
+  .hero-inner.hero-ad-slide {
+    padding: 14px 22px;
+  }
+  .hero-ad-slide > section {
+    border-radius: 14px;
+  }
 }
 .hero-ad-slide picture,
 .hero-ad-slide > section > a {
