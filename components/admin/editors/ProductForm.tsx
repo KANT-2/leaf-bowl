@@ -3,7 +3,7 @@ import { Button } from "@/components/admin/button";
 import { Checkbox } from "@/components/admin/checkbox";
 import { Input } from "@/components/admin/input";
 import { Textarea } from "@/components/admin/textarea";
-import { ingredientAllergens } from "@/modules/catalog/allergens";
+import { ingredientAllergens, matchesIngredient } from "@/modules/catalog/allergens";
 import { type Catalog, type OptionGroup, type Product } from "@/modules/catalog/schema";
 import { statusNames } from "@/features/admin/editor-helpers";
 import { useState } from "react";
@@ -31,6 +31,12 @@ export default function ProductForm({
   const [p, setP] = useState(initial),
     [uploading, setUploading] = useState(false),
     [error, setError] = useState("");
+  const [ingredientQuery, setIngredientQuery] = useState("");
+  const availableIngredients = ingredients.filter((ingredient) => !ingredient.deleted);
+  const tokens = (p.ingredients ?? "")
+    .split(/[·,，、;\n]+/)
+    .map((value) => value.trim())
+    .filter(Boolean);
   const inferred = ingredientAllergens(p.ingredients ?? "", ingredients);
   const updateIngredients = (value: string) =>
     setP((x) => ({
@@ -113,6 +119,45 @@ export default function ProductForm({
                 options={["", "BEST", "NEW", "PLANT", "PICK"].map((v) => [v, v || "배지 없음"])}
               />
             </label>
+            <label className="field">
+              알레르기 안내
+              <Input
+                value={p.allergens}
+                maxLength={400}
+                onChange={(e) => set("allergens", e.target.value)}
+                placeholder="예: 우유, 대두, 밀"
+              />
+            </label>
+            {p.type === "salad" && (
+              <div className="field">
+                <Button type="button" variant="outline" size="sm" onClick={() => set("allergens", inferred.allergens)}>
+                  재료 기준으로 자동 입력
+                </Button>
+                <p className="meta">구성 재료 변경 시 등록된 재료의 안내를 자동 입력하며 직접 보완할 수 있습니다.</p>
+                {inferred.unknown.length > 0 && (
+                  <p className="meta" role="status">
+                    등록된 재료와 일치하지 않아 확인이 필요합니다: {inferred.unknown.join(", ")}
+                  </p>
+                )}
+              </div>
+            )}
+            {p.type === "salad" && (
+              <div className="field">
+                연결할 옵션 그룹
+                {groups.map((g) => (
+                  <label className="check-line" key={g.id}>
+                    <Checkbox
+                      checked={p.optionIds.includes(g.id)}
+                      onCheckedChange={(v) =>
+                        set("optionIds", v ? [...p.optionIds, g.id] : p.optionIds.filter((x) => x !== g.id))
+                      }
+                    />
+                    {g.name}
+                  </label>
+                ))}
+                {!groups.length && <div className="meta">옵션 관리에서 그룹을 먼저 등록해주세요.</div>}
+              </div>
+            )}
           </div>
           <div>
             <div className="field">
@@ -137,51 +182,68 @@ export default function ProductForm({
                 <label className="field">
                   구성 재료
                   <Textarea
+                    aria-label="구성 재료"
                     maxLength={600}
                     value={p.ingredients ?? ""}
                     onChange={(e) => updateIngredients(e.target.value)}
                   />
                 </label>
-              </>
-            )}
-            {p.type === "salad" && (
-              <div className="field">
-                <Button type="button" variant="outline" size="sm" onClick={() => set("allergens", inferred.allergens)}>
-                  재료 기준으로 자동 입력
-                </Button>
-                <p className="meta">구성 재료 변경 시 등록된 재료의 안내를 자동 입력하며 직접 보완할 수 있습니다.</p>
-                {inferred.unknown.length > 0 && (
-                  <p className="meta" role="status">
-                    등록된 재료와 일치하지 않아 확인이 필요합니다: {inferred.unknown.join(", ")}
+                <fieldset className="field">
+                  <legend>등록된 재료 선택</legend>
+                  <p className="meta">
+                    원산지 및 알레르기 관리에 등록한 재료입니다. 선택하면 구성 재료와 알레르기 안내에 자동 반영됩니다.
                   </p>
-                )}
-              </div>
-            )}
-            <label className="field">
-              알레르기 안내
-              <Input
-                value={p.allergens}
-                maxLength={400}
-                onChange={(e) => set("allergens", e.target.value)}
-                placeholder="예: 우유, 대두, 밀"
-              />
-            </label>
-            {p.type === "salad" && (
-              <div className="field">
-                연결할 옵션 그룹
-                {groups.map((g) => (
-                  <label className="check-line" key={g.id}>
-                    <Checkbox
-                      checked={p.optionIds.includes(g.id)}
-                      onCheckedChange={(v) =>
-                        set("optionIds", v ? [...p.optionIds, g.id] : p.optionIds.filter((x) => x !== g.id))
-                      }
-                    />
-                    {g.name}
-                  </label>
-                ))}
-                {!groups.length && <div className="meta">옵션 관리에서 그룹을 먼저 등록해주세요.</div>}
-              </div>
+                  <Input
+                    aria-label="구성 재료 검색"
+                    placeholder="재료 이름 또는 분류 검색"
+                    value={ingredientQuery}
+                    onChange={(e) => setIngredientQuery(e.target.value)}
+                  />
+                  <div style={{ maxHeight: 240, overflowY: "auto", marginTop: 8 }}>
+                    {availableIngredients
+                      .filter((ingredient) =>
+                        `${ingredient.name} ${ingredient.category}`
+                          .toLowerCase()
+                          .includes(ingredientQuery.trim().toLowerCase()),
+                      )
+                      .map((ingredient) => (
+                        <label className="check-line" key={ingredient.id}>
+                          <Checkbox
+                            checked={tokens.some((token) => matchesIngredient(token, ingredient))}
+                            onCheckedChange={(checked) => {
+                              const remaining = tokens.filter((token) => !matchesIngredient(token, ingredient));
+                              const next = (checked ? [...remaining, ingredient.name] : remaining).join(" · ");
+                              if (next.length > 600) {
+                                setError("구성 재료는 600자까지 입력할 수 있습니다.");
+                                return;
+                              }
+                              setError("");
+                              updateIngredients(next);
+                            }}
+                          />
+                          <span>
+                            {ingredient.name}
+                            <span className="meta">
+                              {" "}
+                              · {ingredient.category}
+                              {ingredient.origin ? ` · ${ingredient.origin}` : ""}
+                              {ingredient.allergens ? ` · 알레르기: ${ingredient.allergens}` : ""}
+                            </span>
+                          </span>
+                        </label>
+                      ))}
+                    {!availableIngredients.length && (
+                      <p className="meta">원산지 및 알레르기 관리에서 재료를 먼저 등록해주세요.</p>
+                    )}
+                    {availableIngredients.length > 0 &&
+                      !availableIngredients.some((ingredient) =>
+                        `${ingredient.name} ${ingredient.category}`
+                          .toLowerCase()
+                          .includes(ingredientQuery.trim().toLowerCase()),
+                      ) && <p className="meta">검색 결과가 없습니다.</p>}
+                  </div>
+                </fieldset>
+              </>
             )}
           </div>
         </div>

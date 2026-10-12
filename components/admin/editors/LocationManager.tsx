@@ -2,8 +2,8 @@
 import { Button } from "@/components/admin/button";
 import { Input } from "@/components/admin/input";
 import { type Catalog } from "@/modules/catalog/schema";
-import { MapPin } from "lucide-react";
-import { useState } from "react";
+import { ChevronDown, ChevronUp, MapPin } from "lucide-react";
+import { useId, useState } from "react";
 
 export default function LocationManager({
   catalog,
@@ -14,6 +14,8 @@ export default function LocationManager({
   busy: boolean;
   onSave: (catalog: Catalog) => Promise<void>;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const locationPanelId = useId();
   const [location, setLocation] = useState(
       catalog.location ?? {
         name: "leaf & bowl",
@@ -36,9 +38,26 @@ export default function LocationManager({
       <section className="surface">
         <div className="section-heading">
           <h2>매장 위치</h2>
-          {catalog.location && <span className="meta">등록된 위치</span>}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-expanded={expanded}
+            aria-controls={locationPanelId}
+            aria-label={expanded ? "매장 위치 접기" : "매장 위치 펼치기"}
+            onClick={() => setExpanded((value) => !value)}
+          >
+            {catalog.location && <span className="meta">등록된 위치</span>}
+            {expanded ? "접기" : "펼치기"}
+            {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </Button>
         </div>
-        <div className="store-location-grid">
+        <div
+          id={locationPanelId}
+          className="store-location-grid"
+          hidden={!expanded}
+          style={expanded ? undefined : { display: "none" }}
+        >
           <form
             onSubmit={async (e) => {
               e.preventDefault();
