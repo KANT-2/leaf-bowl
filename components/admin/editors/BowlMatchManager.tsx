@@ -297,7 +297,16 @@ export default function BowlMatchManager({
           }
         }}
       >
-        <DialogContent className="editor-dialog" onInteractOutside={(e) => e.preventDefault()}>
+        <DialogContent
+          className="editor-dialog"
+          closeDisabled={busy || uploading}
+          onEscapeKeyDown={(e) => {
+            if (busy || uploading) {
+              e.preventDefault();
+            }
+          }}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle>{items.some((i) => i.id === editing?.id) ? "재료 수정" : "재료 추가"}</DialogTitle>
             <DialogDescription>재료 정보와 카드 노출 상태를 설정하세요.</DialogDescription>
@@ -306,6 +315,9 @@ export default function BowlMatchManager({
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
+                if (busy || uploading) {
+                  return;
+                }
                 if (
                   await persist(
                     items.some((i) => i.id === editing.id)
@@ -317,7 +329,7 @@ export default function BowlMatchManager({
                 }
               }}
             >
-              <fieldset disabled={busy || uploading}>
+              <fieldset disabled={busy}>
                 <div className="form-grid">
                   <div>
                     <label className="field">

@@ -1,11 +1,12 @@
-import { mkdir, rm, writeFile } from "node:fs/promises";
-import path from "node:path";
 import { publicSnapshot } from "@/modules/catalog/public-snapshot";
 import { z } from "zod";
 import { unstable_rethrow } from "next/navigation";
 import { AppError } from "@/modules/shared/errors";
 import { readJsonBody } from "@/infrastructure/http/response";
-import { appendCustomerReview, dataDirectory } from "@/application/catalog";
+import { appendCustomerReview } from "@/application/catalog";
+import { normalizeImage, saveImage, removeImage } from "@/infrastructure/images/files";
+import { maintainImages } from "@/application/images";
+import { createRateLimiter } from "@/modules/shared/rate-limit";
 import { sameOrigin, jsonError } from "@/infrastructure/http/request";
 const schema = z.object({
   id: z
@@ -24,25 +25,19 @@ const schema = z.object({
 
 /** 리뷰 사진 한 장 용량 한도 (줄인 뒤 기준) */
 const PHOTO_MAX_BYTES = 1024 * 1024;
+const submissions = createRateLimiter(60, 60_000);
 
 /** data: 주소를 검사해 [바이트, 확장자]로 바꾼다. 파일 내용이 PNG·JPEG·WebP 가 아니면 null */
-function decodePhoto(dataUrl: string): [Uint8Array, string] | null {
-  const m = /^data:image\/(?:jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
+async function decodePhoto(dataUrl: string) {
+  const m = /^data:image\/(?:jpeg|png|webp);base64,([A-Za-z0-9+/]*={0,2})$/.exec(dataUrl);
   if (!m) {
     return null;
   }
   const bytes = new Uint8Array(Buffer.from(m[1], "base64"));
-  if (!bytes.length || bytes.length > PHOTO_MAX_BYTES) {
+  if (!bytes.length || bytes.length > PHOTO_MAX_BYTES || Buffer.from(bytes).toString("base64") !== m[1]) {
     return null;
   }
-  const png = bytes.length > 8 && [137, 80, 78, 71, 13, 10, 26, 10].every((n, i) => bytes[i] === n);
-  const jpeg = bytes.length > 3 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
-  const webp =
-    bytes.length > 12 &&
-    String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" &&
-    String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
-  const ext = png ? "png" : jpeg ? "jpg" : webp ? "webp" : null;
-  return ext ? [bytes, ext] : null;
+  return normalizeImage(bytes, PHOTO_MAX_BYTES);
 }
 
 export async function POST(request: Request) {
@@ -50,29 +45,29 @@ export async function POST(request: Request) {
     return jsonError("허용되지 않은 요청입니다.", 403);
   }
   try {
+    submissions.hit("all");
     const body = await readJsonBody(request, 5 * 1024 * 1024);
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
       return jsonError("리뷰 내용을 확인해주세요.");
     }
     const { photos = [], ...review } = parsed.data;
-    const decoded = photos.map(decodePhoto);
+    const decoded = [];
+    for (const photo of photos) {
+      decoded.push(await decodePhoto(photo));
+    }
     if (decoded.some((d) => d === null)) {
       return jsonError("사진은 JPG·PNG·WebP, 장당 1MB 이하로 올려주세요.");
     }
     // 사진은 관리자 이미지와 같은 폴더에 저장하고, 리뷰에는 주소만 남긴다.
-    const directory = path.join(dataDirectory(), "images");
     const saved: string[] = [];
     let referenced = new Set<string>();
     try {
-      if (decoded.length) {
-        await mkdir(directory, { recursive: true });
+      if (request.signal.aborted) {
+        throw new AppError(408, "리뷰 요청이 취소되었습니다.");
       }
       for (const d of decoded) {
-        const [bytes, ext] = d!;
-        const key = `review-${crypto.randomUUID()}.${ext}`;
-        saved.push(key);
-        await writeFile(path.join(directory, key), bytes);
+        saved.push(await saveImage(d!, "review-"));
       }
       const snapshot = await appendCustomerReview({
         ...review,
@@ -80,21 +75,14 @@ export async function POST(request: Request) {
       });
       // 중복·삭제된 ID는 저장소가 성공 응답으로 무시한다. 그 요청의 새 사진은 참조되지 않는다.
       referenced = new Set((snapshot.catalog.reviews ?? []).flatMap((r) => r.images ?? []));
-      await Promise.all(
-        saved
-          .filter((key) => !referenced.has("/api/admin/images/" + key))
-          .map((key) => rm(path.join(directory, key), { force: true })),
-      );
+      await Promise.all(saved.filter((key) => !referenced.has("/api/admin/images/" + key)).map(removeImage));
+      await maintainImages();
       return Response.json(publicSnapshot(snapshot), {
         headers: { "Cache-Control": "no-store" },
       });
     } catch (e) {
       // 리뷰 저장에 실패하면 먼저 써 둔 사진 파일도 지운다.
-      await Promise.all(
-        saved
-          .filter((key) => !referenced.has("/api/admin/images/" + key))
-          .map((key) => rm(path.join(directory, key), { force: true })),
-      );
+      await Promise.all(saved.filter((key) => !referenced.has("/api/admin/images/" + key)).map(removeImage));
       throw e;
     }
   } catch (e) {

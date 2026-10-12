@@ -389,6 +389,92 @@ test("catalog revisions, optional fields, stable IDs and review deletion survive
   }
 });
 
+test("shared, hidden, trash and banner references retain images until the final reference is removed", async () => {
+  const { saveImage, imageExists } = require("../infrastructure/images/files.ts");
+  const { pruneExpiredImages } = require("../application/images.ts");
+  const { readEvents, writeEvents } = require("../application/events.ts");
+  const bytes = await require("sharp")({ create: { width: 1, height: 1, channels: 3, background: "white" } })
+    .png()
+    .toBuffer();
+  const key = await saveImage({ bytes, ext: "png" });
+  const url = "/api/admin/images/" + key;
+  let events = await readEvents();
+  events = await writeEvents(
+    [
+      {
+        id: "shared-event",
+        title: "이벤트",
+        description: "",
+        startDate: "2026-10-01",
+        endDate: "2026-10-31",
+        image: url,
+        mobileImage: "",
+        alt: "",
+        href: "",
+        visible: false,
+      },
+    ],
+    events.revision,
+  );
+  let state = await readCatalog();
+  state.catalog.products[0].image = url;
+  state.catalog.ingredients[0].image = url;
+  state.catalog.content.bannerPages = [
+    { id: "hidden-banner", image: "", mobileImage: url, alt: "", href: "", visible: false },
+  ];
+  state = await writeCatalog(state.catalog, state.revision);
+  const past = new Date(Date.now() - 25 * 3600_000);
+  await fs.utimes(path.join(directory, "images", key), past, past);
+  state.catalog.products[0].deleted = true;
+  state.catalog.ingredients[0].image = "";
+  state = await writeCatalog(state.catalog, state.revision);
+  await pruneExpiredImages(true);
+  assert.equal(await imageExists(key), true);
+  state.catalog.products[0].deleted = false;
+  state.catalog.products[0].image = "";
+  state = await writeCatalog(state.catalog, state.revision);
+  assert.equal(await imageExists(key), true);
+  state.catalog.content.bannerPages = [];
+  state = await writeCatalog(state.catalog, state.revision);
+  assert.equal(await imageExists(key), true);
+  await writeEvents([], events.revision);
+  assert.equal(await imageExists(key), false);
+  state.catalog.products[0].image = url;
+  await assert.rejects(writeCatalog(state.catalog, state.revision), (error) => error.status === 400);
+  assert.equal((await readCatalog()).revision, state.revision);
+});
+
+test("draft cleanup preserves recent uploads and serializes with concurrent publication", async () => {
+  const { saveImage, imageExists } = require("../infrastructure/images/files.ts");
+  const { pruneExpiredImages } = require("../application/images.ts");
+  const bytes = await require("sharp")({ create: { width: 1, height: 1, channels: 3, background: "white" } })
+    .png()
+    .toBuffer();
+  const old = await saveImage({ bytes, ext: "png" });
+  const fresh = await saveImage({ bytes, ext: "png" });
+  const past = new Date(Date.now() - 25 * 3600_000);
+  await fs.utimes(path.join(directory, "images", old), past, past);
+  const result = await pruneExpiredImages();
+  assert.ok(result.candidates >= 1);
+  assert.equal(result.applied, false);
+  assert.equal(await imageExists(old), true);
+  const state = await readCatalog();
+  state.catalog.content.mainMobileImage = "/api/admin/images/" + old;
+  const [write, cleanup] = await Promise.allSettled([
+    writeCatalog(state.catalog, state.revision),
+    pruneExpiredImages(true),
+  ]);
+  assert.equal(cleanup.status, "fulfilled");
+  if (write.status === "fulfilled") {
+    assert.equal(await imageExists(old), true);
+    assert.equal((await readCatalog()).catalog.content.mainMobileImage, "/api/admin/images/" + old);
+  } else {
+    assert.equal(write.reason.status, 400);
+    assert.equal(await imageExists(old), false);
+  }
+  assert.equal(await imageExists(fresh), true);
+});
+
 test("parallel duplicate orders are one durable order, and conflicting bodies remain conflicts", async () => {
   const fresh = createPrismaClient(url);
   try {
