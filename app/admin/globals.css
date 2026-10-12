@@ -1762,3 +1762,167 @@
   outline: 2px solid #317447;
   outline-offset: -2px;
 }
+
+.review-calendar-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin: 0 0 20px;
+}
+.review-calendar-controls > div {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.review-calendar-controls label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+}
+.review-calendar-controls select {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  padding: 8px 12px;
+  max-width: 100%;
+}
+.review-calendar-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #e8eddf;
+  padding: 12px 16px;
+  border-radius: 10px;
+  margin: 12px 0;
+  font-size: 18px;
+}
+.review-calendar-heading span {
+  font-size: 13px;
+  font-weight: 400;
+}
+@media (max-width: 540px) {
+  .review-calendar-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .review-calendar-controls label > select {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.bowl-registration-steps {
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+  list-style: none;
+  padding: 0;
+  margin: 20px 0;
+  color: var(--muted-foreground);
+}
+.bowl-registration-steps li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bowl-registration-steps span {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #e8ecdf;
+}
+.bowl-registration-steps [aria-current="step"] {
+  color: #204e3c;
+  font-weight: 700;
+}
+.bowl-registration-steps [aria-current="step"] span {
+  background: #204e3c;
+  color: white;
+}
+.bowl-registration-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+.bowl-registration-filters button {
+  border-radius: 24px;
+}
+.bowl-registration-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 2px;
+}
+.bowl-registration-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #d8dfd1;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.bowl-registration-card.selected {
+  border-color: #204e3c;
+  background: #f0f3e8;
+}
+.bowl-registration-card:focus-within {
+  outline: 2px solid #204e3c;
+  outline-offset: 1px;
+}
+.bowl-registration-card > span {
+  flex: 1;
+  min-width: 0;
+}
+.bowl-registration-card small {
+  display: block;
+  margin-top: 4px;
+}
+.bowl-registration-card input {
+  width: 18px;
+  height: 18px;
+  accent-color: #204e3c;
+  flex-shrink: 0;
+}
+.bowl-registration-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px;
+  margin-top: 16px;
+  border-radius: 10px;
+  background: #eaf0e0;
+}
+.bowl-registration-summary .photo {
+  width: 40px;
+  height: 40px;
+}
+.bowl-registration-footer {
+  flex-wrap: wrap;
+}
+.bowl-registration-footer > button:first-child {
+  margin-right: auto;
+}
+@media (max-width: 600px) {
+  .bowl-registration-cards {
+    grid-template-columns: 1fr;
+  }
+  .bowl-registration-footer > button:first-child {
+    width: 100%;
+  }
+}
+
+.review-filter-controls [data-slot="tabs-trigger"][data-state="active"],
+.menu-type-tabs [data-slot="tabs-trigger"][data-state="active"] {
+  background: var(--color-ink);
+  color: #fff;
+  border-color: var(--color-ink);
+}

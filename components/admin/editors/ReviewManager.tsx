@@ -15,8 +15,14 @@ import { Input } from "@/components/admin/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/admin/tabs";
 import { reviewDateTime, reviewMenuLabel } from "@/features/admin/catalog-presentation";
 import { type Catalog, type Review } from "@/modules/catalog/schema";
+import { kstDate, legacyKSTUTC, normalizeUTC } from "@/modules/shared/time";
 import { RotateCcw, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Fragment, useState } from "react";
+
+export function reviewCalendarDay(review: Pick<Review, "date" | "createdAt">): string {
+  const instant = normalizeUTC(review.createdAt) ?? legacyKSTUTC(review.date);
+  return instant ? kstDate(Date.parse(instant)) : "";
+}
 
 export default function ReviewManager({
   catalog,
@@ -27,6 +33,9 @@ export default function ReviewManager({
   busy: boolean;
   onSave: (catalog: Catalog) => Promise<void>;
 }) {
+  const [groupBy, setGroupBy] = useState<"month" | "day">("day");
+  const [month, setMonth] = useState("");
+  const [day, setDay] = useState("");
   const [reviewPage, setReviewPage] = useState(1);
   const [permanentId, setPermanentId] = useState<string | null>(null);
   const [permanentError, setPermanentError] = useState("");
@@ -54,11 +63,36 @@ export default function ReviewManager({
   const detail = reviews.find((r) => r.id === detailId);
   const visible = reviews.filter((r) => !r.deleted),
     removed = reviews.filter((r) => r.deleted),
-    filtered = visible.filter(
-      (r) =>
-        (reviewFilter === "all" || (reviewFilter === "photo" ? !!r.images?.length : !r.images?.length)) &&
-        [r.title, r.body, r.author, reviewMenuLabel(r)].some((t) => t.toLowerCase().includes(query.toLowerCase())),
-    );
+    filtered = visible
+      .filter(
+        (r) =>
+          (reviewFilter === "all" || (reviewFilter === "photo" ? !!r.images?.length : !r.images?.length)) &&
+          (!month || reviewCalendarDay(r).startsWith(month)) &&
+          (!day || reviewCalendarDay(r) === day) &&
+          [r.title, r.body, r.author, reviewMenuLabel(r)].some((t) => t.toLowerCase().includes(query.toLowerCase())),
+      )
+      .sort((a, b) => {
+        const instant = (review: Review) =>
+          Date.parse(normalizeUTC(review.createdAt) ?? legacyKSTUTC(review.date) ?? "") || 0;
+        return instant(b) - instant(a);
+      });
+  const months = [...new Set(visible.map((review) => reviewCalendarDay(review).slice(0, 7)).filter(Boolean))]
+    .sort()
+    .reverse();
+  const days = [
+    ...new Set(visible.map(reviewCalendarDay).filter((value) => value && (!month || value.startsWith(month)))),
+  ]
+    .sort()
+    .reverse();
+  const groupKey = (review: Review) => reviewCalendarDay(review).slice(0, groupBy === "month" ? 7 : 10);
+
+  const groupLabel = (key: string) =>
+    key
+      ? key
+          .split("-")
+          .map((part, index) => `${Number(part)}${["년", "월", "일"][index]}`)
+          .join(" ")
+      : "날짜 미확인";
   const pageCount = Math.max(1, Math.ceil(filtered.length / 8));
   const currentPage = Math.min(reviewPage, pageCount);
   const pagedReviews = filtered.slice((currentPage - 1) * 8, currentPage * 8);
@@ -129,85 +163,156 @@ export default function ReviewManager({
           style={{ maxWidth: 320 }}
         />
       </div>
+      <div className="review-calendar-controls">
+        <div role="group" aria-label="리뷰 묶음 보기">
+          {(["month", "day"] as const).map((value) => (
+            <Button
+              type="button"
+              key={value}
+              variant={groupBy === value ? "default" : "outline"}
+              aria-pressed={groupBy === value}
+              onClick={() => {
+                setGroupBy(value);
+                setReviewPage(1);
+                if (value === "month") {
+                  setDay("");
+                }
+              }}
+            >
+              {value === "month" ? "월별 모아보기" : "일별 모아보기"}
+            </Button>
+          ))}
+        </div>
+        <label>
+          월 선택
+          <select
+            aria-label="리뷰 월 선택"
+            value={month}
+            onChange={(e) => {
+              setMonth(e.target.value);
+              setDay("");
+              setReviewPage(1);
+            }}
+          >
+            <option value="">전체 월</option>
+            {months.map((value) => (
+              <option key={value} value={value}>
+                {groupLabel(value)}
+              </option>
+            ))}
+          </select>
+        </label>
+        {groupBy === "day" && (
+          <label>
+            날짜 선택
+            <select
+              aria-label="리뷰 날짜 선택"
+              value={day}
+              onChange={(e) => {
+                setDay(e.target.value);
+                setReviewPage(1);
+              }}
+            >
+              <option value="">전체 날짜</option>
+              {days.map((value) => (
+                <option key={value} value={value}>
+                  {groupLabel(value)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <span className="meta" role="status">
+          조회 {filtered.length}개 · 최신순 · 한국 시간 기준
+        </span>
+      </div>
       {error && (
         <div className="error" role="alert">
           {error}
         </div>
       )}
       <section className="surface">
-        {pagedReviews.map((r) => (
-          <article
-            className="managed-review review-clickable"
-            key={r.id}
-            onClick={() => {
-              setDetailId(r.id);
-              setImageIndex(0);
-            }}
-          >
-            {!!r.images?.length && (
-              <div className="review-list-photos" role="group" aria-label={r.author + " 리뷰 첨부 사진"}>
-                {r.images.map((src, i) => (
-                  <button
-                    key={`${src}-${i}`}
-                    type="button"
-                    aria-label={r.author + " 리뷰 사진 " + (i + 1) + " 크게 보기"}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDetailId(r.id);
-                      setImageIndex(i);
-                    }}
-                  >
-                    <Image
-                      unoptimized
-                      width={160}
-                      height={160}
-                      src={src}
-                      alt={r.author + " 리뷰 첨부 사진 " + (i + 1)}
-                    />
-                  </button>
-                ))}
-              </div>
+        {pagedReviews.map((r, index) => (
+          <Fragment key={r.id}>
+            {(index === 0 || groupKey(pagedReviews[index - 1]) !== groupKey(r)) && (
+              <h2 className="review-calendar-heading">
+                {groupLabel(groupKey(r))}
+                <span>{filtered.filter((review) => groupKey(review) === groupKey(r)).length}개</span>
+              </h2>
             )}
-            <div className="section-heading">
-              <div>
-                <strong>{r.author}</strong>
-                <span className="meta"> · {reviewDateTime(r)}</span>
-                <div className="review-rating" aria-label={"별점 " + r.rating + "점"}>
-                  {"★".repeat(r.rating)}
-                  {"☆".repeat(5 - r.rating)} <span>{r.rating}.0</span>
+            <article
+              className="managed-review review-clickable"
+              key={r.id}
+              onClick={() => {
+                setDetailId(r.id);
+                setImageIndex(0);
+              }}
+            >
+              {!!r.images?.length && (
+                <div className="review-list-photos" role="group" aria-label={r.author + " 리뷰 첨부 사진"}>
+                  {r.images.map((src, i) => (
+                    <button
+                      key={`${src}-${i}`}
+                      type="button"
+                      aria-label={r.author + " 리뷰 사진 " + (i + 1) + " 크게 보기"}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDetailId(r.id);
+                        setImageIndex(i);
+                      }}
+                    >
+                      <Image
+                        unoptimized
+                        width={160}
+                        height={160}
+                        src={src}
+                        alt={r.author + " 리뷰 첨부 사진 " + (i + 1)}
+                      />
+                    </button>
+                  ))}
                 </div>
+              )}
+              <div className="section-heading">
+                <div>
+                  <strong>{r.author}</strong>
+                  <span className="meta"> · {reviewDateTime(r)}</span>
+                  <div className="review-rating" aria-label={"별점 " + r.rating + "점"}>
+                    {"★".repeat(r.rating)}
+                    {"☆".repeat(5 - r.rating)} <span>{r.rating}.0</span>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  disabled={busy}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelected(r.id);
+                  }}
+                >
+                  <Trash2 size={15} />
+                  리뷰 삭제
+                </Button>
               </div>
-              <Button
-                variant="outline"
-                disabled={busy}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelected(r.id);
-                }}
-              >
-                <Trash2 size={15} />
-                리뷰 삭제
-              </Button>
-            </div>
-            <h3>
-              <button type="button" className="review-detail-trigger" aria-label={r.title + " 리뷰 상세 보기"}>
-                {r.title}
-              </button>
-            </h3>
-            <p className="review-excerpt">{r.body}</p>
-            <div className="section-heading">
-              <span className="meta">{reviewMenuLabel(r)}</span>
-              <span className="meta">
-                {r.images?.length ? "사진 " + r.images.length + "장 · " : ""}
-                상세 보기 ↗
-              </span>
-            </div>
-          </article>
+              <h3>
+                <button type="button" className="review-detail-trigger" aria-label={r.title + " 리뷰 상세 보기"}>
+                  {r.title}
+                </button>
+              </h3>
+              <p className="review-excerpt">{r.body}</p>
+              <div className="section-heading">
+                <span className="meta">{reviewMenuLabel(r)}</span>
+                <span className="meta">
+                  {r.images?.length ? "사진 " + r.images.length + "장 · " : ""}
+                  상세 보기 ↗
+                </span>
+              </div>
+            </article>
+          </Fragment>
         ))}
         {!filtered.length && (
           <div className="empty">
-            {query
-              ? "검색 결과가 없습니다."
+            {query || month || day
+              ? "선택한 조건에 맞는 리뷰가 없습니다."
               : reviewFilter === "photo"
                 ? "사진 리뷰가 없습니다."
                 : reviewFilter === "text"
