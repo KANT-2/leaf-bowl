@@ -520,7 +520,14 @@ test("failed order/history writes roll back, and competing status updates append
         subtotal: order.subtotal,
         deliveryFee: order.deliveryFee,
         total: order.total,
-        items: order.items,
+        items: order.items.map(({ productId, productType, name, options, unitPrice, quantity }) => ({
+          productId,
+          productType,
+          name,
+          options,
+          unitPrice,
+          quantity,
+        })),
       };
       await tx.create(body);
       throw new Error("force rollback");
