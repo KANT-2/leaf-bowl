@@ -35,9 +35,8 @@ export default function ProductCard({ product: p, eager = false }: { product: Pr
       <div className="product-photo">
         <FoodImage id={p.id} sizes={CARD_SIZES} eager={eager} />
         {p.tag && <span className="product-tag">{p.tag}</span>}
-        {soldOut && <SoldOutCover />}
         {soldOut ? (
-          <span className="soldout-chip">품절</span>
+          <SoldOutCover />
         ) : (
           <button
             type="button"

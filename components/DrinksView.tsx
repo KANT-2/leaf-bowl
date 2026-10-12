@@ -38,9 +38,8 @@ export default function DrinksView() {
                   loading="eager"
                 />
               )}
-              {!d.available && <SoldOutCover />}
               {!d.available ? (
-                <span className="soldout-chip">품절</span>
+                <SoldOutCover />
               ) : (
                 <button
                   type="button"

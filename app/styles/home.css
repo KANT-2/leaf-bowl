@@ -316,9 +316,17 @@
   display: flex;
   gap: 9px;
   margin-bottom: 16px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.filters::-webkit-scrollbar {
+  display: none;
 }
 .filters button {
+  flex: none;
+  white-space: nowrap;
   border: 1px solid #bbcab6;
   border-radius: 25px;
   padding: 10px 19px;
