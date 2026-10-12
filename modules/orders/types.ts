@@ -14,6 +14,11 @@ export interface OrderItemRecord {
   quantity: number;
 }
 
+/** 저장된 주문 품목. DB 행 id가 있어서 리뷰를 어떤 구매에 연결할지 가릴 수 있다. */
+export interface StoredOrderItemRecord extends OrderItemRecord {
+  id: string;
+}
+
 export interface StatusHistoryRecord {
   fromStatus: OrderStatus | null;
   toStatus: OrderStatus;
@@ -44,26 +49,29 @@ export interface OrderRecord {
   cancelReason: string | null;
   canceledAt: Date | null;
   createdAt: Date;
-  items: OrderItemRecord[];
+  items: StoredOrderItemRecord[];
   history: StatusHistoryRecord[];
 }
 
-export type NewOrder = Pick<
-  OrderRecord,
-  | "customerSessionId"
-  | "ordererName"
-  | "phone"
-  | "address"
-  | "addressDetail"
-  | "desiredStartAt"
-  | "desiredEndAt"
-  | "subtotal"
-  | "deliveryFee"
-  | "total"
-  | "requestKey"
-  | "requestHash"
-  | "items"
->;
+export type NewOrder = Omit<
+  Pick<
+    OrderRecord,
+    | "customerSessionId"
+    | "ordererName"
+    | "phone"
+    | "address"
+    | "addressDetail"
+    | "desiredStartAt"
+    | "desiredEndAt"
+    | "subtotal"
+    | "deliveryFee"
+    | "total"
+    | "requestKey"
+    | "requestHash"
+    | "items"
+  >,
+  "items"
+> & { items: OrderItemRecord[] };
 
 export interface StatusUpdate {
   id: string;

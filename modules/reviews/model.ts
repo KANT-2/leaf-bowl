@@ -21,6 +21,10 @@ export interface Review {
   t: number;
   sample: boolean;
   mine?: boolean;
+  /** 이 리뷰를 쓴 계정 이메일 (이 브라우저에 저장된 리뷰에만 있음, 서버로 보내지 않는다) */
+  ownerEmail?: string;
+  /** 이 리뷰가 달린 주문 품목 id (같은 구매를 중복으로 리뷰하지 못하게 막는 데 쓴다, 서버로 보내지 않는다) */
+  orderItemId?: string;
 }
 
 export interface ReviewStats {

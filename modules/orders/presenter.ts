@@ -38,6 +38,9 @@ export function detailView(o: OrderRecord) {
     desiredDate: delivery.day,
     desiredSlot: delivery.timeLabel,
     items: o.items.map((i) => ({
+      id: i.id,
+      productId: i.productId,
+      productType: i.productType,
       name: i.name,
       options: optionsLabel(i.options),
       unitPrice: i.unitPrice,

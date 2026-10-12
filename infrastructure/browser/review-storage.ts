@@ -16,7 +16,9 @@ function isStoredReview(v: unknown): v is Review {
     typeof v.author === "string" &&
     (v.via === "pickup" || v.via === "delivery") &&
     typeof v.t === "number" &&
-    Number.isFinite(v.t)
+    Number.isFinite(v.t) &&
+    (v.ownerEmail === undefined || typeof v.ownerEmail === "string") &&
+    (v.orderItemId === undefined || typeof v.orderItemId === "string")
   );
 }
 
@@ -38,6 +40,8 @@ export function loadUserReviews(): Review[] {
         }),
         sample: false,
         mine: true,
+        ownerEmail: r.ownerEmail,
+        orderItemId: r.orderItemId,
       }))
     : [];
 }
@@ -45,7 +49,7 @@ export function loadUserReviews(): Review[] {
 export function saveUserReviews(list: Review[]) {
   writeJSON(
     REVIEW_KEY,
-    list.map(({ id, pid, author, stars, title, text, date, via, t }) => ({
+    list.map(({ id, pid, author, stars, title, text, date, via, t, ownerEmail, orderItemId }) => ({
       id,
       pid,
       author,
@@ -55,6 +59,8 @@ export function saveUserReviews(list: Review[]) {
       date: reviewDisplayDate({ t, date }),
       via,
       t,
+      ownerEmail,
+      orderItemId,
     })),
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "./AuthProvider";
 import { useCustomerCatalog, notifyCatalogSaved } from "./CustomerCatalogProvider";
 import { createContext, useCallback, useContext, useMemo, useEffect, useRef, useSyncExternalStore } from "react";
 import { startReviewMigration } from "@/features/reviews/migration";
@@ -31,6 +32,7 @@ export function useReviews(): ReviewsContextValue {
 }
 
 export default function ReviewsProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const { reviews } = useCustomerCatalog();
   const userReviews = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getServerSnapshot);
 
@@ -55,9 +57,10 @@ export default function ReviewsProvider({ children }: { children: React.ReactNod
   );
 
   const allReviews = useMemo(() => {
-    const mine = new Set(userReviews.map((r) => r.id));
+    // 로그인한 계정이 쓴 리뷰만 "내가 작성"으로 본다. 다른 계정·비로그인 상태에서 남은 캐시는 무시한다.
+    const mine = new Set(user ? userReviews.filter((r) => r.ownerEmail === user.email).map((r) => r.id) : []);
     return reviews.map((r) => ({ ...r, mine: mine.has(r.id) }));
-  }, [reviews, userReviews]);
+  }, [reviews, userReviews, user]);
   const reviewsFor = useCallback((pid: number) => allReviews.filter((r) => r.pid === pid), [allReviews]);
   const statsFor = useCallback((pid: number) => statsOf(reviewsFor(pid)), [reviewsFor]);
   const addReview = useCallback(async (review: Review, photos: string[] = []) => {
