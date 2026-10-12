@@ -35,7 +35,7 @@ export default function Admin() {
   const [type, setType] = useState<Product["type"]>("salad");
   const editors = useCatalogEditors();
   const { setProduct, setGroup, setDeleting, setPurging, setPreview } = editors;
-  const { snapshot, loadError, busy, load, save, action } = useAdminCatalog(view === "reviews");
+  const { snapshot, loadError, busy, load, save, action } = useAdminCatalog();
   const [navigationReady, setNavigationReady] = useState(false);
   useEffect(() => {
     const restore = () => {

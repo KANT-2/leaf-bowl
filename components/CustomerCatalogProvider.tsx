@@ -72,12 +72,10 @@ export default function CustomerCatalogProvider({
     window.addEventListener("storage", storage);
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", refresh);
-    const timer = setInterval(refresh, 3000);
     void refresh();
     return () => {
       disposed = true;
       controller.abort();
-      clearInterval(timer);
       channel?.close();
       window.removeEventListener("catalog-saved", refresh);
       window.removeEventListener("storage", storage);
