@@ -3,11 +3,13 @@ import { deliveryWindowKST } from "@/modules/delivery/time";
 
 /** 응답에는 필요한 필드만 고른다 (docs/api-design.md §3). 금액은 BigInt 라 toJson 이 문자열로 바꾼다. */
 function optionsLabel(options: OrderRecord["items"][number]["options"]): string {
+  // Older persisted orders used a single dressing and omitted empty option arrays.
+  const legacy = options as typeof options & { dressing?: { name: string } | null };
   return [
-    ...options.dressings.map((d) => d.name),
-    ...options.drinks.map((d) => d.name),
-    ...options.ingredients.map((i) => i.name),
-    ...(options.custom ?? []).map((c) => c.name),
+    ...(options?.dressings ?? (legacy?.dressing ? [legacy.dressing] : [])).map((d) => d.name),
+    ...(options?.drinks ?? []).map((d) => d.name),
+    ...(options?.ingredients ?? []).map((i) => i.name),
+    ...(options?.custom ?? []).map((c) => c.name),
   ]
     .filter(Boolean)
     .join(" · ");
