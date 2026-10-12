@@ -20,7 +20,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
     try {
       body = JSON.parse(new TextDecoder().decode(await readLimited(request, 16_384)));
     } catch (error) {
-      if (error instanceof BodyTooLarge) {
+      if (error instanceof BodyTooLarge || error instanceof AppError) {
         throw error;
       }
       throw new AppError(400, "요청 본문이 올바른 JSON이 아닙니다");

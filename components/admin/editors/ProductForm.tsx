@@ -21,6 +21,7 @@ export default function ProductForm({
   onSave,
   onRefresh,
   onManageIngredients,
+  onUploadBusy,
 }: {
   onManageIngredients: () => void;
   initial: Product;
@@ -29,6 +30,7 @@ export default function ProductForm({
   groups: OptionGroup[];
   originCountries: string[];
   busy: boolean;
+  onUploadBusy?: (busy: boolean) => void;
   onRefresh: () => Promise<void>;
   onCancel: () => void;
   onSave: (p: Product) => Promise<void>;
@@ -56,6 +58,9 @@ export default function ProductForm({
     <form
       onSubmit={async (e) => {
         e.preventDefault();
+        if (busy || uploading) {
+          return;
+        }
         setError("");
         try {
           await onSave({
@@ -67,7 +72,7 @@ export default function ProductForm({
         }
       }}
     >
-      <fieldset disabled={busy || uploading}>
+      <fieldset disabled={busy}>
         <div className="menu-basics">
           <label className="field">
             메뉴 이름
@@ -99,7 +104,14 @@ export default function ProductForm({
           </label>
           <div className="field menu-image-field">
             <span>메뉴 이미지</span>
-            <Upload value={p.image} onChange={(v) => set("image", v)} onBusy={setUploading} />
+            <Upload
+              value={p.image}
+              onChange={(v) => set("image", v)}
+              onBusy={(value) => {
+                setUploading(value);
+                onUploadBusy?.(value);
+              }}
+            />
           </div>
           <label className="field">
             메뉴 설명
@@ -200,7 +212,7 @@ export default function ProductForm({
               <h3>
                 구성 재료 <span>{tokens.length}개 선택</span>
               </h3>
-              <Button type="button" variant="ghost" size="sm" onClick={onManageIngredients}>
+              <Button type="button" variant="ghost" size="sm" disabled={uploading} onClick={onManageIngredients}>
                 재료 관리 ›
               </Button>
             </div>
