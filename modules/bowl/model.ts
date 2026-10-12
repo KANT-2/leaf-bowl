@@ -7,6 +7,7 @@ export interface Decision {
 
 /** "내 조합 저장하기"로 남긴 조합 */
 export interface SavedRecipe {
+  id: string;
   name: string;
   /** 재료 id 목록 */
   ingredients: string[];
@@ -14,4 +15,6 @@ export interface SavedRecipe {
   dressingKey?: string;
   price: number;
   savedAt: string;
+  /** 저장한 계정 이메일. 마이페이지에서 계정별로 걸러 보여준다 (서버로 보내지 않는다). */
+  ownerEmail?: string;
 }

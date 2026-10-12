@@ -10,6 +10,7 @@ import AddressTab from "./mypage/AddressTab";
 import PreferencesTab from "./mypage/PreferencesTab";
 import OrdersTab from "./mypage/OrdersTab";
 import ReviewsTab from "./mypage/ReviewsTab";
+import BowlRecipesTab from "./mypage/BowlRecipesTab";
 
 const TABS = [
   { key: "profile", label: "기본 정보" },
@@ -17,6 +18,7 @@ const TABS = [
   { key: "preferences", label: "취향·알레르기" },
   { key: "orders", label: "주문 내역" },
   { key: "reviews", label: "내가 쓴 리뷰" },
+  { key: "bowls", label: "내 조합" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -58,6 +60,7 @@ export default function MyPageView() {
       {tab === "preferences" && <PreferencesTab />}
       {tab === "orders" && <OrdersTab />}
       {tab === "reviews" && <ReviewsTab />}
+      {tab === "bowls" && <BowlRecipesTab />}
     </main>
   );
 }

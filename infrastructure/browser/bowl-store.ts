@@ -8,19 +8,20 @@ import { dressingKey as recipeDressingKey } from "@/modules/cart/identifiers";
 
 const RECIPE_KEY = "bm-recipe";
 
-function loadRecipe(): SavedRecipe | null {
-  const r = read(RECIPE_KEY);
+function parseRecipe(r: unknown): SavedRecipe | null {
   if (typeof r !== "object" || r === null) {
     return null;
   }
-  const { name, ingredients, dressing, price, savedAt } = r as Record<string, unknown>;
+  const { id, name, ingredients, dressing, price, savedAt, ownerEmail } = r as Record<string, unknown>;
   if (
+    typeof id !== "string" ||
     typeof name !== "string" ||
     !Array.isArray(ingredients) ||
-    !ingredients.every((id) => typeof id === "string") ||
+    !ingredients.every((i) => typeof i === "string") ||
     typeof dressing !== "number" ||
     dressing < -1 ||
-    !Number.isInteger(dressing)
+    !Number.isInteger(dressing) ||
+    (ownerEmail !== undefined && typeof ownerEmail !== "string")
   ) {
     return null;
   }
@@ -29,13 +30,21 @@ function loadRecipe(): SavedRecipe | null {
     return null;
   }
   return {
+    id,
     name: name.slice(0, 30),
     ingredients,
     dressing,
     dressingKey: recipeDressingKey({ dressing, dressingKey: key }),
     price: Number(price) || 0,
     savedAt: normalizeUTC(savedAt) ?? legacyKSTUTC(savedAt) ?? "",
+    ownerEmail,
   };
+}
+
+/** 예전엔 조합 하나만 저장했다. 배열이 아니면 옛 형식이라 보고 통째로 버린다(계정에 연결된 적 없는 데이터라 되살릴 수 없다). */
+function loadRecipes(): SavedRecipe[] {
+  const raw = read(RECIPE_KEY);
+  return Array.isArray(raw) ? raw.map(parseRecipe).filter((r): r is SavedRecipe => r !== null) : [];
 }
 
 const NO_DECISIONS: Decision[] = [];
@@ -61,18 +70,14 @@ function createMemoryStore<T>(empty: T): LocalStore<T> {
 // 재료 고르기 진행 상황은 이번 방문에서만 유지한다 ("내 조합 저장하기"로 남긴 조합과는 다르게,
 // 다른 페이지로 갔다 오거나 새로고침하면 새로 시작한다).
 export const decisionsStore = createMemoryStore<Decision[]>(NO_DECISIONS);
-export const recipeStore = createLocalStore<SavedRecipe | null>(
+const NO_RECIPES: SavedRecipe[] = [];
+export const recipeStore = createLocalStore<SavedRecipe[]>(
   RECIPE_KEY,
-  loadRecipe,
-  (v) =>
+  loadRecipes,
+  (list) =>
     write(
       RECIPE_KEY,
-      v
-        ? {
-            ...v,
-            savedAt: normalizeUTC(v.savedAt) ?? legacyKSTUTC(v.savedAt) ?? "",
-          }
-        : null,
+      list.map((v) => ({ ...v, savedAt: normalizeUTC(v.savedAt) ?? legacyKSTUTC(v.savedAt) ?? "" })),
     ),
-  null,
+  NO_RECIPES,
 );

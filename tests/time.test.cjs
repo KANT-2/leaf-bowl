@@ -187,13 +187,17 @@ test("browser review caches display KST and saved recipes normalize offset times
   const values = new Map([
     [
       "bm-recipe",
-      JSON.stringify({
-        name: "내 조합",
-        ingredients: ["romaine"],
-        dressing: -1,
-        price: 7500,
-        savedAt: "2027-01-01T00:10:00+09:00",
-      }),
+      JSON.stringify([
+        {
+          id: "recipe-1",
+          name: "내 조합",
+          ingredients: ["romaine"],
+          dressing: -1,
+          price: 7500,
+          savedAt: "2027-01-01T00:10:00+09:00",
+          ownerEmail: "me@example.com",
+        },
+      ]),
     ],
     [
       "bb-user-reviews",
@@ -215,9 +219,9 @@ test("browser review caches display KST and saved recipes normalize offset times
   global.localStorage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };
   try {
     const { recipeStore } = require("../infrastructure/browser/bowl-store.ts");
-    assert.equal(recipeStore.getSnapshot().savedAt, at);
-    recipeStore.set({ ...recipeStore.getSnapshot(), savedAt: "2027-01-01T00:10:00+09:00" });
-    assert.equal(JSON.parse(values.get("bm-recipe")).savedAt, at);
+    assert.equal(recipeStore.getSnapshot()[0].savedAt, at);
+    recipeStore.set([{ ...recipeStore.getSnapshot()[0], savedAt: "2027-01-01T00:10:00+09:00" }]);
+    assert.equal(JSON.parse(values.get("bm-recipe"))[0].savedAt, at);
     const { loadUserReviews, saveUserReviews } = require("../infrastructure/browser/review-storage.ts");
     const reviews = loadUserReviews();
     assert.equal(reviews[0].date, "2027.01.01");
