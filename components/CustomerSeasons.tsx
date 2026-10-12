@@ -46,12 +46,11 @@ export default function CustomerSeasons() {
   return (
     <section
       className={`monthly wrap${many ? " has-nav" : ""}`}
-      id="monthly"
       aria-roledescription={many ? "carousel" : undefined}
-      aria-label="시즌 스페셜"
+      aria-label="이달의 이벤트"
     >
       <div className="monthly-copy">
-        <span className="pill">THIS MONTH’S PICK</span>
+        <span className="pill">THIS MONTH’S EVENT</span>
         <h2>
           <Lines text={page.title} at=", " />
         </h2>
