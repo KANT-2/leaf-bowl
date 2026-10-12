@@ -115,8 +115,8 @@ export default function ProductDetail({ product: p }: { product: Product }) {
                                   ? [c.id]
                                   : [],
                             }));
-                            // 하나만 고르는 그룹은 고르면 바로 접는다(여러 개 고르는 그룹은 계속 열어둔다).
-                            if (!g.multiple) {
+                            // 골랐으면(체크 해제가 아니라 선택했으면) 드롭다운을 접는다.
+                            if (e.target.checked) {
                               e.currentTarget.closest("details")?.removeAttribute("open");
                             }
                           }}
