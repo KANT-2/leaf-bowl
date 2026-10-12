@@ -134,6 +134,9 @@ export async function loadServerOrders(cursor?: string): Promise<{ items: Server
         desiredStartAt: string;
         desiredEndAt: string;
         items: {
+          id: string;
+          productId: string | null;
+          productType?: "salad" | "drink" | "custom";
           name: string;
           options: string;
           quantity: number;
@@ -156,6 +159,9 @@ export async function loadServerOrders(cursor?: string): Promise<{ items: Server
           desiredStartAt: order.desiredStartAt,
           desiredEndAt: order.desiredEndAt,
           items: order.items.map((item) => ({
+            id: item.id,
+            productId: item.productId,
+            productType: item.productType,
             name: item.name,
             options: item.options,
             qty: item.quantity,

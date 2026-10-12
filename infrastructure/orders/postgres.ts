@@ -18,6 +18,7 @@ function record(row: StoredOrder): OrderRecord {
     ...row,
     status: row.status as OrderRecord["status"],
     items: row.items.map((item) => ({
+      id: item.id.toString(),
       productId: item.originalProductId ?? item.productId,
       productType: item.productType as OrderRecord["items"][number]["productType"],
       name: item.name,

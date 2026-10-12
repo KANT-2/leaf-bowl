@@ -405,6 +405,90 @@ html:has(dialog[open]) {
   font-weight: 600;
 }
 
+/* 리뷰 쓸 주문 고르기: 펼치면 목록, 고르면 하나만 보이는 커스텀 드롭다운 */
+.rw-order-pick {
+  position: relative;
+}
+.rw-order-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #bccdb0;
+  border-radius: 6px;
+  background: #fff;
+  text-align: left;
+}
+.rw-order-trigger img {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--color-pale);
+}
+.rw-order-trigger > span:not(.rw-order-caret) {
+  flex: 1;
+  min-width: 0;
+}
+.rw-order-caret {
+  flex-shrink: 0;
+  color: var(--color-muted);
+}
+.rw-order-list {
+  position: absolute;
+  z-index: 1;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: #fff;
+  border: 1px solid #bccdb0;
+  border-radius: 6px;
+  box-shadow: 0 8px 20px rgb(0 0 0 / 12%);
+  max-height: 220px;
+  overflow-y: auto;
+}
+.rw-order-list li + li {
+  margin-top: 4px;
+}
+.rw-order-list button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  text-align: left;
+}
+.rw-order-list button:hover,
+.rw-order-list button.on {
+  background: var(--color-pale);
+}
+.rw-order-list img {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--color-pale);
+}
+.rw-order-trigger strong,
+.rw-order-list strong {
+  display: block;
+  font-size: 13px;
+  color: var(--color-ink);
+}
+.rw-order-trigger small,
+.rw-order-list small {
+  display: block;
+  color: var(--color-muted);
+  margin-top: 2px;
+}
+
 /* 별점 입력 */
 .rate {
   border: 0;
