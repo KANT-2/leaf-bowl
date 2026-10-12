@@ -25,9 +25,7 @@ const KEY_LENGTH = 64;
 // 형식: scrypt$<salt base64>$<hash base64>  (admin_users.password_hash VARCHAR(255) 안에 들어간다)
 function derive(password: string, salt: Buffer): Promise<Buffer> {
   return new Promise((resolve, reject) =>
-    scrypt(password.normalize("NFKC"), salt, KEY_LENGTH, (err, key) =>
-      err ? reject(err) : resolve(key),
-    ),
+    scrypt(password.normalize("NFKC"), salt, KEY_LENGTH, (err, key) => (err ? reject(err) : resolve(key))),
   );
 }
 
@@ -39,7 +37,9 @@ export async function hashPassword(password: string): Promise<string> {
 
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
   const [scheme, saltB64, keyB64] = stored.split("$");
-  if (scheme !== "scrypt" || !saltB64 || !keyB64) return false;
+  if (scheme !== "scrypt" || !saltB64 || !keyB64) {
+    return false;
+  }
   const expected = Buffer.from(keyB64, "base64");
   const actual = await derive(password, Buffer.from(saltB64, "base64"));
   return expected.length === actual.length && timingSafeEqual(expected, actual);

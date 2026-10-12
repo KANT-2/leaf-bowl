@@ -1,7 +1,7 @@
 import { clearedCookie, readCookie } from "@/modules/identity/cookies";
 import { ADMIN_COOKIE } from "@/modules/identity/service";
-import { services } from "@/modules/container";
-import { assertSameOrigin, jsonResponse, run } from "@/modules/shared/http";
+import { services } from "@/application/container";
+import { assertSameOrigin, jsonResponse, run } from "@/infrastructure/http/response";
 
 export async function POST(request: Request) {
   return run(async () => {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MATCH_URL } from "@/lib/products";
+import { MATCH_URL } from "@/features/customer/routes";
 
 const REVIEWS_PATH = /^\/(reviews|product\/\d+\/reviews)\/?$/;
 
@@ -17,7 +17,9 @@ export default function HeaderNav() {
       <Link href="/drinks" aria-current={path === "/drinks" ? "page" : undefined}>
         음료
       </Link>
-      <Link href="/#monthly">시즌 스페셜</Link>
+      <Link href="/event" aria-current={path === "/event" ? "page" : undefined}>
+        이달의 이벤트
+      </Link>
       <Link href="/reviews" aria-current={onReviews ? "page" : undefined}>
         고객 리뷰
       </Link>

@@ -1,14 +1,10 @@
 "use client";
-import { isCustom, isDrink } from "@/lib/cart";
-import { drinkKey } from "@/lib/cart-identifiers";
-import {
-  choiceSlot,
-  withRo,
-  type ChoiceSlot,
-} from "@/lib/customer/cart-choice";
-import type { CustomerCatalog } from "@/lib/customer/catalog";
-import { money } from "@/lib/products";
-import type { CartItem } from "@/lib/storage";
+import { hasCustomIngredientIds, isCustom, isDrink } from "@/modules/cart/identity";
+import { drinkKey } from "@/modules/cart/identifiers";
+import { choiceSlot, dressingSlot, withRo, type ChoiceSlot } from "@/features/cart/choice";
+import type { CustomerCatalog } from "@/modules/catalog/customer-view";
+import { money } from "@/modules/shared/format";
+import { type CartItem } from "@/modules/cart/types";
 import Image from "next/image";
 import Link from "next/link";
 import { useCart } from "../CartProvider";
@@ -52,37 +48,29 @@ export default function CartLine({
   closeBtn: React.RefObject<HTMLButtonElement | null>;
   onOther: (index: number, slot: ChoiceSlot) => void;
 }) {
-  const { update, remove, close, changeChoice } = useCart();
+  const { update, remove, close, changeChoice, toggleDressing } = useCart();
   const toast = useToast();
-  const {
-    itemAllergens,
-    itemName,
-    itemOptions,
-    itemUnitPrice,
-    itemAvailable,
-    DRINKS,
-  } = cat;
+  const { itemAllergens, itemName, itemOptions, itemUnitPrice, itemAvailable, DRINKS } = cat;
 
   const slot = choiceSlot(item, cat);
-  // 드롭다운에 보이는 선택은 옵션 줄에서 뺀다.
-  const picked = slot?.choices.find((c) => c.value === slot.value)?.name;
+  const dSlot = dressingSlot(item, cat);
+  // 드롭다운·드레싱 체크박스에 보이는 선택은 옵션 줄에서 뺀다.
+  const picked = new Set(
+    [
+      slot?.choices.find((c) => c.value === slot.value)?.name,
+      ...(dSlot?.selected.map((v) => dSlot.choices.find((c) => c.value === v)?.name) ?? []),
+    ].filter((x): x is string => !!x),
+  );
   const rest = itemOptions(item)
     .split(" · ")
-    .filter((x) => x && x !== picked)
+    .filter((x) => x && !picked.has(x))
     .join(" · ");
-  const changeQty = (
-    e: React.MouseEvent<HTMLButtonElement>,
-    index: number,
-    delta: number,
-  ) => {
+  const changeQty = (e: React.MouseEvent<HTMLButtonElement>, index: number, delta: number) => {
     const next = item.qty + delta;
     update(index, next);
     // 이번 클릭으로 버튼이 비활성화되면 반대쪽 수량 버튼으로 포커스를 옮긴다.
     if (next <= 1 || next >= 99) {
-      const other =
-        e.currentTarget.parentElement?.querySelector<HTMLButtonElement>(
-          `[data-delta="${-delta}"]`,
-        );
+      const other = e.currentTarget.parentElement?.querySelector<HTMLButtonElement>(`[data-delta="${-delta}"]`);
       other?.focus({ preventScroll: true });
     }
   };
@@ -111,6 +99,33 @@ export default function CartLine({
 
         <>
           {rest && <p>{rest}</p>}
+          {dSlot && (
+            <div className="cart-dressing cart-dressing-multi" role="group" aria-label={dSlot.label}>
+              <span className="cart-dressing-label">{dSlot.label}</span>
+              <div className="dressing-chip-list">
+                {dSlot.choices.map((c) => {
+                  const active = dSlot.selected.includes(c.value);
+                  return (
+                    <button
+                      key={c.value}
+                      type="button"
+                      className={`dressing-chip${active ? " is-on" : ""}`}
+                      aria-pressed={active}
+                      disabled={!c.available && !active}
+                      onClick={() => {
+                        if (toggleDressing(index, dSlot.groupId, c.value)) {
+                          toast("같은 구성이 있어 한 줄로 합쳤어요");
+                        }
+                      }}
+                    >
+                      {c.name}
+                      {c.available ? "" : " (품절)"}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           {slot && (
             <div className="cart-dressing">
               <label htmlFor={`choice-${index}`}>{slot.label}</label>
@@ -118,8 +133,9 @@ export default function CartLine({
                 id={`choice-${index}`}
                 value={slot.value}
                 onChange={(e) => {
-                  if (changeChoice(index, slot.groupId, e.target.value))
+                  if (changeChoice(index, slot.groupId, e.target.value)) {
                     toast("같은 구성이 있어 한 줄로 합쳤어요");
+                  }
                 }}
               >
                 {slot.choices.map((c) => (
@@ -129,27 +145,30 @@ export default function CartLine({
                   </option>
                 ))}
               </select>
-              <button
-                type="button"
-                className="cart-variant"
-                onClick={() => onOther(index, slot)}
-              >
+              <button type="button" className="cart-variant" onClick={() => onOther(index, slot)}>
                 + 다른 {withRo(slot.label)}
               </button>
             </div>
           )}
         </>
 
-        {!itemAvailable(item) && (
+        {isCustom(item) && !hasCustomIngredientIds(item) ? (
           <p className="cart-soldout">
-            <b>품절</b> 지금은 주문할 수 없는 {isDrink(item) ? "음료" : "구성"}
-            이에요
+            저장한 조합의 재료를 다시 선택해주세요.{" "}
+            <Link href="/match" onClick={() => close(false)}>
+              재료 다시 선택
+            </Link>
           </p>
+        ) : (
+          !itemAvailable(item) && (
+            <p className="cart-soldout">
+              <b>품절</b> 지금은 주문할 수 없는 {isDrink(item) ? "음료" : "구성"}
+              이에요
+            </p>
+          )
         )}
         {!isDrink(item) && (
-          <p className="cart-allergy">
-            알레르기: {itemAllergens(item).join(", ") || "주요 표기 대상 없음"}
-          </p>
+          <p className="cart-allergy">알레르기: {itemAllergens(item).join(", ") || "주요 표기 대상 없음"}</p>
         )}
         <div className="item-bottom">
           <strong>{money(itemUnitPrice(item) * item.qty)}</strong>

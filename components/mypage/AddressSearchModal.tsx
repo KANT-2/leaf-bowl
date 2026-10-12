@@ -20,12 +20,16 @@ export default function AddressSearchModal({
 
   useEffect(() => {
     const d = ref.current;
-    if (!d) return;
+    if (!d) {
+      return;
+    }
     if (open && !d.open) {
       setQuery("");
       d.showModal();
     }
-    if (!open && d.open) d.close();
+    if (!open && d.open) {
+      d.close();
+    }
   }, [open]);
 
   return (
@@ -40,7 +44,9 @@ export default function AddressSearchModal({
         className="address-search-form"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!query.trim()) return;
+          if (!query.trim()) {
+            return;
+          }
           onSelect(query.trim());
           ref.current?.close();
         }}
@@ -70,9 +76,7 @@ export default function AddressSearchModal({
           <li>건물명, 아파트명 (예: 반포자이아파트)</li>
         </ul>
       </div>
-      <p className="demo-note">
-        체험용 화면이라 실제 주소 검색은 되지 않아요. 입력한 내용을 그대로 주소로 사용합니다.
-      </p>
+      <p className="demo-note">체험용 화면이라 실제 주소 검색은 되지 않아요. 입력한 내용을 그대로 주소로 사용합니다.</p>
     </dialog>
   );
 }

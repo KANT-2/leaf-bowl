@@ -1,13 +1,15 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "./AuthProvider";
 import { useReviews } from "./ReviewsProvider";
 import { useToast } from "./ToastProvider";
-import {useCustomerCatalog} from "./CustomerCatalogProvider";
-import { createReviewSubmission } from "@/lib/review-submission";
-import { shrinkImage } from "@/lib/image";
-import { RATE_LABELS, REVIEW_PHOTO_MAX, type Review } from "@/lib/reviews";
+import { useReviewableOrderItems } from "@/features/reviews/reviewable-orders";
+import { createReviewSubmission } from "@/features/reviews/submission";
+import { shrinkImage } from "@/features/shared/image";
+import { RATE_LABELS, REVIEW_PHOTO_MAX, type Review } from "@/modules/reviews/model";
 
 const len = (s: string) => [...s].length;
 
@@ -25,19 +27,33 @@ const ReviewWriteContext = createContext<ReviewWriteContextValue | null>(null);
 
 export function useReviewWrite(): ReviewWriteContextValue {
   const ctx = useContext(ReviewWriteContext);
-  if (!ctx) throw new Error("useReviewWrite must be used inside <ReviewWriteProvider>");
+  if (!ctx) {
+    throw new Error("useReviewWrite must be used inside <ReviewWriteProvider>");
+  }
   return ctx;
 }
 
 /** 어느 페이지에서든 같은 리뷰 쓰기 모달을 열 수 있게 레이아웃에 한 번 둔다. */
 export default function ReviewWriteProvider({ children }: { children: React.ReactNode }) {
+  const { isLoggedIn } = useAuth();
+  const router = useRouter();
+  const toast = useToast();
   const [target, setTarget] = useState<{ pid: number | null; key: number } | null>(null);
   const onAdded = useRef<OpenOptions["onAdded"]>(undefined);
 
-  const openWrite = useCallback((pid: number | null, options?: OpenOptions) => {
-    onAdded.current = options?.onAdded;
-    setTarget({ pid, key: Date.now() });
-  }, []);
+  const openWrite = useCallback(
+    (pid: number | null, options?: OpenOptions) => {
+      if (!isLoggedIn) {
+        toast("리뷰를 쓰려면 로그인해주세요");
+        const back = pid === null ? "/reviews" : `/product/${pid}/reviews`;
+        router.push(`/login?next=${encodeURIComponent(`${back}#write`)}`);
+        return;
+      }
+      onAdded.current = options?.onAdded;
+      setTarget({ pid, key: Date.now() });
+    },
+    [isLoggedIn, router, toast],
+  );
 
   const value = useMemo(() => ({ openWrite }), [openWrite]);
 
@@ -67,9 +83,14 @@ interface DialogProps {
  * 작성 중에 닫으려 하면(×, Esc, 바깥 클릭) 한 번 확인한다.
  */
 function WriteDialog({ fixedPid, onAdded, onClosed }: DialogProps) {
+  const { user } = useAuth();
   const { addReview } = useReviews();
-  const {visibleProducts: PRODUCTS, getProduct}=useCustomerCatalog();
-  const [saving,setSaving]=useState(false);
+  const { loading: loadingOrders, items: reviewable } = useReviewableOrderItems();
+  const options = useMemo(
+    () => (fixedPid === null ? reviewable : reviewable.filter((it) => it.pid === fixedPid)),
+    [reviewable, fixedPid],
+  );
+  const [saving, setSaving] = useState(false);
   const submission = useRef<ReturnType<typeof createReviewSubmission> | null>(null);
   const pending = useRef(false);
   const [photos, setPhotos] = useState<string[]>([]);
@@ -77,13 +98,15 @@ function WriteDialog({ fixedPid, onAdded, onClosed }: DialogProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
   const dialog = useRef<HTMLDialogElement>(null);
-  const menuRef = useRef<HTMLSelectElement>(null);
+  const menuRef = useRef<HTMLButtonElement>(null);
+  const pickRef = useRef<HTMLDivElement>(null);
   const firstStar = useRef<HTMLInputElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
   const keepRef = useRef<HTMLButtonElement>(null);
 
-  const [pid, setPid] = useState<number | null>(fixedPid);
+  const [orderItemId, setOrderItemId] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [stars, setStars] = useState(0);
   const [hover, setHover] = useState(0);
   const [nick, setNick] = useState("");
@@ -93,27 +116,60 @@ function WriteDialog({ fixedPid, onAdded, onClosed }: DialogProps) {
   const [asking, setAsking] = useState(false);
 
   const dirty = stars > 0 || !!nick.trim() || !!title.trim() || !!text.trim() || photos.length > 0;
-  const product = pid === null ? null : getProduct(pid);
+  const effectiveOrderItemId = orderItemId ?? (options.length === 1 ? options[0].orderItemId : null);
+  const selected = options.find((it) => it.orderItemId === effectiveOrderItemId) ?? null;
 
   useEffect(() => {
     const d = dialog.current;
-    if (!d) return;
+    if (!d) {
+      return;
+    }
     d.showModal();
     (fixedPid === null ? menuRef.current : firstStar.current)?.focus();
     return () => d.close();
   }, [fixedPid]);
 
   useEffect(() => {
-    if (asking) keepRef.current?.focus();
+    if (asking) {
+      keepRef.current?.focus();
+    }
   }, [asking]);
+
+  useEffect(() => {
+    if (!pickerOpen) {
+      return;
+    }
+    const onPointer = (e: MouseEvent) => {
+      if (!pickRef.current?.contains(e.target as Node)) {
+        setPickerOpen(false);
+      }
+    };
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setPickerOpen(false);
+        menuRef.current?.focus();
+      }
+    };
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [pickerOpen]);
 
   const close = () => dialog.current?.close();
 
   const addPhotos = async (files: FileList | null) => {
-    if (!files?.length) return;
+    if (!files?.length) {
+      return;
+    }
     const room = REVIEW_PHOTO_MAX - photos.length;
     const list = [...files].slice(0, room);
-    if (files.length > room) toast(`사진은 ${REVIEW_PHOTO_MAX}장까지 올릴 수 있어요`);
+    if (files.length > room) {
+      toast(`사진은 ${REVIEW_PHOTO_MAX}장까지 올릴 수 있어요`);
+    }
     setReading(true);
     const done: string[] = [];
     for (const f of list) {
@@ -125,23 +181,37 @@ function WriteDialog({ fixedPid, onAdded, onClosed }: DialogProps) {
     }
     setPhotos((cur) => [...cur, ...done].slice(0, REVIEW_PHOTO_MAX));
     setReading(false);
-    if (fileRef.current) fileRef.current.value = "";
+    if (fileRef.current) {
+      fileRef.current.value = "";
+    }
   };
+
   const requestClose = () => {
-    if (saving) return;
-    if (dirty) setAsking(true);
-    else close();
+    if (saving) {
+      return;
+    }
+    if (dirty) {
+      setAsking(true);
+    } else {
+      close();
+    }
   };
 
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if(pending.current)return;
+    if (pending.current) {
+      return;
+    }
     const tTitle = title.trim();
     const tText = text.trim();
     const tNick = nick.trim();
-    if (pid === null || !getProduct(pid)) {
-      setMsg("리뷰를 남길 메뉴를 선택해주세요.");
+    if (!selected) {
+      setMsg("리뷰를 남길 주문 내역을 선택해주세요.");
       menuRef.current?.focus();
+      return;
+    }
+    if (!user) {
+      setMsg("로그인 후 이용해주세요.");
       return;
     }
     if (!stars) {
@@ -160,11 +230,19 @@ function WriteDialog({ fixedPid, onAdded, onClosed }: DialogProps) {
       return;
     }
     submission.current ??= createReviewSubmission();
-    const review = submission.current({
-      pid,
-      author: tNick ? [...tNick][0] + "**" : "익명",
-      stars, title: tTitle, text: tText, via: "delivery",
-    }, photos);
+    const review = submission.current(
+      {
+        pid: selected.pid,
+        author: tNick ? [...tNick][0] + "**" : "익명",
+        stars,
+        title: tTitle,
+        text: tText,
+        via: "delivery",
+      },
+      user.email,
+      selected.orderItemId,
+      photos,
+    );
     pending.current = true;
     setSaving(true);
     try {
@@ -172,8 +250,12 @@ function WriteDialog({ fixedPid, onAdded, onClosed }: DialogProps) {
       toast("리뷰가 등록되었어요");
       close();
       onAdded(review);
-    } catch {setMsg("리뷰를 저장하지 못했습니다. 다시 시도해주세요.");}
-    finally {pending.current = false; setSaving(false);}
+    } catch {
+      setMsg("리뷰를 저장하지 못했습니다. 다시 시도해주세요.");
+    } finally {
+      pending.current = false;
+      setSaving(false);
+    }
   };
 
   const painted = hover || stars;
@@ -185,156 +267,217 @@ function WriteDialog({ fixedPid, onAdded, onClosed }: DialogProps) {
       aria-labelledby="rwTitle"
       // 개발 모드의 effect 재실행(닫았다 다시 열기)으로 늦게 오는 close 이벤트는 무시한다.
       onClose={() => {
-        if (!dialog.current?.open) onClosed();
+        if (!dialog.current?.open) {
+          onClosed();
+        }
       }}
       onCancel={(e) => {
         e.preventDefault();
         requestClose();
       }}
       onClick={(e) => {
-        if (e.target === e.currentTarget) requestClose();
+        if (e.target === e.currentTarget) {
+          requestClose();
+        }
       }}
     >
       <form className="rw-body" onSubmit={submit} noValidate>
         <div className="rw-head">
           <div>
             <span className="eyebrow">WRITE A REVIEW</span>
-            <h2 id="rwTitle">{product ? `${product.name}, 어떠셨나요?` : "어떤 메뉴를 드셨나요?"}</h2>
+            <h2 id="rwTitle">{selected ? `${selected.name}, 어떠셨나요?` : "어떤 메뉴를 드셨나요?"}</h2>
           </div>
           <button type="button" className="rw-close" aria-label="리뷰 쓰기 닫기" onClick={requestClose}>
             ×
           </button>
         </div>
 
-        {fixedPid === null && (
-          <label className="field">
-            <span>메뉴</span>
-            <select
-              ref={menuRef}
-              value={pid ?? ""}
-              onChange={(e) => setPid(e.target.value === "" ? null : Number(e.target.value))}
-            >
-              <option value="">메뉴를 선택해주세요</option>
-              {PRODUCTS.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-
-        <fieldset className="rate">
-          <legend>별점</legend>
-          <div className="rate-row" onMouseLeave={() => setHover(0)}>
-            {[1, 2, 3, 4, 5].map((n) => (
-              <label key={n} className={n <= painted ? "on" : ""} onMouseEnter={() => setHover(n)}>
-                <input
-                  ref={n === 1 ? firstStar : undefined}
-                  type="radio"
-                  name="stars"
-                  value={n}
-                  checked={stars === n}
-                  onChange={() => setStars(n)}
-                />
-                <span aria-hidden="true">★</span>
-                <span className="sr-only">{n}점</span>
-              </label>
-            ))}
-          </div>
-          <em>{stars ? RATE_LABELS[stars] : "선택해주세요"}</em>
-        </fieldset>
-
-        <label className="field">
-          <span>
-            닉네임 <small>첫 글자만 보이고 나머지는 **로 가려져요</small>
-          </span>
-          <input
-            name="nick"
-            maxLength={10}
-            placeholder="예: 샐러드러버"
-            autoComplete="nickname"
-            value={nick}
-            onChange={(e) => setNick(e.target.value)}
-          />
-        </label>
-        <label className="field">
-          <span>제목</span>
-          <input
-            ref={titleRef}
-            name="title"
-            maxLength={30}
-            placeholder="한 줄로 요약해주세요 (2~30자)"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-        </label>
-        <label className="field">
-          <span>
-            내용 <small>{len(text)} / 300</small>
-          </span>
-          <textarea
-            ref={textRef}
-            name="text"
-            rows={4}
-            maxLength={300}
-            placeholder="맛, 양, 드레싱 조합 등 어떤 점이 좋았나요? (10자 이상)"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-          />
-        </label>
-
-        <div className="field rw-photos">
-          <span>
-            사진 <small>선택 · 최대 {REVIEW_PHOTO_MAX}장</small>
-          </span>
-          <div className="rw-photo-list">
-            {photos.map((src, k) => (
-              <div className="rw-photo" key={k}>
-                <Image src={src} alt={`첨부 사진 ${k + 1}`} width={80} height={80} unoptimized />
-                <button
-                  type="button"
-                  aria-label={`첨부 사진 ${k + 1} 빼기`}
-                  onClick={() => setPhotos((cur) => cur.filter((_, i) => i !== k))}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-            {photos.length < REVIEW_PHOTO_MAX && (
-              <button type="button" className="rw-photo-add" disabled={reading || saving} onClick={() => fileRef.current?.click()}>
-                <span aria-hidden="true">＋</span>
-                {reading ? "불러오는 중" : "사진 추가"}
+        {loadingOrders ? (
+          <p className="empty" role="status">
+            주문 내역을 불러오고 있어요.
+          </p>
+        ) : options.length === 0 ? (
+          <p className="empty">
+            {fixedPid === null
+              ? "아직 리뷰를 쓸 수 있는 주문이 없어요. 배달 완료된 주문의 메뉴에만 리뷰를 남길 수 있어요."
+              : "이 메뉴는 주문 내역에 없거나 이미 리뷰를 다 쓰셨어요."}
+          </p>
+        ) : (
+          <>
+            <div className="field rw-order-pick" ref={pickRef}>
+              <span>메뉴</span>
+              <button
+                ref={menuRef}
+                type="button"
+                className="rw-order-trigger"
+                aria-haspopup="listbox"
+                aria-expanded={pickerOpen}
+                onClick={() => setPickerOpen((v) => !v)}
+              >
+                {selected ? (
+                  <>
+                    <Image src={selected.image} alt="" width={40} height={40} unoptimized />
+                    <span>
+                      <strong>{selected.name}</strong>
+                      <small>{selected.dateLabel} 주문</small>
+                    </span>
+                  </>
+                ) : (
+                  <span>주문을 선택해주세요</span>
+                )}
+                <span className="rw-order-caret" aria-hidden="true">
+                  ⌄
+                </span>
               </button>
-            )}
-          </div>
-          <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => void addPhotos(e.target.files)} />
-        </div>
-
-        <div className="rw-foot">
-          {asking ? (
-            <div className="rw-confirm" role="alertdialog" aria-label="작성 취소 확인">
-              <p>작성 중인 내용이 사라져요. 닫을까요?</p>
-              <div>
-                <button type="button" ref={keepRef} className="ghost-btn" onClick={() => setAsking(false)}>
-                  계속 쓰기
-                </button>
-                <button type="button" className="rw-discard" onClick={close}>
-                  닫기
-                </button>
-              </div>
+              {pickerOpen && (
+                <ul className="rw-order-list" role="listbox">
+                  {options.map((it) => (
+                    <li key={it.orderItemId} role="option" aria-selected={effectiveOrderItemId === it.orderItemId}>
+                      <button
+                        type="button"
+                        className={effectiveOrderItemId === it.orderItemId ? "on" : ""}
+                        onClick={() => {
+                          setOrderItemId(it.orderItemId);
+                          setPickerOpen(false);
+                        }}
+                      >
+                        <Image src={it.image} alt="" width={40} height={40} unoptimized />
+                        <span>
+                          <strong>{it.name}</strong>
+                          <small>{it.dateLabel} 주문</small>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
-          ) : (
-            <>
-              <p className="rv-msg" role="alert">
-                {msg}
-              </p>
-              <button className="primary" type="submit" disabled={saving || reading}>
-                {saving ? "저장 중…" : "리뷰 등록하기"}
-              </button>
-            </>
-          )}
-        </div>
+
+            <fieldset className="rate">
+              <legend>별점</legend>
+              <div className="rate-row" onMouseLeave={() => setHover(0)}>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <label key={n} className={n <= painted ? "on" : ""} onMouseEnter={() => setHover(n)}>
+                    <input
+                      ref={n === 1 ? firstStar : undefined}
+                      type="radio"
+                      name="stars"
+                      value={n}
+                      checked={stars === n}
+                      onChange={() => setStars(n)}
+                    />
+                    <span aria-hidden="true">★</span>
+                    <span className="sr-only">{n}점</span>
+                  </label>
+                ))}
+              </div>
+              <em>{stars ? RATE_LABELS[stars] : "선택해주세요"}</em>
+            </fieldset>
+
+            <label className="field">
+              <span>
+                닉네임 <small>첫 글자만 보이고 나머지는 **로 가려져요</small>
+              </span>
+              <input
+                name="nick"
+                maxLength={10}
+                placeholder="예: 샐러드러버"
+                autoComplete="nickname"
+                value={nick}
+                onChange={(e) => setNick(e.target.value)}
+              />
+            </label>
+            <label className="field">
+              <span>제목</span>
+              <input
+                ref={titleRef}
+                name="title"
+                maxLength={30}
+                placeholder="한 줄로 요약해주세요 (2~30자)"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+            </label>
+            <label className="field">
+              <span>
+                내용 <small>{len(text)} / 300</small>
+              </span>
+              <textarea
+                ref={textRef}
+                name="text"
+                rows={4}
+                maxLength={300}
+                placeholder="맛, 양, 드레싱 조합 등 어떤 점이 좋았나요? (10자 이상)"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+              />
+            </label>
+
+            <div className="field rw-photos">
+              <span>
+                사진 <small>선택 · 최대 {REVIEW_PHOTO_MAX}장</small>
+              </span>
+              <div className="rw-photo-list">
+                {photos.map((src, k) => (
+                  <div className="rw-photo" key={k}>
+                    <Image src={src} alt={`첨부 사진 ${k + 1}`} width={80} height={80} unoptimized />
+                    <button
+                      type="button"
+                      aria-label={`첨부 사진 ${k + 1} 빼기`}
+                      onClick={() => setPhotos((cur) => cur.filter((_, i) => i !== k))}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                {photos.length < REVIEW_PHOTO_MAX && (
+                  <button
+                    type="button"
+                    className="rw-photo-add"
+                    disabled={reading || saving}
+                    onClick={() => fileRef.current?.click()}
+                  >
+                    <span aria-hidden="true">＋</span>
+                    {reading ? "불러오는 중" : "사진 추가"}
+                  </button>
+                )}
+              </div>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(e) => void addPhotos(e.target.files)}
+              />
+            </div>
+
+            <div className="rw-foot">
+              {asking ? (
+                <div className="rw-confirm" role="alertdialog" aria-label="작성 취소 확인">
+                  <p>작성 중인 내용이 사라져요. 닫을까요?</p>
+                  <div>
+                    <button type="button" ref={keepRef} className="ghost-btn" onClick={() => setAsking(false)}>
+                      계속 쓰기
+                    </button>
+                    <button type="button" className="rw-discard" onClick={close}>
+                      닫기
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className="rv-msg" role="alert">
+                    {msg}
+                  </p>
+                  <button className="primary" type="submit" disabled={saving || reading || !selected}>
+                    {saving ? "저장 중…" : "리뷰 등록하기"}
+                  </button>
+                </>
+              )}
+            </div>
+          </>
+        )}
       </form>
     </dialog>
   );

@@ -17,23 +17,33 @@ export function createRateLimiter(limit: number, windowMs: number, options: Rate
   let nextSweepAt = 0;
 
   function sweep(at: number): void {
-    for (const [key, entry] of hits) if (entry.resetAt <= at) hits.delete(key);
+    for (const [key, entry] of hits) {
+      if (entry.resetAt <= at) {
+        hits.delete(key);
+      }
+    }
     nextSweepAt = at + windowMs;
   }
 
   return {
     hit(key: string): void {
       const at = now();
-      if (at >= nextSweepAt) sweep(at);
+      if (at >= nextSweepAt) {
+        sweep(at);
+      }
       const entry = hits.get(key);
       if (entry && entry.resetAt > at) {
-        if (entry.count >= limit) throw new AppError(429, "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.");
+        if (entry.count >= limit) {
+          throw new AppError(429, "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.");
+        }
         entry.count += 1;
         return;
       }
       // 가득 차면 가장 오래 전에 들어온 키를 버린다 (Map 은 넣은 순서를 기억한다). 만료된 키는 위의 구간별 정리가 맡으므로
       // 여기서 다시 훑지 않는다 — 새 키마다 전체를 훑으면 상한에 도달한 뒤 다시 O(n) 이 된다.
-      if (!entry && hits.size >= maxKeys) hits.delete(hits.keys().next().value as string);
+      if (!entry && hits.size >= maxKeys) {
+        hits.delete(hits.keys().next().value as string);
+      }
       hits.delete(key); // 만료된 키를 다시 넣을 때 순서를 맨 뒤로
       hits.set(key, { count: 1, resetAt: at + windowMs });
     },
@@ -55,7 +65,12 @@ export type RateLimiter = ReturnType<typeof createRateLimiter>;
  */
 export function clientKey(request: Request): string | null {
   const hops = Number(process.env.TRUSTED_PROXY_HOPS ?? 0);
-  if (!Number.isInteger(hops) || hops < 1) return null;
-  const parts = (request.headers.get("x-forwarded-for") ?? "").split(",").map((p) => p.trim()).filter(Boolean);
+  if (!Number.isInteger(hops) || hops < 1) {
+    return null;
+  }
+  const parts = (request.headers.get("x-forwarded-for") ?? "")
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
   return parts[parts.length - hops] ?? null;
 }

@@ -12,9 +12,9 @@
 
 브라우저는 상대 경로 `/api/v1/*`로 요청한다. 여기서 API는 화면이 서버에 주문 생성이나 조회를 요청하는 창구다. 같은 Next.js 앱이 화면도 만들고 이 요청도 처리한다. 브라우저에서 실행하는 화면 코드는 API를 호출하고, 서버에서 실행하는 화면 코드인 Server Component는 아래의 서비스를 직접 호출해 조회할 수 있다. 운영·검증은 기존 배포 환경을 사용하되 DB·이미지 저장 영역은 각각 분리한다.
 
-## 추가할 디렉토리 구조
+## 디렉토리 구조와 예정 화면
 
-현재 app·components·lib가 저장소 최상위에 있으므로 이 배치를 유지한다. 아래는 관련 부분만 표시한 목표 구조다. 기존 화면과 API는 유지하고 modules·Prisma 파일 및 주문 화면·API를 추가한다. 이 문서의 트리는 구현 계획이며 실제 파일 생성 상태를 뜻하지 않는다.
+현재 구현의 모듈 경계는 [아키텍처 가이드](architecture.md)를 따른다. 아래는 현재 서버 코드 구조와 앞으로 추가할 주문 상세·관리자 주문 화면을 함께 표시했다. 추가할 화면은 주석으로 구분하며 화면 파일이 이미 존재함을 의미하지 않는다.
 
 ```text
 leaf-bowl/
@@ -31,7 +31,7 @@ leaf-bowl/
 │  └─ api/
 │     ├─ catalog/route.ts            # 기존 고객 카탈로그 API
 │     ├─ admin/catalog/route.ts      # 기존 관리자 카탈로그 API
-│     └─ v1/                        # 추가할 주문·인증 API 묶음
+│     └─ v1/                        # 현재 주문·인증 API 묶음
 │        ├─ session/route.ts         # 비회원 방문자 세션 발급
 │        ├─ auth/login/route.ts      # 관리자 로그인
 │        ├─ auth/logout/route.ts     # 관리자 로그아웃
@@ -44,25 +44,23 @@ leaf-bowl/
 │           ├─ route.ts              # GET: 관리자 주문 목록
 │           └─ [id]/status/route.ts  # PATCH: 주문 상태 변경
 ├─ components/                      # 기존 버튼·장바구니 등 화면 조각
-├─ modules/                         # 추가할 서버 기능 코드
-│  ├─ orders/
-│  │  ├─ schema.ts                  # 주문 입력을 실제로 검사
-│  │  ├─ types.ts                   # 입력에서 추론한 타입·응답 타입
-│  │  ├─ service.ts                 # 가격 계산·접수·상태 변경·취소 규칙
-│  │  └─ repository.ts              # Prisma로 주문 조회·저장
-│  ├─ identity/                     # 관리자·비회원 세션과 권한
-│  ├─ catalog/                      # 상품·옵션·재료 조회 및 관리
-│  ├─ reviews/                      # 리뷰 작성·조회·삭제·복원
-│  ├─ content/                      # 홈·시즌 콘텐츠
-│  └─ media/                        # 이미지 검사·업로드·조회
-├─ lib/
-│  └─ prisma.ts                     # 공통 Prisma 연결 생성
+├─ modules/                         # 저장소·화면과 독립적인 계약·업무 규칙
+│  ├─ orders/                       # 주문 서비스·가격 계산·저장소 인터페이스
+│  ├─ identity/                     # 관리자·비회원 세션과 권한 규칙
+│  ├─ catalog/                      # 공통 스키마·상태 변경·고객 조회 모델
+│  ├─ cart/                         # 항목 식별·변형·수량·가격 표시 계산
+│  ├─ profile/                      # 데모 프로필·배송지 상태 변경
+│  └─ settings/                     # DB 설정 계약
+├─ application/                     # 저장소 조합·카탈로그 트랜잭션·서버 조회
+├─ infrastructure/                  # PostgreSQL·HTTP·브라우저 어댑터
+├─ features/                        # 화면별 표시·입력·요청
+├─ seed/                            # SQL 초기화·명시적 레거시 이관
 ├─ prisma/
 │  ├─ schema.prisma                 # DB 테이블·관계·제약 정의
 │  ├─ migrations/                   # DB 구조 변경 이력
 │  └─ seed.ts                       # 초기 데이터 입력
 ├─ generated/prisma/                # Prisma가 자동 생성하는 코드
-├─ tests/integration/orders.test.ts # 추가할 실제 DB 주문 검증
+├─ tests/postgres.integration.cjs   # 실제 DB 통합 검증
 ├─ prisma.config.ts                 # Prisma CLI의 경로·DB 설정
 ├─ package.json                     # 기존 의존성·실행 명령
 └─ next.config.ts                   # 기존 Next.js 설정
@@ -76,11 +74,11 @@ leaf-bowl/
 
 **관련 기능은 한곳에 모은다.** 주문 규칙은 modules/orders, 상품 규칙은 modules/catalog에 모은다. 주문을 수정할 때 orders 폴더부터 찾아보면 된다. 고객 주문 상세와 관리자 주문 상세는 권한이 다르지만 같은 주문 데이터를 다루므로, 공통 조회·처리 코드를 함께 사용한다.
 
-**요청 처리, 업무 규칙, DB 작업은 따로 둔다.** route.ts는 “입력이 올바른가, 이 사람이 요청할 권한이 있는가”를 확인한다. service.ts는 “품절 상품을 주문할 수 있는가, 준비 중인 주문을 취소할 수 있는가”를 판단한다. repository.ts는 “DB에서 주문을 읽고 저장하는 방법”을 담당한다. 배달비 계산이 바뀌면 service.ts, DB 조회 방식이 바뀌면 repository.ts를 먼저 확인하면 된다. 파일 수는 늘지만 한 파일에서 이해해야 할 내용은 줄어든다.
+**요청 처리, 업무 규칙, DB 작업은 따로 둔다.** route.ts는 “입력이 올바른가, 이 사람이 요청할 권한이 있는가”를 확인한다. service.ts는 “품절 상품을 주문할 수 있는가, 준비 중인 주문을 취소할 수 있는가”를 판단한다. repository.ts는 저장소가 제공해야 하는 계약을 정의하고 infrastructure/orders/postgres.ts가 DB 조회·저장을 구현한다. 배달비 계산이 바뀌면 service.ts, DB 조회 방식이 바뀌면 repository.ts를 먼저 확인하면 된다. 파일 수는 늘지만 한 파일에서 이해해야 할 내용은 줄어든다.
 
-**DB 연결과 DB 구조도 구분한다.** lib/prisma.ts는 여러 기능이 사용하는 공통 연결이고, prisma/schema.prisma는 어떤 데이터를 저장할지 정하는 설계다. migrations는 그 설계가 바뀐 기록이다. generated/prisma는 이 설계에서 Prisma가 만들어주는 코드이므로 직접 수정하지 않는다.
+**DB 연결과 DB 구조도 구분한다.** infrastructure/database/prisma.ts는 여러 기능이 사용하는 공통 연결이고, prisma/schema.prisma는 어떤 데이터를 저장할지 정하는 설계다. migrations는 그 설계가 바뀐 기록이다. generated/prisma는 이 설계에서 Prisma가 만들어주는 코드이므로 직접 수정하지 않는다.
 
-orders 외의 기능도 필요에 따라 같은 파일 구성을 따른다. 단순 조회 기능은 적은 파일로 시작하고 별도 인터페이스·기반 클래스는 미리 만들지 않는다. 기존 lib/admin/store.ts·lib/products-repository.ts의 호출부를 차례로 공통 서비스에 연결하고, 파일·메모리 저장 경로를 Prisma 저장으로 전환한다. 기능을 옮긴 뒤 기존 호출이 남아 있는지 확인하고 사용하지 않는 저장 코드를 정리한다.
+orders 외의 기능도 필요에 따라 같은 파일 구성을 따른다. 단순 조회 기능은 적은 파일로 시작하고 별도 인터페이스·기반 클래스는 미리 만들지 않는다. 운영 카탈로그는 application/catalog.ts의 PostgreSQL 트랜잭션을 사용하고 주문은 application/container.ts가 PostgreSQL 어댑터를 주입한다. 파일·메모리 저장소는 tests/fixtures에 격리한다. 전체 의존성 규칙은 [아키텍처 가이드](architecture.md)를 따른다.
 
 ## 주문 버튼을 누르면 일어나는 일
 
@@ -96,7 +94,7 @@ orders 외의 기능도 필요에 따라 같은 파일 구성을 따른다. 단�
 
 PostgreSQL은 실제 데이터를 보관하는 DB이고, Prisma는 TypeScript 코드로 그 데이터를 조회·저장하도록 도와주는 도구다. 모델은 “상품에는 이름·가격·상태가 있다”처럼 저장할 데이터의 모양을 정의한다. 주문 모델을 정의한 뒤 Prisma Client의 order.create·order.findUnique 같은 함수로 DB를 사용할 수 있다.
 
-Prisma ORM 7 계열을 기준으로 CLI·Client·adapter 버전을 맞춰 고정한다. `prisma-client` generator의 출력을 `generated/prisma`로 지정하고 `lib/prisma.ts`에서 PostgreSQL 연결 도구인 PrismaPg adapter와 Client를 생성한다. 개발 중 코드가 다시 로드될 때 연결이 계속 늘어나지 않도록 globalThis로 재사용하고 운영에서는 연결 수·대기 시간을 제한한다. prisma.config.ts에 경로·DB URL을 설정하고 CLI 환경변수를 명시적으로 로드한다. [Prisma 7 구성](https://docs.prisma.io/docs/guides/upgrade-prisma-orm/v7)
+Prisma ORM 7 계열을 기준으로 CLI·Client·adapter 버전을 맞춰 고정한다. `prisma-client` generator의 출력을 `generated/prisma`로 지정하고 `infrastructure/database/prisma.ts`에서 PostgreSQL 연결 도구인 PrismaPg adapter와 Client를 생성한다. 개발 중 코드가 다시 로드될 때 연결이 계속 늘어나지 않도록 globalThis로 재사용하고 운영에서는 연결 수·대기 시간을 제한한다. prisma.config.ts에 경로·DB URL을 설정하고 CLI 환경변수를 명시적으로 로드한다. [Prisma 7 구성](https://docs.prisma.io/docs/guides/upgrade-prisma-orm/v7)
 
 | 주요 모델 | 필드와 제약 |
 | --- | --- |

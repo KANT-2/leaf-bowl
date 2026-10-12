@@ -2,7 +2,6 @@
 import { useCustomerCatalog } from "./CustomerCatalogProvider";
 import Image from "next/image";
 
-
 interface Props {
   id: number;
   sizes: string;

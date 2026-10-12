@@ -3,14 +3,12 @@ import BowlMatch from "@/components/BowlMatch";
 import Breadcrumb from "@/components/Breadcrumb";
 import PageHeading from "@/components/PageHeading";
 
-
 export const metadata: Metadata = {
   title: "내 취향 찾기 — bowl match | leaf & bowl",
   description: "좋아하는 재료에 하트를 보내세요. 스와이프로 완성하는 나만의 샐러드, bowl match.",
 };
 
 export default async function MatchPage() {
-
   return (
     <main className="bm">
       <div className="wrap bm-head">

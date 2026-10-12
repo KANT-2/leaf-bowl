@@ -3,7 +3,9 @@ import type { CreateOrderInput } from "./schema";
 
 /** 키 순서와 무관하게 같은 내용이면 같은 문자열이 되도록 정렬해서 직렬화한다 */
 function canonical(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (Array.isArray(value)) {
+    return `[${value.map(canonical).join(",")}]`;
+  }
   if (value && typeof value === "object") {
     return `{${Object.entries(value as Record<string, unknown>)
       .filter(([, v]) => v !== undefined)
@@ -30,7 +32,11 @@ export function requestHash(input: CreateOrderInput): string {
       drinkKeys: sorted(i.drinkKeys),
       ingredientKeys: sorted(i.ingredientKeys),
       ...(i.optionSelections
-        ? { optionSelections: Object.fromEntries(Object.entries(i.optionSelections).map(([group, keys]) => [group, sorted(keys)])) }
+        ? {
+            optionSelections: Object.fromEntries(
+              Object.entries(i.optionSelections).map(([group, keys]) => [group, sorted(keys)]),
+            ),
+          }
         : {}),
     })),
   };

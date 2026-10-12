@@ -1,10 +1,12 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { chromium } = require("./playwright.cjs");
+require("./register-typescript.cjs");
+const { publicSnapshot } = require("../modules/catalog/public-snapshot.ts");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const base = process.env.FRONT5_BASE_URL || "http://localhost:3337";
-const shots = path.join(__dirname, "../docs/screenshots/code-quality");
+const shots = process.env.FRONT5_SCREENSHOT_DIR || path.join(__dirname, "../docs/screenshots/code-quality");
 fs.mkdirSync(shots, { recursive: true });
 (async () => {
   const browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
@@ -14,15 +16,31 @@ fs.mkdirSync(shots, { recursive: true });
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
     const shot = (name) => page.screenshot({ path: path.join(shots, name + ".jpg"), type: "jpeg", quality: 80 });
+    // "내 조합 저장하기"는 로그인한 계정에만 연결되므로 먼저 체험용 로그인을 해둔다.
+    await page.goto(base + "/login");
+    await page.getByLabel("이메일").fill("quality@example.com");
+    await page.getByLabel("비밀번호").fill("password");
+    await page.getByRole("button", { name: "로그인", exact: true }).click();
+    await page.waitForURL("**/mypage");
     console.log("Match state across unrelated catalog updates");
     let snapshot = await (await page.request.get(base + "/api/catalog")).json();
-    await page.route("**/api/catalog", (route) => route.fulfill({ json: snapshot }));
+    await page.route("**/api/catalog", (route) => route.fulfill({ json: publicSnapshot(snapshot) }));
     await page.goto(base + "/match");
     for (let n = 1; n <= 2; n++) {
       await page.getByRole("button", { name: "재료 추가하기", exact: true }).click();
       await page.waitForFunction((n) => document.querySelectorAll(".ingredient-chip").length === n, n);
     }
-    snapshot.catalog.reviews.unshift({ id: "quality-revision-review", productId: "salad-0", author: "검증", rating: 5, title: "새 리뷰", body: "선택 진행 중 들어온 리뷰입니다.", menu: "코드 품질 검증 메뉴", date: "2026.10.10", deleted: false });
+    snapshot.catalog.reviews.unshift({
+      id: "quality-revision-review",
+      productId: "salad-0",
+      author: "검증",
+      rating: 5,
+      title: "새 리뷰",
+      body: "선택 진행 중 들어온 리뷰입니다.",
+      menu: "코드 품질 검증 메뉴",
+      date: "2026.10.10",
+      deleted: false,
+    });
     snapshot.revision++;
     await page.evaluate(() => window.dispatchEvent(new Event("focus")));
     await page.waitForTimeout(700);
@@ -37,15 +55,23 @@ fs.mkdirSync(shots, { recursive: true });
     assert.equal(await result.getByLabel("내 샐러드 이름", { exact: true }).inputValue(), "진행 보존 볼");
     await result.getByRole("button", { name: /내 조합 저장하기/ }).click();
     const selectedDressing = await result.getByLabel("마지막으로, 드레싱").inputValue();
-    assert.ok(snapshot.catalog.products.some((product) => product.id === selectedDressing && product.type === "dressing"));
-    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("bm-recipe")).dressingKey), selectedDressing);
+    assert.ok(
+      snapshot.catalog.products.some((product) => product.id === selectedDressing && product.type === "dressing"),
+    );
+    assert.equal(
+      await page.evaluate(() => JSON.parse(localStorage.getItem("bm-recipe")).at(-1).dressingKey),
+      selectedDressing,
+    );
     await shot("match-result");
     await result.getByRole("button", { name: "장바구니에 담기", exact: true }).click();
     const cart = page.getByRole("dialog", { name: "장바구니", exact: true });
     await cart.waitFor();
     await cart.getByText("진행 보존 볼", { exact: false }).first().waitFor();
     assert.equal(await cart.getByLabel("드레싱", { exact: true }).inputValue(), selectedDressing);
-    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("bb-cart"))[0].dressingKey), selectedDressing);
+    assert.equal(
+      await page.evaluate(() => JSON.parse(localStorage.getItem("bb-cart"))[0].dressingKey),
+      selectedDressing,
+    );
     await shot("cart");
     await page.keyboard.press("Escape");
     await page.goto(base + "/menu");
@@ -55,12 +81,18 @@ fs.mkdirSync(shots, { recursive: true });
     await result.waitFor();
     assert.equal(await page.locator(".ingredient-chip").count(), 2);
 
-    snapshot.catalog.ingredients.find((ingredient) => ingredient.status === "active" && !ingredient.deleted).status = "hidden";
+    snapshot.catalog.ingredients.find((ingredient) => ingredient.status === "active" && !ingredient.deleted).status =
+      "hidden";
     snapshot.revision++;
     await page.evaluate(() => window.dispatchEvent(new Event("focus")));
     await page.waitForFunction(() => document.querySelectorAll(".ingredient-chip").length === 0);
     await result.waitFor({ state: "hidden" });
     assert.deepEqual(errors, []);
     console.log("Browser scenario passed; no page errors.");
-  } finally { await browser.close(); }
-})().catch((error) => { console.error(error); process.exitCode = 1; });
+  } finally {
+    await browser.close();
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

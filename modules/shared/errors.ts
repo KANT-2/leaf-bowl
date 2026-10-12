@@ -1,7 +1,7 @@
 /** 공통 에러. route.ts 가 잡아서 `{ status, message }` 로 응답한다 (docs/api-design.md §1). */
 export class AppError extends Error {
   constructor(
-    readonly status: 400 | 401 | 403 | 404 | 409 | 413 | 429 | 503,
+    readonly status: 400 | 401 | 403 | 404 | 408 | 409 | 413 | 429 | 502 | 503,
     message: string,
   ) {
     super(message);

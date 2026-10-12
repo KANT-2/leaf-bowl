@@ -1,8 +1,8 @@
 import { requireAdmin } from "@/modules/identity/guard";
-import { services } from "@/modules/container";
+import { services } from "@/application/container";
 import { adminListItemView } from "@/modules/orders/presenter";
 import { adminOrderListQuerySchema } from "@/modules/orders/schema";
-import { jsonResponse, parseOrThrow, run } from "@/modules/shared/http";
+import { jsonResponse, parseOrThrow, run } from "@/infrastructure/http/response";
 
 /** 관리자 주문 목록: 상태·접수일 범위(from, to)로 거른 최신순, 마지막으로 본 주문(cursor) 기준 다음 쪽 */
 export async function GET(request: Request) {
@@ -12,7 +12,11 @@ export async function GET(request: Request) {
     const params = new URL(request.url).searchParams;
     const query = parseOrThrow(
       adminOrderListQuerySchema,
-      Object.fromEntries(["status", "from", "to", "limit", "cursor"].flatMap((k) => (params.has(k) ? [[k, params.get(k)]] : []))),
+      Object.fromEntries(
+        ["status", "from", "to", "limit", "cursor", "deliveryDate", "deliveryHour"].flatMap((k) =>
+          params.has(k) ? [[k, params.get(k)]] : [],
+        ),
+      ),
       "조회 조건을 확인해주세요.",
     );
     const { items, nextCursor } = await orders.listOrders(query);

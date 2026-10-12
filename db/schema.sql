@@ -1,5 +1,10 @@
+-- leaf & bowl 최신 전체 스키마. 신규 DB에서 직접 SQL 초기화할 때 사용한다.
+-- Prisma 관리 DB는 npm run db:migrate를 사용한다.
+-- psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f db/schema.sql
+BEGIN;
+-- 0001_baseline
 -- leaf & bowl DB 스키마 (PostgreSQL)
--- 관리자 카탈로그(lib/admin/catalog.ts 의 catalogSchema)를 그대로 옮긴 구조.
+-- 관리자 카탈로그(modules/catalog/schema.ts 의 catalogSchema)를 그대로 옮긴 구조.
 -- 지금 .data/admin/catalog.json 한 파일에 저장하는 내용을 테이블로 나눈다.
 -- 실행 순서: schema.sql → seed.sql
 -- 재료와 재료 기준 자동 품절은 맨 아래 '재료' 절에 있다.
@@ -129,6 +134,17 @@ CREATE TABLE review_drinks (
 
 -- 메인 문구·시즌 스페셜 (1행)
 CREATE TABLE site_content (
+  banner_includes_originals BOOLEAN NOT NULL DEFAULT FALSE,
+  banner_pages JSONB NOT NULL DEFAULT '[]',
+  has_banner_pages BOOLEAN NOT NULL DEFAULT FALSE,
+  banner_visible BOOLEAN NOT NULL DEFAULT TRUE,
+  main_image VARCHAR(200) NOT NULL DEFAULT '',
+  main_mobile_image VARCHAR(200) NOT NULL DEFAULT '',
+  hero_image VARCHAR(200) NOT NULL DEFAULT '',
+  hero_mobile_image VARCHAR(200) NOT NULL DEFAULT '',
+  hero_alt VARCHAR(300) NOT NULL DEFAULT '',
+  hero_href VARCHAR(300) NOT NULL DEFAULT '',
+
   id                  SMALLINT     PRIMARY KEY DEFAULT 1 CHECK (id = 1),
   hero_title          VARCHAR(200) NOT NULL,
   hero_description    VARCHAR(600) NOT NULL DEFAULT '',
@@ -342,3 +358,74 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_order_status_transition
   BEFORE UPDATE OF status ON orders
   FOR EACH ROW EXECUTE FUNCTION enforce_order_status_transition();
+
+-- 0002_catalog_persistence
+ALTER TABLE catalog_meta ADD COLUMN next_customer_id INTEGER NOT NULL DEFAULT 12 CHECK (next_customer_id >= 12);
+ALTER TABLE catalog_meta ADD COLUMN has_season_pages BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE products ADD COLUMN allergens_text VARCHAR(400) NOT NULL DEFAULT '';
+ALTER TABLE products ADD COLUMN is_new BOOLEAN;
+ALTER TABLE ingredients ADD COLUMN allergens_text VARCHAR(400) NOT NULL DEFAULT '';
+ALTER TABLE ingredients ADD COLUMN origin VARCHAR(100);
+ALTER TABLE ingredients ADD COLUMN origin_detail VARCHAR(300);
+ALTER TABLE reviews ADD COLUMN via VARCHAR(10) CHECK (via IN ('pickup', 'delivery'));
+ALTER TABLE reviews ADD COLUMN original_product_id VARCHAR(80);
+
+CREATE TABLE deleted_review_ids (
+  id VARCHAR(80) PRIMARY KEY,
+  deleted_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE catalog_imports (
+  checksum VARCHAR(64) PRIMARY KEY,
+  imported_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Stable option/item order and sales reporting after restart.
+ALTER TABLE order_items ADD COLUMN position INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE order_items ADD COLUMN product_type VARCHAR(10) CHECK (product_type IN ('salad', 'drink', 'custom'));
+CREATE INDEX idx_orders_completed ON orders (updated_at DESC) WHERE status = 'completed';
+
+-- 0003_allergen_text
+-- The catalog accepts up to 400 characters of allergen text.
+ALTER TABLE allergens ALTER COLUMN name TYPE VARCHAR(400);
+
+-- Keep the ordered identifier after the catalog FK is set to NULL.
+ALTER TABLE order_items ADD COLUMN original_product_id VARCHAR(80);
+UPDATE order_items SET original_product_id = product_id;
+
+-- 0004_app_settings
+-- 기본 데이터 중 배너·운영시간·영양정보·가격 정책은 SQL로 초기화한다.
+CREATE TABLE app_settings (
+  key VARCHAR(80) PRIMARY KEY CHECK (key ~ '^[a-z_]+$'),
+  value JSONB NOT NULL CHECK (jsonb_typeof(value) IN ('object', 'array')),
+  updated_at TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+COMMIT;
+
+-- Administrator-only event drafts; no customer catalog linkage.
+CREATE TABLE admin_event_settings (
+  id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+  events JSONB NOT NULL DEFAULT '[]' CHECK (jsonb_typeof(events) = 'array')
+);
+INSERT INTO admin_event_settings (id) VALUES (1);
+-- 0006_toss_test_payments
+CREATE TABLE payment_checkouts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_session_id uuid NOT NULL,
+  request_key varchar(80) NOT NULL,
+  request_hash varchar(64) NOT NULL,
+  amount bigint NOT NULL CHECK (amount > 0 AND amount <= 300000000),
+  order_snapshot jsonb NOT NULL,
+  expires_at timestamptz NOT NULL,
+  payment_key varchar(200) UNIQUE,
+  order_id uuid UNIQUE REFERENCES orders(id) ON DELETE RESTRICT,
+  method varchar(30),
+  approved_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_payment_request UNIQUE (customer_session_id, request_key),
+  CONSTRAINT payment_approval_complete CHECK (
+    (order_id IS NULL AND approved_at IS NULL AND method IS NULL) OR
+    (order_id IS NOT NULL AND approved_at IS NOT NULL AND method IS NOT NULL AND payment_key IS NOT NULL)
+  )
+);
+CREATE INDEX idx_payment_checkouts_expires ON payment_checkouts(expires_at) WHERE order_id IS NULL;

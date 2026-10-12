@@ -14,10 +14,11 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/admin/sidebar";
-import { type Product } from "@/lib/admin/catalog";
-import { blankProduct } from "@/lib/admin/editor-helpers";
+import { type Product } from "@/modules/catalog/schema";
+import { blankProduct } from "@/features/admin/editor-helpers";
 import {
   BarChart3,
+  CalendarDays,
   Eye,
   LayoutTemplate,
   Leaf,
@@ -32,6 +33,7 @@ import { Toaster } from "sonner";
 import CatalogDialogs from "./CatalogDialogs";
 import BowlMatchManager from "./editors/BowlMatchManager";
 import ContentEditor from "./editors/ContentEditor";
+import EventManager from "./editors/EventManager";
 import LocationManager from "./editors/LocationManager";
 import ReviewManager from "./editors/ReviewManager";
 import OptionsPanel from "./OptionsPanel";
@@ -44,9 +46,7 @@ export default function Admin() {
   const [type, setType] = useState<Product["type"]>("salad");
   const editors = useCatalogEditors();
   const { setProduct, setGroup, setDeleting, setPurging, setPreview } = editors;
-  const { snapshot, loadError, busy, load, save, action } = useAdminCatalog(
-    view === "reviews",
-  );
+  const { snapshot, loadError, busy, load, save, action } = useAdminCatalog();
   const [navigationReady, setNavigationReady] = useState(false);
   useEffect(() => {
     const restore = () => {
@@ -57,6 +57,7 @@ export default function Admin() {
           "options",
           "bowlmatch",
           "content",
+          "events",
           "reviews",
           "location",
           "origins",
@@ -77,12 +78,15 @@ export default function Admin() {
     return () => window.removeEventListener("hashchange", restore);
   }, []);
   useEffect(() => {
-    if (!navigationReady) return;
+    if (!navigationReady) {
+      return;
+    }
     const url = new URL(window.location.href);
     url.hash = view;
     url.searchParams.set("menuType", type);
-    if (url.href !== window.location.href)
+    if (url.href !== window.location.href) {
       window.history.replaceState(window.history.state, "", url);
+    }
   }, [view, type, navigationReady]);
   const stateRef = useRef(snapshot);
   useEffect(() => {
@@ -92,14 +96,13 @@ export default function Admin() {
     const context = (
       document as Document & {
         modelContext?: {
-          registerTool?: (
-            tool: unknown,
-            options: { signal: AbortSignal },
-          ) => unknown;
+          registerTool?: (tool: unknown, options: { signal: AbortSignal }) => unknown;
         };
       }
     ).modelContext;
-    if (!context?.registerTool) return;
+    if (!context?.registerTool) {
+      return;
+    }
     const lifecycle = new AbortController();
     for (const tool of [
       {
@@ -114,9 +117,12 @@ export default function Admin() {
         },
         annotations: { readOnlyHint: true, untrustedContentHint: true },
         execute: (input: unknown) => {
-          if (!input || typeof input !== "object" || Object.keys(input).length)
+          if (!input || typeof input !== "object" || Object.keys(input).length) {
             throw Error("입력은 빈 객체여야 합니다.");
-          if (!stateRef.current) throw Error("데이터를 불러오는 중입니다.");
+          }
+          if (!stateRef.current) {
+            throw Error("데이터를 불러오는 중입니다.");
+          }
           return stateRef.current;
         },
       },
@@ -131,19 +137,18 @@ export default function Admin() {
         },
         annotations: { readOnlyHint: false },
         execute: (input: unknown) => {
-          if (!input || typeof input !== "object" || Object.keys(input).length)
+          if (!input || typeof input !== "object" || Object.keys(input).length) {
             throw Error("입력은 빈 객체여야 합니다.");
+          }
           setView("products");
           setType("salad");
-          setProduct(blankProduct("salad"));
+          setProduct(blankProduct("salad", stateRef.current?.catalog.categories?.[0] ?? ""));
           return { status: "form_opened" };
         },
       },
     ]) {
       try {
-        Promise.resolve(
-          context.registerTool(tool, { signal: lifecycle.signal }),
-        ).catch(() => {});
+        Promise.resolve(context.registerTool(tool, { signal: lifecycle.signal })).catch(() => {});
       } catch {}
     }
     return () => lifecycle.abort();
@@ -154,6 +159,7 @@ export default function Admin() {
     { id: "options", name: "옵션 관리", icon: SlidersHorizontal },
     { id: "bowlmatch", name: "bowl match 관리", icon: Leaf },
     { id: "content", name: "고객 페이지 편집", icon: LayoutTemplate },
+    { id: "events", name: "이달의 이벤트 관리", icon: CalendarDays },
     { id: "sales", name: "제품 판매 현황", icon: BarChart3 },
     { id: "reviews", name: "고객 리뷰 관리", icon: MessageSquare },
     { id: "location", name: "위치 및 배달 관리", icon: MapPin },
@@ -163,15 +169,16 @@ export default function Admin() {
   return (
     <SidebarProvider>
       <Sidebar>
-        <SidebarHeader>
+        <SidebarHeader className="px-[22px] py-7">
           <div className="brand">leaf & bowl</div>
         </SidebarHeader>
-        <SidebarContent>
+        <SidebarContent className="px-3.5 py-2">
           <div className="nav-label">고객 페이지 관리</div>
           <SidebarMenu>
             {nav.map((n) => (
               <SidebarMenuItem key={n.id}>
                 <SidebarMenuButton
+                  className="h-[46px] text-[15px]"
                   isActive={navigationReady && view === n.id}
                   onClick={() => {
                     if (n.id === "products" && view !== "products") {
@@ -180,11 +187,7 @@ export default function Admin() {
                     if (n.id === "reviews" && view !== "reviews") {
                       const url = new URL(window.location.href);
                       url.searchParams.set("reviewType", "all");
-                      window.history.replaceState(
-                        window.history.state,
-                        "",
-                        url,
-                      );
+                      window.history.replaceState(window.history.state, "", url);
                     }
                     setView(n.id);
                   }}
@@ -209,7 +212,7 @@ export default function Admin() {
       </Sidebar>
       <SidebarInset>
         <header className="topbar">
-          <SidebarTrigger />
+          <SidebarTrigger className="max-[600px]:p-2 max-[600px]:text-[13px]" />
           <div className="topbar-end">
             <div className="admin-account-links">
               <Button variant="ghost" asChild>
@@ -225,6 +228,7 @@ export default function Admin() {
             </div>
             <Button
               variant="outline"
+              className="max-[600px]:p-2 max-[600px]:text-[13px] max-[600px]:has-[>svg]:px-2"
               disabled={!catalog}
               onClick={() => setPreview(true)}
             >
@@ -258,46 +262,32 @@ export default function Admin() {
                 />
               )}
               {view === "options" && (
-                <OptionsPanel
-                  catalog={catalog}
-                  busy={busy}
-                  setGroup={setGroup}
-                  setDeleting={setDeleting}
-                />
+                <OptionsPanel catalog={catalog} busy={busy} setGroup={setGroup} setDeleting={setDeleting} />
               )}
               {view === "sales" && <SalesRanking />}
-              {view === "location" && (
-                <LocationManager catalog={catalog} busy={busy} onSave={save} />
-              )}
-              {view === "reviews" && (
-                <ReviewManager catalog={catalog} busy={busy} onSave={save} />
-              )}
-              {view === "bowlmatch" && (
-                <BowlMatchManager catalog={catalog} busy={busy} onSave={save} />
-              )}
+              {view === "location" && <LocationManager catalog={catalog} busy={busy} onSave={save} />}
+              {view === "reviews" && <ReviewManager catalog={catalog} busy={busy} onSave={save} />}
+              {view === "bowlmatch" && <BowlMatchManager catalog={catalog} busy={busy} onSave={save} />}
+              {view === "events" && <EventManager />}
               {view === "content" && (
                 <ContentEditor
+                  originalSlides={snapshot?.defaults?.heroSlides ?? []}
                   catalog={catalog}
                   busy={busy}
                   onRefresh={load}
                   onSave={(c) => save({ ...catalog, content: c })}
                 />
               )}
-              {view === "origins" && (
+              {view === "origins" && snapshot?.defaults && (
                 <OriginAllergyManager
+                  config={snapshot.defaults.catalogConfig}
                   catalog={catalog}
                   busy={busy}
                   onSave={save}
                 />
               )}
               {view === "trash" && (
-                <TrashPanel
-                  catalog={catalog}
-                  busy={busy}
-                  setPurging={setPurging}
-                  save={save}
-                  action={action}
-                />
+                <TrashPanel catalog={catalog} busy={busy} setPurging={setPurging} save={save} action={action} />
               )}
             </>
           )}
@@ -306,6 +296,7 @@ export default function Admin() {
       {catalog && (
         <CatalogDialogs
           catalog={catalog}
+          originCountries={snapshot?.defaults?.catalogConfig.originCountries ?? []}
           busy={busy}
           editors={editors}
           load={load}

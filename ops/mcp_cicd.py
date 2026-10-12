@@ -16,7 +16,7 @@ import subprocess
 import tarfile
 import tempfile
 import time
-from urllib.parse import urlencode
+from urllib.parse import unquote, urlencode, urlsplit
 from urllib.request import Request, urlopen
 
 
@@ -24,6 +24,7 @@ REPOSITORY = "KANT-2/Front-5"
 WORKFLOW_ID = 377985071
 BRANCHES = {"main", "production"}
 SHA_PATTERN = re.compile(r"[0-9a-f]{40}")
+MIGRATION_TIMEOUT_SECONDS = 300
 
 
 def successful_ci(runs, branch, sha):
@@ -71,6 +72,7 @@ class Deployer:
         self.state_file = self.base / "state.json"
         self.server = None
         self.build_process = None
+        self.migration_process = None
         self.current = None
         self.env = {**os.environ, "NEXT_TELEMETRY_DISABLED": "1", "GIT_TERMINAL_PROMPT": "0", "TZ": "UTC"}
 
@@ -173,19 +175,80 @@ class Deployer:
                 start_new_session=True,
             )
 
-    def wait_healthy(self, process, port):
+    def redact_database_details(self, message):
+        connection = self.env.get("DATABASE_URL", "")
+        if connection:
+            message = message.replace(connection, "[DATABASE_URL redacted]")
+            with contextlib.suppress(ValueError):
+                password = urlsplit(connection).password
+                if password:
+                    for secret in (password, unquote(password)):
+                        message = message.replace(secret, "[redacted]")
+        return re.sub(r"postgres(?:ql)?://[^\s\"'<>]+", "[DATABASE_URL redacted]", message)
+
+    def migrate_release(self, release):
+        """Apply this release's migrations using only the supervisor's database."""
+        migrations = release / "prisma" / "migrations"
+        if not any(migrations.glob("*/migration.sql")):
+            if (release / "prisma" / "schema.prisma").exists():
+                raise RuntimeError("Prisma release has no migration SQL; refusing deployment")
+            return
+        if not self.env.get("DATABASE_URL", "").strip():
+            raise RuntimeError("DATABASE_URL is required before deploying a Prisma release")
+        cli = release / "node_modules" / "prisma" / "build" / "index.js"
+        if not cli.is_file():
+            raise RuntimeError("Release-local Prisma CLI is missing; refusing deployment")
+
+        log_path = self.logs / f"migration-{release.name}.log"
+        self.log(f"Applying database migrations for {release.name}; log: {log_path}")
+        # Keep raw CLI errors private until connection details have been removed.
+        with tempfile.TemporaryFile(mode="w+t") as output:
+            try:
+                self.migration_process = subprocess.Popen(
+                    ["node", str(cli), "migrate", "deploy"],
+                    cwd=release, env=self.env, stdout=output, stderr=subprocess.STDOUT,
+                    start_new_session=True,
+                )
+                result = self.migration_process.wait(timeout=MIGRATION_TIMEOUT_SECONDS)
+                if result:
+                    raise RuntimeError(f"Database migration failed (exit {result}); see {log_path}")
+            except subprocess.TimeoutExpired:
+                raise RuntimeError(f"Database migration timed out; see {log_path}") from None
+            finally:
+                stop_process(self.migration_process)
+                self.migration_process = None
+                output.seek(0)
+                with log_path.open("a") as log:
+                    log_path.chmod(0o600)
+                    log.write(self.redact_database_details(output.read()))
+        self.log(f"Database migrations ready for {release.name}")
+
+    def wait_healthy(self, process, port, release):
+        paths = ["/"]
+        if (release / "app" / "api" / "catalog" / "route.ts").is_file():
+            paths.append("/api/catalog")
         deadline = time.monotonic() + 45
         while time.monotonic() < deadline:
             if process.poll() is not None:
                 raise RuntimeError("Next.js exited before becoming healthy")
             try:
-                with urlopen(f"http://127.0.0.1:{port}/", timeout=3) as response:
-                    if response.status == 200:
-                        return
-            except OSError:
+                healthy = True
+                for path in paths:
+                    with urlopen(f"http://127.0.0.1:{port}{path}", timeout=3) as response:
+                        if response.status != 200:
+                            healthy = False
+                            break
+                        if path == "/api/catalog":
+                            payload = json.load(response)
+                            if not isinstance(payload, dict) or "error" in payload:
+                                healthy = False
+                                break
+                if healthy:
+                    return
+            except (OSError, ValueError):
                 pass
             time.sleep(0.5)
-        raise RuntimeError("Next.js HTTP health check timed out")
+        raise RuntimeError("Next.js HTTP/database health check timed out")
 
     def check_candidate(self, release):
         with socket.socket() as listener:
@@ -193,18 +256,20 @@ class Deployer:
             port = listener.getsockname()[1]
         candidate = self.start_server(release, port, "127.0.0.1")
         try:
-            self.wait_healthy(candidate, port)
+            self.wait_healthy(candidate, port, release)
         finally:
             stop_process(candidate)
 
-    def activate(self, state):
+    def activate(self, state, *, database_ready=False):
         previous = self.current
         release = self.releases / state["sha"]
+        if not database_ready:
+            self.migrate_release(release)
         stop_process(self.server)
         self.server = None
         try:
             self.server = self.start_server(release, self.port, "0.0.0.0")
-            self.wait_healthy(self.server, self.port)
+            self.wait_healthy(self.server, self.port, release)
             self.current = {**state, "status": "running"}
             self.write_state(self.current)
             self.log(f"Serving {state['sha']} on port {self.port}; CI run {state['ci_run_id']}")
@@ -214,13 +279,21 @@ class Deployer:
             if previous:
                 self.log(f"Activation failed; restoring {previous['sha']}")
                 self.server = self.start_server(self.releases / previous["sha"], self.port, "0.0.0.0")
-                self.wait_healthy(self.server, self.port)
+                self.wait_healthy(self.server, self.port, self.releases / previous["sha"])
                 self.current = previous
                 self.write_state(previous)
             raise
 
     def deploy_revision(self, sha, run, prepare_only=False):
         release = self.prepare_release(sha)
+        # Recheck approval before changing the shared DB, then again before activation.
+        if not self.still_latest(sha):
+            self.log(f"Skipping superseded revision {sha}")
+            return False
+        if self.approved_ci(sha) is None:
+            self.log(f"CI is no longer successful for {sha}; keeping the current release")
+            return False
+        self.migrate_release(release)
         self.check_candidate(release)
         if not self.still_latest(sha):
             self.log(f"Skipping superseded revision {sha}")
@@ -234,7 +307,7 @@ class Deployer:
             self.write_state({**state, "status": "prepared"})
             self.log(f"Prepared {sha}; CI run {run['id']}")
         else:
-            self.activate(state)
+            self.activate(state, database_ready=True)
         return True
 
     def run(self, prepare_only=False):
@@ -272,6 +345,7 @@ class Deployer:
                 time.sleep(self.poll_seconds)
 
     def close(self):
+        stop_process(self.migration_process)
         stop_process(self.build_process)
         stop_process(self.server)
 

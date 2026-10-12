@@ -7,8 +7,12 @@ import { NextResponse, type NextRequest } from "next/server";
  */
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  if (pathname !== "/admin" && pathname !== "/admin/") return NextResponse.next();
-  if (request.cookies.has("lb_admin")) return NextResponse.next();
+  if (pathname !== "/admin" && pathname !== "/admin/") {
+    return NextResponse.next();
+  }
+  if (request.cookies.has("lb_admin")) {
+    return NextResponse.next();
+  }
   return NextResponse.redirect(new URL("/admin/login", request.url));
 }
 

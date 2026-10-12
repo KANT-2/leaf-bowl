@@ -1,9 +1,10 @@
 "use client";
+import DeliveryOrders from "./DeliveryOrders";
 import { Button } from "@/components/admin/button";
 import { Input } from "@/components/admin/input";
-import { type Catalog } from "@/lib/admin/catalog";
-import { MapPin } from "lucide-react";
-import { useState } from "react";
+import { type Catalog } from "@/modules/catalog/schema";
+import { ChevronDown, ChevronUp, MapPin } from "lucide-react";
+import { useId, useState } from "react";
 
 export default function LocationManager({
   catalog,
@@ -14,6 +15,8 @@ export default function LocationManager({
   busy: boolean;
   onSave: (catalog: Catalog) => Promise<void>;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const locationPanelId = useId();
   const [location, setLocation] = useState(
       catalog.location ?? {
         name: "leaf & bowl",
@@ -23,10 +26,7 @@ export default function LocationManager({
     ),
     [mapAddress, setMapAddress] = useState(catalog.location?.address ?? ""),
     [error, setError] = useState("");
-  const mapUrl =
-    "https://maps.google.com/maps?q=" +
-    encodeURIComponent(mapAddress) +
-    "&output=embed&hl=ko";
+  const mapUrl = "https://maps.google.com/maps?q=" + encodeURIComponent(mapAddress) + "&output=embed&hl=ko";
   return (
     <>
       <div className="page-heading">
@@ -36,12 +36,30 @@ export default function LocationManager({
           <p className="muted">매장 위치를 설정하고 지도에서 확인하세요.</p>
         </div>
       </div>
+      <DeliveryOrders />
       <section className="surface">
         <div className="section-heading">
           <h2>매장 위치</h2>
-          {catalog.location && <span className="meta">등록된 위치</span>}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-expanded={expanded}
+            aria-controls={locationPanelId}
+            aria-label={expanded ? "매장 위치 접기" : "매장 위치 펼치기"}
+            onClick={() => setExpanded((value) => !value)}
+          >
+            {catalog.location && <span className="meta">등록된 위치</span>}
+            {expanded ? "접기" : "펼치기"}
+            {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </Button>
         </div>
-        <div className="store-location-grid">
+        <div
+          id={locationPanelId}
+          className="store-location-grid"
+          hidden={!expanded}
+          style={expanded ? undefined : { display: "none" }}
+        >
           <form
             onSubmit={async (e) => {
               e.preventDefault();
@@ -71,9 +89,7 @@ export default function LocationManager({
                   required
                   maxLength={100}
                   value={location.name}
-                  onChange={(e) =>
-                    setLocation({ ...location, name: e.target.value })
-                  }
+                  onChange={(e) => setLocation({ ...location, name: e.target.value })}
                   placeholder="예: leaf & bowl 시청점"
                 />
               </label>
@@ -83,9 +99,7 @@ export default function LocationManager({
                   required
                   maxLength={300}
                   value={location.address}
-                  onChange={(e) =>
-                    setLocation({ ...location, address: e.target.value })
-                  }
+                  onChange={(e) => setLocation({ ...location, address: e.target.value })}
                   placeholder="도로명 주소를 입력해주세요"
                 />
               </label>
@@ -94,9 +108,7 @@ export default function LocationManager({
                 <Input
                   maxLength={200}
                   value={location.detailAddress}
-                  onChange={(e) =>
-                    setLocation({ ...location, detailAddress: e.target.value })
-                  }
+                  onChange={(e) => setLocation({ ...location, detailAddress: e.target.value })}
                   placeholder="예: 1층, 101호"
                 />
               </label>
@@ -136,10 +148,7 @@ export default function LocationManager({
                 <p className="meta">{mapAddress}</p>
                 <a
                   className="store-map-link"
-                  href={
-                    "https://www.google.com/maps/search/?api=1&query=" +
-                    encodeURIComponent(mapAddress)
-                  }
+                  href={"https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(mapAddress)}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -158,15 +167,6 @@ export default function LocationManager({
             )}
           </div>
         </div>
-      </section>
-      <section className="surface delivery-pending">
-        <div className="section-heading">
-          <h2>배달 관리</h2>
-          <span className="pill">보류</span>
-        </div>
-        <p className="muted">
-          배달 설정은 운영 방식이 정해진 뒤 추가할 예정입니다.
-        </p>
       </section>
     </>
   );

@@ -1,4 +1,55 @@
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
-import { dataDirectory } from '@/lib/admin/store';
-export async function GET(_request:Request,{params}:{params:Promise<{key:string}>}){const {key}=await params;if(!/^[a-zA-Z0-9_-]+\.(png|jpg|webp)$/.test(key))return new Response('Not found',{status:404});try{const bytes=await readFile(path.join(dataDirectory(),'images',key)).catch(async error=>{if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;return readFile(path.join(process.cwd(),'public/admin-assets/uploads',key))});return new Response(new Uint8Array(bytes),{headers:{'Content-Type':key.endsWith('.png')?'image/png':key.endsWith('.jpg')?'image/jpeg':'image/webp','Cache-Control':'private, max-age=86400','X-Content-Type-Options':'nosniff'}})}catch(e){return new Response('Image unavailable',{status:(e as NodeJS.ErrnoException).code==='ENOENT'?404:503})}}
+import { readCatalog } from "@/application/catalog";
+import { adminGate } from "@/application/admin-access";
+import { readImage } from "@/infrastructure/images/files";
+import { imageKeyPattern, catalogImageKeys } from "@/modules/images/references";
+import { publicSnapshot } from "@/modules/catalog/public-snapshot";
+import { connection } from "next/server";
+import { unstable_rethrow } from "next/navigation";
+
+export async function GET(request: Request, { params }: { params: Promise<{ key: string }> }) {
+  const { key } = await params;
+  if (!imageKeyPattern.test(key)) {
+    return new Response("Not found", { status: 404 });
+  }
+  try {
+    await connection();
+    const snapshot = await readCatalog();
+    const published = publicSnapshot(snapshot).catalog;
+    const content = published.content;
+    const visible = {
+      ...published,
+      content: {
+        ...content,
+        mainImage: content.bannerVisible ? content.mainImage : "",
+        mainMobileImage: content.bannerVisible ? content.mainMobileImage : "",
+        heroImage: content.bannerVisible ? content.heroImage : "",
+        heroMobileImage: content.bannerVisible ? content.heroMobileImage : "",
+        seasonImage: content.seasonVisible ? content.seasonImage : "",
+        seasonPages: content.seasonVisible ? content.seasonPages : [],
+      },
+    };
+    if (!catalogImageKeys(visible).has(key)) {
+      const denied = await adminGate(request);
+      if (denied) {
+        return new Response("Image unavailable", {
+          status: denied.status === 503 ? 503 : 404,
+          headers: { "Cache-Control": "no-store" },
+        });
+      }
+    }
+    const bytes = await readImage(key);
+    return new Response(new Uint8Array(bytes), {
+      headers: {
+        "Content-Type": key.endsWith(".png") ? "image/png" : key.endsWith(".jpg") ? "image/jpeg" : "image/webp",
+        "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+  } catch (e) {
+    unstable_rethrow(e);
+    return new Response("Image unavailable", {
+      status: (e as NodeJS.ErrnoException).code === "ENOENT" ? 404 : 503,
+      headers: { "Cache-Control": "no-store" },
+    });
+  }
+}

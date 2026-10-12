@@ -1,13 +1,18 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { chromium } = require("./playwright.cjs");
+const { signInAdmin } = require("./browser-helpers.cjs");
 const assert = require("node:assert/strict");
 const base = process.env.FRONT5_BASE_URL || "http://localhost:3581";
 const statusNames = { active: "판매 중", soldout: "품절", hidden: "숨김" };
 
 (async () => {
-  const browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
+  const browser = await chromium.launch({
+    headless: true,
+    args: ["--no-sandbox"],
+  });
   try {
     const page = await browser.newPage();
+    await signInAdmin(page.context(), base);
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
     const seed = await (await page.request.get(base + "/api/catalog")).json();
@@ -17,12 +22,20 @@ const statusNames = { active: "판매 중", soldout: "품절", hidden: "숨김" 
       if (route.request().method() === "PUT") {
         if (failSave) {
           failSave = false;
-          await route.fulfill({ status: 500, json: { error: "복원 저장 실패 검증" } });
+          await route.fulfill({
+            status: 500,
+            json: { error: "복원 저장 실패 검증" },
+          });
           return;
         }
         const input = route.request().postDataJSON();
         assert.equal(input.revision, snapshot.revision);
-        snapshot = { catalog: input.catalog, revision: snapshot.revision + 1 };
+        snapshot = {
+          ...snapshot,
+          catalog: input.catalog,
+          revision: snapshot.revision + 1,
+          updatedAt: new Date().toISOString(),
+        };
       }
       await route.fulfill({ json: snapshot });
     });
@@ -34,12 +47,18 @@ const statusNames = { active: "판매 중", soldout: "품절", hidden: "숨김" 
         product.status = status;
         product.name = `복원 검증 ${type} ${status}`;
         const activeGroup = snapshot.catalog.groups.find((group) => !group.deleted);
-        snapshot.catalog.groups.push({ ...structuredClone(activeGroup), id: "deleted-test-group", deleted: true });
+        snapshot.catalog.groups.push({
+          ...structuredClone(activeGroup),
+          id: "deleted-test-group",
+          deleted: true,
+        });
         product.optionIds = [activeGroup.id, "deleted-test-group", "missing-test-group"];
         await page.goto(base + "/admin#trash");
         const row = page.locator(".trash-row").filter({ hasText: product.name });
         await row.getByRole("button", { name: "복원", exact: true }).click();
-        await page.getByText(`“${product.name}”을 ${statusNames[status]} 상태로 복원했습니다.`, { exact: true }).waitFor();
+        await page
+          .getByText(`“${product.name}”을 ${statusNames[status]} 상태로 복원했습니다.`, { exact: true })
+          .waitFor();
         const restored = snapshot.catalog.products.find((item) => item.id === product.id);
         assert.equal(restored.status, status);
         assert.equal(restored.deleted, false);
@@ -74,8 +93,13 @@ const statusNames = { active: "판매 중", soldout: "품절", hidden: "숨김" 
     await page.getByText("옵션 그룹을 복원했습니다.", { exact: true }).waitFor();
     assert.equal(snapshot.catalog.groups.find((item) => item.id === group.id).deleted, false);
     assert.deepEqual(errors, []);
-    console.log("Passed: 9 product status/type combinations, option cleanup, failed save/retry, reload and group restore; no page errors.");
+    console.log(
+      "Passed: 9 product status/type combinations, option cleanup, failed save/retry, reload and group restore; no page errors.",
+    );
   } finally {
     await browser.close();
   }
-})().catch((error) => { console.error(error); process.exitCode = 1; });
+})().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

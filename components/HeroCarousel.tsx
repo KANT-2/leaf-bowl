@@ -1,10 +1,13 @@
 "use client";
 
+import HeroBanner from "./HeroBanner";
+import { visibleBannerPages } from "@/modules/catalog/banner-pages";
+import type { Content } from "@/modules/catalog/schema";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import type { HeroSlide } from "@/lib/data/hero";
-import { useReducedMotion } from "@/lib/hooks";
+import { type HeroSlide } from "@/modules/settings/hero";
+import { useReducedMotion } from "@/features/shared/hooks";
 
 /** 다음 배너로 넘어가기까지의 시간 (밀리초) */
 export const HERO_MS = 6000;
@@ -31,8 +34,51 @@ function arcPath([cx, cy, rx, ry]: HeroSlide["bowl"]) {
  * 홈 상단 히어로 배너. 여러 장을 겹쳐 두고 HERO_MS 마다 페이드로 넘긴다.
  * 마우스를 올리거나 키보드 포커스가 있거나, 화면 밖·탭 숨김·정지 버튼·동작 줄이기 설정이면 멈춘다.
  */
-export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
-  const total = slides.length;
+export default function HeroCarousel({ slides, advertisement }: { slides: HeroSlide[]; advertisement?: Content }) {
+  const entries: ({ kind: "standard"; slide: HeroSlide } | { kind: "advertisement"; content: Content })[] = slides.map(
+    (slide) => ({ kind: "standard", slide }),
+  );
+  if (advertisement?.bannerPages === undefined && advertisement?.bannerVisible && advertisement.mainImage) {
+    entries.splice(0, entries.length ? 1 : 0, {
+      kind: "advertisement",
+      content: {
+        ...advertisement,
+        heroImage: advertisement.mainImage,
+        heroMobileImage: advertisement.mainMobileImage,
+        heroAlt: "leaf & bowl 메인 배너",
+        heroHref: "/menu",
+      },
+    });
+  }
+  if (advertisement?.bannerPages === undefined && advertisement?.bannerVisible && advertisement.heroImage) {
+    entries.splice(Math.min(1, entries.length), 0, { kind: "advertisement", content: advertisement });
+  }
+  if (advertisement?.bannerPages !== undefined) {
+    const managed: typeof entries = visibleBannerPages(advertisement).flatMap<(typeof entries)[number]>((page) => {
+      if (!page.image && page.originalIndex !== undefined) {
+        const slide = slides.find((slide, i) => (slide.originalIndex ?? i) === page.originalIndex);
+        return slide ? [{ kind: "standard" as const, slide }] : [];
+      }
+      return [
+        {
+          kind: "advertisement" as const,
+          content: {
+            ...advertisement,
+            heroImage: page.image,
+            heroMobileImage: page.mobileImage,
+            heroAlt: page.alt,
+            heroHref: page.href,
+          },
+        },
+      ];
+    });
+    if (advertisement.bannerIncludesOriginals) {
+      entries.splice(0, entries.length, ...managed);
+    } else {
+      entries.splice(Math.min(1, entries.length), 0, ...managed);
+    }
+  }
+  const total = entries.length;
   const reduced = useReducedMotion();
   // 첫 렌더는 서버와 같게 항상 첫 번째 배너
   const [index, setIndex] = useState(0);
@@ -47,11 +93,10 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
 
   useEffect(() => {
     const el = box.current;
-    if (!el || !("IntersectionObserver" in window)) return;
-    const io = new IntersectionObserver(
-      (en) => setVisible(en[0].isIntersecting),
-      { threshold: 0.15 },
-    );
+    if (!el || !("IntersectionObserver" in window)) {
+      return;
+    }
+    const io = new IntersectionObserver((en) => setVisible(en[0].isIntersecting), { threshold: 0.15 });
     io.observe(el);
     return () => io.disconnect();
   }, []);
@@ -65,13 +110,17 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
   const paused = hover || focus || stopped || reduced || !visible || pageHidden;
 
   useEffect(() => {
-    if (paused || total < 2) return;
+    if (paused || total < 2) {
+      return;
+    }
     const t = setTimeout(() => setIndex((i) => (i + 1) % total), HERO_MS);
     return () => clearTimeout(t);
   }, [paused, index, cycle, total]);
 
   // 데이터에서 배너를 하나도 받지 못하면 영역을 그리지 않는다.
-  if (!total) return null;
+  if (!total) {
+    return null;
+  }
 
   const go = (n: number) => {
     setIndex((n + total) % total);
@@ -88,12 +137,30 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
       onMouseLeave={() => setHover(false)}
       onFocus={(e) => setFocus(e.target.matches(":focus-visible"))}
       onBlur={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget)) setFocus(false);
+        if (!e.currentTarget.contains(e.relatedTarget)) {
+          setFocus(false);
+        }
       }}
     >
       <div className="hero-slides">
-        {slides.map((s, i) => {
+        {entries.map((entry, i) => {
           const active = i === index;
+          if (entry.kind === "advertisement") {
+            return (
+              <div
+                key={`image-${i}`}
+                className={`hero-inner hero-ad-slide${active ? " is-active" : ""}`}
+                role="group"
+                aria-roledescription="slide"
+                aria-label={`${total}개 중 ${i + 1}번째: 광고`}
+                aria-hidden={!active}
+                inert={!active}
+              >
+                <HeroBanner content={entry.content} />
+              </div>
+            );
+          }
+          const s = entry.slide;
           const Title = active ? "h1" : "p";
           return (
             <div
@@ -132,16 +199,8 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
                     loading="eager"
                     alt={s.alt}
                   />
-                  <svg
-                    className="hero-ring"
-                    viewBox="0 0 100 100"
-                    aria-hidden="true"
-                  >
-                    <path
-                      id={`hero-ring-${i}`}
-                      d={arcPath(s.bowl)}
-                      fill="none"
-                    />
+                  <svg className="hero-ring" viewBox="0 0 100 100" aria-hidden="true">
+                    <path id={`hero-ring-${i}`} d={arcPath(s.bowl)} fill="none" />
                     <text>
                       <textPath href={`#hero-ring-${i}`}>
                         {s.noteEn} · {s.noteKo}
@@ -166,21 +225,22 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
       <div className="hero-bottom wrap">
         <span>MAKE EVERY DAY A FRESH DAY</span>
         <div className="hero-ctrl">
-          <span
-            className="hero-count"
-            aria-live={paused ? "polite" : "off"}
-            aria-atomic="true"
-          >
+          {total > 1 && (
+            <button type="button" className="hero-arrow" aria-label="이전 메인 배너" onClick={() => go(index - 1)}>
+              ←
+            </button>
+          )}
+          <span className="hero-count" aria-live={paused ? "polite" : "off"} aria-atomic="true">
             <span className="sr-only">현재 배너 </span>
             {two(index + 1)}
           </span>
           <div className="hero-dots" role="group" aria-label="배너 선택">
-            {slides.map((s, i) => (
+            {entries.map((entry, i) => (
               <button
-                key={s.src}
+                key={entry.kind === "advertisement" ? `image-${i}` : entry.slide.src}
                 type="button"
                 className={i === index ? "is-active" : ""}
-                aria-label={`${i + 1}번째 배너: ${s.noteKo}`}
+                aria-label={`${i + 1}번째 배너: ${entry.kind === "advertisement" ? "광고" : entry.slide.noteKo}`}
                 aria-current={i === index}
                 onClick={() => go(i)}
               >
@@ -193,13 +253,16 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
             ))}
           </div>
           <span className="hero-total">{two(total)}</span>
+          {total > 1 && (
+            <button type="button" className="hero-arrow" aria-label="다음 메인 배너" onClick={() => go(index + 1)}>
+              →
+            </button>
+          )}
           {!reduced && (
             <button
               type="button"
               className="hero-pause"
-              aria-label={
-                stopped ? "배너 자동 넘김 재생" : "배너 자동 넘김 정지"
-              }
+              aria-label={stopped ? "배너 자동 넘김 재생" : "배너 자동 넘김 정지"}
               onClick={() => setStopped((v) => !v)}
             >
               <span aria-hidden="true">{stopped ? "▶" : "❚❚"}</span>

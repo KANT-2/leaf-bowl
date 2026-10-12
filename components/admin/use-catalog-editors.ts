@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import type { Product, OptionGroup } from "@/lib/admin/catalog";
+import { type Product, type OptionGroup } from "@/modules/catalog/schema";
 export function useCatalogEditors() {
   const [product, setProduct] = useState<Product | null>(null);
   const [group, setGroup] = useState<OptionGroup | null>(null);

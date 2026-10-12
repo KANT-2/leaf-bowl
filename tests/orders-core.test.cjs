@@ -2,8 +2,12 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 require("./register-typescript.cjs");
-const { customerSeed } = require("../lib/admin/customer-seed.ts");
-const { priceOrder, deliveryFee } = require("../modules/orders/pricing.ts");
+const { customerSeed } = require("../seed/legacy/catalog.ts");
+const pricing = require("../modules/orders/pricing.ts");
+const policy = require("./fixtures/settings.cjs").appDefaults().pricingPolicy;
+const priceOrder = (catalog, items) => pricing.priceOrder(catalog, items, policy);
+
+const deliveryFee = (subtotal) => pricing.deliveryFee(subtotal, policy);
 const status = require("../modules/orders/status.ts");
 const schema = require("../modules/orders/schema.ts");
 const { requestHash } = require("../modules/orders/request-hash.ts");
@@ -14,11 +18,16 @@ const { encodeCursor, decodeCursor } = require("../modules/shared/cursor.ts");
 const idc = require("../modules/identity/crypto.ts");
 
 const big = (n) => BigInt(n);
+
 const throws400 = (fn, re) =>
   assert.throws(fn, (e) => e instanceof AppError && e.status === 400 && (!re || re.test(e.message)));
+
 const catalog = () => customerSeed();
+
 const drinkKey = (c, name) => c.products.find((p) => p.type === "drink" && p.name === name).id;
+
 const dressingKey = (c, name) => c.products.find((p) => p.type === "dressing" && p.name === name).id;
+
 const parse = (o) => schema.createOrderSchema.parse(o);
 const base = {
   ordererName: "홍길동",
@@ -30,23 +39,36 @@ const base = {
 
 test("status: 허용된 순서만 통과하고 완료·취소는 끝이다", () => {
   const flow = ["received", "confirmed", "preparing", "delivering", "completed"];
-  for (let i = 0; i < flow.length - 1; i++) assert.ok(status.canTransition(flow[i], flow[i + 1]));
+  for (let i = 0; i < flow.length - 1; i++) {
+    assert.ok(status.canTransition(flow[i], flow[i + 1]));
+  }
   assert.ok(!status.canTransition("received", "preparing"));
   assert.ok(!status.canTransition("completed", "canceled"));
   for (const s of status.ORDER_STATUSES) {
-    if (s === "completed" || s === "canceled") assert.deepEqual([...status.nextStatuses(s)], []);
+    if (s === "completed" || s === "canceled") {
+      assert.deepEqual([...status.nextStatuses(s)], []);
+    }
     assert.ok(!status.canTransition(s, s));
   }
   assert.ok(status.isCancelable("received") && status.isCancelable("confirmed"));
   assert.ok(!status.isCancelable("preparing") && !status.isCancelable("delivering"));
-  assert.throws(() => status.assertTransition("received", "completed"), (e) => e.status === 409);
+  assert.throws(
+    () => status.assertTransition("received", "completed"),
+    (e) => e.status === 409,
+  );
 });
 
 test("status: 취소 재요청은 현재 결과를 반환하고, 준비 시작 후에는 409", () => {
   assert.equal(status.resolveCancel("received"), "cancel");
   assert.equal(status.resolveCancel("canceled"), "already-canceled");
-  assert.throws(() => status.resolveCancel("preparing"), (e) => e.status === 409);
-  assert.throws(() => status.resolveCancel("completed"), (e) => e.status === 409);
+  assert.throws(
+    () => status.resolveCancel("preparing"),
+    (e) => e.status === 409,
+  );
+  assert.throws(
+    () => status.resolveCancel("completed"),
+    (e) => e.status === 409,
+  );
 });
 
 test("pricing: 서버가 카탈로그 가격으로 계산하고 배달비 규칙을 적용한다", () => {
@@ -57,7 +79,7 @@ test("pricing: 서버가 카탈로그 가격으로 계산하고 배달비 규칙
   const r = priceOrder(c, [
     schema.orderItemSchema.parse({
       productId: 0,
-      dressingKey: dressingKey(c, "발사믹"),
+      dressingKeys: [dressingKey(c, "발사믹")],
       drinkKeys: [orange],
       quantity: 2,
     }),
@@ -68,7 +90,7 @@ test("pricing: 서버가 카탈로그 가격으로 계산하고 배달비 규칙
   assert.equal(r.deliveryFee, r.subtotal >= big(30000) ? big(0) : big(3000));
   assert.equal(r.total, r.subtotal + r.deliveryFee);
   assert.equal(r.lines[0].productId, salad0.id);
-  assert.equal(r.lines[0].options.dressing.name, "발사믹");
+  assert.equal(r.lines[0].options.dressings[0].name, "발사믹");
   assert.equal(deliveryFee(big(29999)), big(3000));
   assert.equal(deliveryFee(big(30000)), big(0));
 });
@@ -76,12 +98,13 @@ test("pricing: 서버가 카탈로그 가격으로 계산하고 배달비 규칙
 test("pricing: 거부해야 하는 주문", () => {
   const c = catalog();
   const dressing = dressingKey(c, "참깨");
-  const item = (extra = {}) => schema.orderItemSchema.parse({ productId: 0, dressingKey: dressing, quantity: 2, ...extra });
+  const item = (extra = {}) =>
+    schema.orderItemSchema.parse({ productId: 0, dressingKeys: [dressing], quantity: 2, ...extra });
   priceOrder(c, [item()]); // 기준: 통과
   throws400(() => priceOrder(c, [item({ quantity: 1 })]), /최소 주문/);
   throws400(() => priceOrder(c, [item({ productId: 99 })]), /존재하지 않는/);
-  throws400(() => priceOrder(c, [item({ dressingKey: undefined })]), /드레싱을 선택/);
-  throws400(() => priceOrder(c, [item({ dressingKey: "dressing-99" })]), /드레싱/);
+  throws400(() => priceOrder(c, [item({ dressingKeys: [] })]), /드레싱을 선택/);
+  throws400(() => priceOrder(c, [item({ dressingKeys: ["dressing-99"] })]), /드레싱/);
   throws400(() => priceOrder(c, [item({ drinkKeys: ["drink-99"] })]), /음료/);
   const orange = drinkKey(c, "오렌지 주스");
   throws400(() => priceOrder(c, [item({ drinkKeys: [orange, orange] })]), /중복/);
@@ -102,16 +125,16 @@ test("pricing: 거부해야 하는 주문", () => {
   const g = customGroup.groups.find((x) => x.id === "dressing");
   g.source = "custom";
   g.choices = [{ id: "dressing-x", name: "특제 소스", price: 500 }];
-  const r = priceOrder(customGroup, [item({ dressingKey: "dressing-x" })]);
-  assert.equal(r.lines[0].options.dressing.price, 500);
-  throws400(() => priceOrder(customGroup, [item({ dressingKey: dressing })]), /드레싱/);
+  const r = priceOrder(customGroup, [item({ dressingKeys: ["dressing-x"] })]);
+  assert.equal(r.lines[0].options.dressings[0].price, 500);
+  throws400(() => priceOrder(customGroup, [item({ dressingKeys: [dressing] })]), /드레싱/);
   const drinkSold = catalog();
   drinkSold.products.find((p) => p.id === orange).status = "soldout";
   throws400(() => priceOrder(drinkSold, [item({ drinkKeys: [orange] })]), /품절된 음료/);
 });
 
 test("pricing: 내 취향 조합은 화면의 bowlPrice(기본 볼 + 재료)와 같고, 품절·숨김 재료는 거부", () => {
-  const { BASE_BOWL_PRICE } = require("../lib/match.ts");
+  const BASE_BOWL_PRICE = policy.baseBowlPrice;
   const c = catalog();
   const priced = c.ingredients.filter((i) => i.price !== undefined && i.status === "active" && !i.deleted).slice(0, 4);
   assert.equal(priced.length, 4);
@@ -122,9 +145,9 @@ test("pricing: 내 취향 조합은 화면의 bowlPrice(기본 볼 + 재료)와 
   assert.equal(r.lines[0].unitPrice, big(BASE_BOWL_PRICE + sum));
   assert.equal(r.lines[0].productId, null);
   // 드레싱을 고르면 그 드레싱 가격이 더해지고 스냅샷에 남는다
-  const dr = priceOrder(c, [mk(keys, { dressingKey: dressingKey(c, "시저") })]);
-  assert.equal(dr.lines[0].options.dressing.name, "시저");
-  throws400(() => priceOrder(c, [mk(keys, { dressingKey: "dressing-99" })]), /드레싱/);
+  const dr = priceOrder(c, [mk(keys, { dressingKeys: [dressingKey(c, "시저")] })]);
+  assert.equal(dr.lines[0].options.dressings[0].name, "시저");
+  throws400(() => priceOrder(c, [mk(keys, { dressingKeys: ["dressing-99"] })]), /드레싱/);
   throws400(() => priceOrder(c, [mk(keys, { drinkKeys: [drinkKey(c, "오렌지 주스")] })]), /음료/);
   const target = c.ingredients.find((i) => i.id === keys[0]);
   target.status = "soldout";
@@ -146,7 +169,7 @@ test("pricing: 음료 단품 주문 (장바구니의 음료 줄)", () => {
   assert.equal(r.subtotal, big(price * 4));
   // 형태 검사: 음료 2개 단품, 드레싱 동반, 음료도 메뉴도 재료도 없음은 거부
   assert.throws(() => item({ drinkKeys: [orange, orange] }));
-  assert.throws(() => item({ dressingKey: "dressing-0" }));
+  assert.throws(() => item({ dressingKeys: ["dressing-0"] }));
   assert.throws(() => schema.orderItemSchema.parse({ quantity: 1 }));
   c.products.find((p) => p.id === orange).status = "soldout";
   throws400(() => priceOrder(c, [item()]), /품절된 음료/);
@@ -154,7 +177,7 @@ test("pricing: 음료 단품 주문 (장바구니의 음료 줄)", () => {
 });
 
 test("schema: 주문 입력 검사 (가격 변조 필드·형식 오류 거부)", () => {
-  const item = { productId: 0, dressingKey: "dressing-0", quantity: 1 };
+  const item = { productId: 0, dressingKeys: ["dressing-0"], quantity: 1 };
   const ok = parse({ ...base, items: [item] });
   assert.deepEqual(ok.items[0].drinkKeys, []);
   assert.equal(ok.addressDetail, "");
@@ -181,7 +204,7 @@ test("schema: 주문 입력 검사 (가격 변조 필드·형식 오류 거부)"
 
 test("request-hash: 같은 내용은 같고 다른 내용은 다르다", () => {
   const mk = (drinkKeys, quantity) =>
-    parse({ ...base, items: [{ productId: 0, dressingKey: "dressing-0", drinkKeys, quantity }] });
+    parse({ ...base, items: [{ productId: 0, dressingKeys: ["dressing-0"], drinkKeys, quantity }] });
   const a = mk(["drink-1", "drink-2"], 1);
   assert.equal(requestHash(a), requestHash(mk(["drink-2", "drink-1"], 1)));
   assert.notEqual(requestHash(a), requestHash(mk(["drink-1", "drink-2"], 2)));
@@ -190,13 +213,30 @@ test("request-hash: 같은 내용은 같고 다른 내용은 다르다", () => {
 });
 
 test("shared: 에러 본문, BigInt 문자열 변환, 커서", () => {
-  assert.deepEqual(errorBody(new AppError(404, "주문을 찾을 수 없습니다.")), { status: 404, message: "주문을 찾을 수 없습니다." });
+  assert.deepEqual(errorBody(new AppError(404, "주문을 찾을 수 없습니다.")), {
+    status: 404,
+    message: "주문을 찾을 수 없습니다.",
+  });
   assert.deepEqual(errorBody(new Error("DB password leaked")), { status: 503, message: "잠시 후 다시 시도해주세요." });
-  assert.deepEqual(toJson({ total: big("24800"), n: 1, nested: [{ fee: big(3000) }] }), { total: "24800", n: 1, nested: [{ fee: "3000" }] });
+  assert.deepEqual(toJson({ total: big("24800"), n: 1, nested: [{ fee: big(3000) }] }), {
+    total: "24800",
+    n: 1,
+    nested: [{ fee: "3000" }],
+  });
   const cur = { createdAt: "2026-10-09T05:30:00.000Z", id: "7c1d9f64-2b0a-4a56-9f0e-3c1a8e5b2d10" };
   assert.deepEqual(decodeCursor(encodeCursor(cur)), cur);
-  const raws = ["", "abc", Buffer.from("{}").toString("base64url"), Buffer.from(JSON.stringify({ c: "x", i: "y" })).toString("base64url")];
-  for (const raw of raws) assert.throws(() => decodeCursor(raw), (e) => e.status === 400);
+  const raws = [
+    "",
+    "abc",
+    Buffer.from("{}").toString("base64url"),
+    Buffer.from(JSON.stringify({ c: "x", i: "y" })).toString("base64url"),
+  ];
+  for (const raw of raws) {
+    assert.throws(
+      () => decodeCursor(raw),
+      (e) => e.status === 400,
+    );
+  }
 });
 
 test("identity: 토큰 해시(64자)와 비밀번호 해시 검증", async () => {
@@ -213,27 +253,44 @@ test("identity: 토큰 해시(64자)와 비밀번호 해시 검증", async () =>
   assert.equal(await idc.verifyPassword("x", "plain"), false);
 });
 
-
 test("pricing: 모든 연결 그룹의 필수·다중 선택과 고객 화면 금액을 검증한다", () => {
   const c = catalog();
   const drinkGroup = c.groups.find((g) => g.source === "drinks");
   drinkGroup.required = true;
-  const item = (extra = {}) => schema.orderItemSchema.parse({ productId: 0, dressingKey: dressingKey(c, "참깨"), quantity: 2, ...extra });
+  const item = (extra = {}) =>
+    schema.orderItemSchema.parse({ productId: 0, dressingKeys: [dressingKey(c, "참깨")], quantity: 2, ...extra });
   throws400(() => priceOrder(c, [item()]), /음료.*선택/);
-  const group = { id: "extra", name: "추가 토핑", source: "custom", required: true, multiple: false, choices: [{ id: "nuts", name: "견과", price: 800 }], deleted: false };
+  const group = {
+    id: "extra",
+    name: "추가 토핑",
+    source: "custom",
+    required: true,
+    multiple: false,
+    choices: [{ id: "nuts", name: "견과", price: 800 }],
+    deleted: false,
+  };
   c.groups.push(group);
   c.products.find((p) => p.customerId === 0).optionIds.push(group.id);
   throws400(() => priceOrder(c, [item({ drinkKeys: [drinkKey(c, "오렌지 주스")] })]), /추가 토핑.*선택/);
-  const selections = { [c.groups.find((g) => g.source === "dressings").id]: [dressingKey(c, "참깨")], [drinkGroup.id]: [drinkKey(c, "오렌지 주스")], extra: ["nuts"] };
+  const selections = {
+    [c.groups.find((g) => g.source === "dressings").id]: [dressingKey(c, "참깨")],
+    [drinkGroup.id]: [drinkKey(c, "오렌지 주스")],
+    extra: ["nuts"],
+  };
   const input = schema.orderItemSchema.parse({ productId: 0, optionSelections: selections, quantity: 2 });
   const priced = priceOrder(c, [input]);
-  const { customerCatalog } = require("../lib/customer/catalog.ts");
+  const { customerCatalog: projectCustomerCatalog } = require("../modules/catalog/customer-view.ts");
+  const { withDefaults } = require("./fixtures/settings.cjs");
+  const customerCatalog = (value) => projectCustomerCatalog(withDefaults(value));
   const client = customerCatalog({ catalog: c, revision: 1, updatedAt: "" });
-  assert.equal(Number(priced.lines[0].unitPrice), client.itemUnitPrice({ id: 0, dressing: -1, drinks: [], optionSelections: selections, qty: 2 }));
+  assert.equal(
+    Number(priced.lines[0].unitPrice),
+    client.itemUnitPrice({ id: 0, dressing: -1, drinks: [], optionSelections: selections, qty: 2 }),
+  );
   assert.equal(priced.lines[0].options.custom[0].name, "견과");
   throws400(() => priceOrder(c, [{ ...input, optionSelections: { ...selections, extra: ["nuts", "nuts"] } }]), /중복/);
   throws400(() => priceOrder(c, [{ ...input, optionSelections: { ...selections, unlinked: ["nuts"] } }]), /연결되지/);
-  assert.throws(() => schema.orderItemSchema.parse({ ...input, dressingKey: "dressing-0" }));
+  assert.throws(() => schema.orderItemSchema.parse({ ...input, dressingKeys: ["dressing-0"] }));
   c.products.find((p) => p.id === selections[drinkGroup.id][0]).status = "soldout";
   throws400(() => priceOrder(c, [input]), /품절/);
 });
@@ -242,8 +299,12 @@ test("delivery: 받을 날짜·시간대는 화면과 같은 규칙(14일 이내
   const hours = { days: "매일", open: 10, close: 21 };
   const now = new Date("2026-10-10T03:00:00.000Z"); // 한국 시간 2026-10-10 12:00
   const ok = (desiredDate, desiredSlot) => delivery.assertDeliverySlot({ desiredDate, desiredSlot }, hours, now);
+
   const bad = (desiredDate, desiredSlot, re) =>
-    assert.throws(() => ok(desiredDate, desiredSlot), (e) => e instanceof AppError && e.status === 400 && re.test(e.message));
+    assert.throws(
+      () => ok(desiredDate, desiredSlot),
+      (e) => e instanceof AppError && e.status === 400 && re.test(e.message),
+    );
   assert.equal(delivery.seoulDate(now), "2026-10-10");
   assert.equal(delivery.seoulDate(new Date("2026-10-10T15:30:00.000Z")), "2026-10-11"); // UTC 로는 아직 10일이어도 한국은 다음 날
   ok("2026-10-10", "13:00–14:00"); // 30분 넘게 남은 시간대
@@ -255,5 +316,8 @@ test("delivery: 받을 날짜·시간대는 화면과 같은 규칙(14일 이내
   bad("2026-10-11", "13:00-14:00", /시간대/); // 화면이 만드는 표시(en dash)와 다름
   bad("2026-10-09", "13:00–14:00", /날짜/); // 어제
   bad("2026-10-25", "13:00–14:00", /날짜/); // 14일 초과
-  assert.deepEqual(delivery.slotLabels("2026-10-11", { days: "매일", open: 10, close: 12 }, now), ["10:00–11:00", "11:00–12:00"]);
+  assert.deepEqual(delivery.slotLabels("2026-10-11", { days: "매일", open: 10, close: 12 }, now), [
+    "10:00–11:00",
+    "11:00–12:00",
+  ]);
 });

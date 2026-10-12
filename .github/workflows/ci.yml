@@ -19,9 +19,23 @@ jobs:
     name: Frontend CI
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: leaf_bowl_test
+          POSTGRES_PASSWORD: test-only-password
+          POSTGRES_DB: leaf_bowl_test
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U leaf_bowl_test -d leaf_bowl_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       NEXT_TELEMETRY_DISABLED: "1"
       TZ: "UTC"
+      DATABASE_URL: postgresql://leaf_bowl_test:test-only-password@127.0.0.1:5432/leaf_bowl_test
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -35,10 +49,16 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Install dependencies
         run: npm ci
+      - name: Validate schema and apply migrations
+        run: |
+          npm run db:validate
+          npm run db:migrate
       - name: Lint
         run: npm run lint
       - name: Domain and API regression tests
         run: npm test
+      - name: PostgreSQL persistence and transaction tests
+        run: npm run test:db
       - name: Verify deployment policy and recovery
         run: python3 -m unittest discover -s ops -p 'test_*.py' -v
       - name: Build

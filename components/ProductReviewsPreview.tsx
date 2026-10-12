@@ -4,14 +4,14 @@ import Link from "next/link";
 import ReviewCard from "./ReviewCard";
 import { useReviewWrite } from "./ReviewWrite";
 import { useReviews } from "./ReviewsProvider";
-import { newest } from "@/lib/reviews";
+import { newest } from "@/modules/reviews/model";
 
 export default function ProductReviewsPreview({ id }: { id: number }) {
   const list = useReviews().reviewsFor(id);
   const { openWrite } = useReviewWrite();
   const latest = [...list].sort(newest).slice(0, 3);
   return (
-    <section className="pvsec" aria-labelledby="pvRvTitle">
+    <section className="pvsec" id="reviews" aria-labelledby="pvRvTitle">
       <div className="section-title">
         <div>
           <div className="eyebrow">FRESH WORDS</div>

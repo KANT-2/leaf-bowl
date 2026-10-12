@@ -19,21 +19,16 @@ require.extensions[".ts"] = (module, filename) =>
   );
 const resolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
-  return resolve.call(
-    this,
-    request.startsWith("@/")
-      ? path.join(__dirname, "..", request.slice(2))
-      : request,
-    ...args,
-  );
+  return resolve.call(this, request.startsWith("@/") ? path.join(__dirname, "..", request.slice(2)) : request, ...args);
 };
-const { setServicesForTests, createLimits } = require("../modules/container.ts");
+const { setServicesForTests, createLimits } = require("../application/container.ts");
+const { appDefaults } = require("./fixtures/settings.cjs");
 const { createOrdersService } = require("../modules/orders/service.ts");
-const { createMemoryOrdersRepository } = require("../modules/orders/memory-repository.ts");
+const { createMemoryOrdersRepository } = require("../tests/fixtures/memory-orders.ts");
 const { createIdentityService } = require("../modules/identity/service.ts");
 const { createMemoryIdentityRepository } = require("../modules/identity/repository.ts");
 const { hashPassword } = require("../modules/identity/crypto.ts");
-const { adminGate } = require("../modules/identity/legacy-admin.ts");
+const { adminGate } = require("../application/admin-access.ts");
 const sessionRoute = require("../app/api/v1/auth/session/route.ts");
 const guestRoute = require("../app/api/v1/session/route.ts");
 const loginRoute = require("../app/api/v1/auth/login/route.ts");
@@ -44,15 +39,35 @@ const { NextRequest } = require("next/server");
 const B = "http://localhost:3000";
 async function setup() {
   setServicesForTests({
-    orders: createOrdersService({ repository: createMemoryOrdersRepository(), getCatalog: async () => ({}) }),
-    identity: createIdentityService({ repository: createMemoryIdentityRepository([{ id: "a1", loginId: "admin", passwordHash: await hashPassword("pw") }]) }),
+    orders: createOrdersService({
+      repository: createMemoryOrdersRepository({
+        getCatalog: async () => ({}),
+        getPricingPolicy: async () => appDefaults().pricingPolicy,
+        getDeliveryHours: async () => appDefaults().deliveryHours,
+      }),
+    }),
+    identity: createIdentityService({
+      repository: createMemoryIdentityRepository([
+        { id: "a1", loginId: "admin", passwordHash: await hashPassword("pw") },
+      ]),
+    }),
     limits: createLimits({ account: 50, clientLogin: 50, order: 50, clientSession: 50, globalSession: 500 }),
   });
 }
+
 const req = (path, { method = "GET", cookie, body } = {}) =>
-  new Request(B + path, { method, headers: { ...(cookie ? { cookie } : {}), ...(body ? { "content-type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  new Request(B + path, {
+    method,
+    headers: { ...(cookie ? { cookie } : {}), ...(body ? { "content-type": "application/json" } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
 const cookieOf = (r) => r.headers.getSetCookie()[0].split(";")[0];
-const adminLogin = async () => cookieOf(await loginRoute.POST(req("/api/v1/auth/login", { method: "POST", body: { loginId: "admin", password: "pw" } })));
+
+const adminLogin = async () =>
+  cookieOf(
+    await loginRoute.POST(req("/api/v1/auth/login", { method: "POST", body: { loginId: "admin", password: "pw" } })),
+  );
 
 test("adminGate: 로그인하지 않았거나 비회원 쿠키면 기존 오류 모양({ error })의 401, 관리자 세션이면 통과", async () => {
   await setup();
@@ -80,6 +95,19 @@ test("GET /api/v1/auth/session: 관리자 로그인 상태 확인, 로그아웃�
   assert.equal(await adminGate(req("/api/admin/catalog", { cookie: admin })).then((r) => r.status), 401);
 });
 
+test("event API rejects absent, guest and forged sessions, and cross-origin writes before persistence", async () => {
+  await setup();
+  const events = require("../app/api/admin/events/route.ts");
+  const guest = cookieOf(await guestRoute.POST(req("/api/v1/session", { method: "POST" })));
+  for (const cookie of [undefined, guest, "lb_admin=forged-token"]) {
+    assert.equal((await events.GET(req("/api/admin/events", { cookie }))).status, 401);
+    assert.equal((await events.PUT(req("/api/admin/events", { method: "PUT", cookie, body: {} }))).status, 401);
+  }
+  const foreign = req("/api/admin/events", { method: "PUT", cookie: await adminLogin(), body: {} });
+  foreign.headers.set("origin", "https://attacker.example");
+  assert.equal((await events.PUT(foreign)).status, 403);
+});
+
 test("proxy: /admin 은 쿠키가 없으면 로그인 화면으로, 다른 경로는 건드리지 않는다", () => {
   const call = (path, cookie) => proxy(new NextRequest(B + path, { headers: cookie ? { cookie } : {} }));
   const redirect = call("/admin");
@@ -90,4 +118,40 @@ test("proxy: /admin 은 쿠키가 없으면 로그인 화면으로, 다른 경�
   for (const path of ["/admin/login", "/admin/logout", "/admin/preview", "/menu", "/api/admin/catalog"]) {
     assert.equal(call(path).headers.get("location"), null, path);
   }
+});
+
+test("미리보기 로그인 이동은 상대 경로라 프록시 뒤의 내부 주소(0.0.0.0:3100)로 가지 않는다", () => {
+  const { adminLoginRedirect } = require("../application/admin-access.ts");
+  const res = adminLoginRedirect();
+  assert.equal(res.status, 307);
+  assert.equal(res.headers.get("location"), "/admin/login"); // 절대 주소가 아니다
+  assert.ok(!/^[a-z]+:\/\//i.test(res.headers.get("location")));
+  assert.equal(res.headers.get("cache-control"), "no-store");
+});
+
+test("adminGate: 세션 저장소 장애는 401 이 아니라 기존 오류 모양({ error })의 503 으로 응답하고, 접근은 허용하지 않는다", async () => {
+  const failing = {
+    ...createMemoryIdentityRepository([]),
+    findSessionByTokenHash: async () => {
+      throw new Error("synthetic session store failure");
+    },
+  };
+  setServicesForTests({ identity: createIdentityService({ repository: failing }) });
+  const original = console.error;
+  const logged = [];
+  console.error = (...a) => logged.push(a.join(" "));
+  try {
+    const res = await adminGate(req("/api/admin/catalog", { cookie: "lb_admin=synthetic-token" }));
+    assert.ok(res instanceof Response, "예외가 응답으로 바뀌지 않고 밖으로 새어 나간다");
+    assert.equal(res.status, 503);
+    assert.deepEqual(await res.json(), { error: "잠시 후 다시 시도해주세요." });
+    assert.equal(res.headers.get("cache-control"), "no-store");
+    assert.ok(logged.length === 1, "장애는 서버 로그에 한 번 남는다");
+  } finally {
+    console.error = original;
+  }
+  // 미리보기는 장애를 로그인 화면 이동으로 가리지 않는다
+  const preview = require("../app/admin/preview/route.ts");
+  const failedPreview = await preview.GET(req("/admin/preview", { cookie: "lb_admin=synthetic-token" }));
+  assert.equal(failedPreview.status, 503);
 });

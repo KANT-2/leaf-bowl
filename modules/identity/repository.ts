@@ -58,8 +58,14 @@ export function createMemoryIdentityRepository(admins: AdminUserRecord[] = []): 
     async createSessionWithinLimit(session, { max, now }) {
       // 세기와 저장 사이에 await 가 없어 이 구간은 끼어들 수 없다 (DB 에서는 위 계약대로 잠금 아래에서)
       let active = 0;
-      for (const s of sessions.values()) if (s.kind === session.kind && s.expiresAt.getTime() > now.getTime()) active += 1;
-      if (active >= max) return null;
+      for (const s of sessions.values()) {
+        if (s.kind === session.kind && s.expiresAt.getTime() > now.getTime()) {
+          active += 1;
+        }
+      }
+      if (active >= max) {
+        return null;
+      }
       const record = { ...session, id: randomUUID() };
       sessions.set(record.tokenHash, record);
       return { ...record };
@@ -76,7 +82,11 @@ export function createMemoryIdentityRepository(admins: AdminUserRecord[] = []): 
     },
     async countSessions(kind, now) {
       let count = 0;
-      for (const s of sessions.values()) if (s.kind === kind && s.expiresAt.getTime() > now.getTime()) count += 1;
+      for (const s of sessions.values()) {
+        if (s.kind === kind && s.expiresAt.getTime() > now.getTime()) {
+          count += 1;
+        }
+      }
       return count;
     },
   };

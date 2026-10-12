@@ -13,7 +13,9 @@ export default function ProfileTab() {
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
 
-  if (!user) return null;
+  if (!user) {
+    return null;
+  }
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,9 +26,7 @@ export default function ProfileTab() {
   return (
     <section className="surface mypage-section">
       <h2>기본 정보</h2>
-      <p className="meta">
-        {user.provider === "email" ? "이메일로 가입" : "구글로 가입"}
-      </p>
+      <p className="meta">{user.provider === "email" ? "이메일로 가입" : "구글로 가입"}</p>
       <form onSubmit={submit} className="mypage-form">
         <label className="field">
           <span>이름</span>
@@ -34,12 +34,7 @@ export default function ProfileTab() {
         </label>
         <label className="field">
           <span>연락처</span>
-          <input
-            value={phone}
-            maxLength={20}
-            placeholder="010-0000-0000"
-            onChange={(e) => setPhone(e.target.value)}
-          />
+          <input value={phone} maxLength={20} placeholder="010-0000-0000" onChange={(e) => setPhone(e.target.value)} />
         </label>
         <label className="field">
           <span>이메일</span>
