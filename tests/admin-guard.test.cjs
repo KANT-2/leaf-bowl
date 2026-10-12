@@ -115,3 +115,30 @@ test("미리보기 로그인 이동은 상대 경로라 프록시 뒤의 내부 
   assert.ok(!/^[a-z]+:\/\//i.test(res.headers.get("location")));
   assert.equal(res.headers.get("cache-control"), "no-store");
 });
+
+test("adminGate: 세션 저장소 장애는 401 이 아니라 기존 오류 모양({ error })의 503 으로 응답하고, 접근은 허용하지 않는다", async () => {
+  const failing = {
+    ...createMemoryIdentityRepository([]),
+    findSessionByTokenHash: async () => {
+      throw new Error("synthetic session store failure");
+    },
+  };
+  setServicesForTests({ identity: createIdentityService({ repository: failing }) });
+  const original = console.error;
+  const logged = [];
+  console.error = (...a) => logged.push(a.join(" "));
+  try {
+    const res = await adminGate(req("/api/admin/catalog", { cookie: "lb_admin=synthetic-token" }));
+    assert.ok(res instanceof Response, "예외가 응답으로 바뀌지 않고 밖으로 새어 나간다");
+    assert.equal(res.status, 503);
+    assert.deepEqual(await res.json(), { error: "잠시 후 다시 시도해주세요." });
+    assert.equal(res.headers.get("cache-control"), "no-store");
+    assert.ok(logged.length === 1, "장애는 서버 로그에 한 번 남는다");
+  } finally {
+    console.error = original;
+  }
+  // 미리보기는 장애를 로그인 화면 이동으로 가리지 않는다
+  const preview = require("../app/admin/preview/route.ts");
+  const failedPreview = await preview.GET(req("/admin/preview", { cookie: "lb_admin=synthetic-token" }));
+  assert.equal(failedPreview.status, 503);
+});
