@@ -351,6 +351,17 @@ model Review {
   @@map("reviews")
 }
 
+/// Retain purchase claims after review deletion so one purchase cannot be reviewed again.
+model ReviewSubmission {
+  orderItemId       BigInt   @id @map("order_item_id")
+  reviewId          String   @unique(map: "uq_review_submission_id") @map("review_id") @db.VarChar(80)
+  customerSessionId String   @map("customer_session_id") @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([customerSessionId], map: "idx_review_submission_session")
+  @@map("review_submissions")
+}
+
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model SeasonPage {
   id          String   @id @db.VarChar(80)

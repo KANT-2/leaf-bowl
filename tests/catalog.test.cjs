@@ -398,18 +398,33 @@ test("review retries keep an ID and duplicated/deleted requests leave no orphan 
     via: "delivery",
   };
   const photo = "data:image/png;base64," + Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 1]).toString("base64");
-  const first = submit(draft, [photo]);
-  assert.equal(submit(draft, [photo]).id, first.id);
-  assert.notEqual(submit({ ...draft, text: "수정한 새로운 리뷰 내용입니다." }, [photo]).id, first.id);
+  const first = submit(draft, "owner@example.test", "1", [photo]);
+  assert.equal(submit(draft, "owner@example.test", "1", [photo]).id, first.id);
+  assert.notEqual(
+    submit({ ...draft, text: "수정한 새로운 리뷰 내용입니다." }, "owner@example.test", "1", [photo]).id,
+    first.id,
+  );
+  assert.notEqual(submit(draft, "owner@example.test", "2", [photo]).id, first.id);
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "review-retry-"));
   const oldDirectory = process.env.ADMIN_DATA_DIR;
   process.env.ADMIN_DATA_DIR = directory;
   const store = require("../application/catalog.ts");
   const originalStore = { ...store };
+  const reviewStore = require("../application/reviews.ts");
+  const originalReviewStore = { ...reviewStore };
+  const container = require("../application/container.ts");
+  container.setServicesForTests({
+    identity: { resolve: async () => ({ id: "own-session" }) },
+    limits: container.createLimits(),
+  });
   const fileStore = require("./fixtures/file-catalog.ts");
   Object.assign(store, fileStore, {
     readCatalog: async () => withDefaults(await fileStore.readCatalog()),
     appendCustomerReview: async (input) => withDefaults(await fileStore.appendCustomerReview(input)),
+  });
+  Object.assign(reviewStore, {
+    verifyReviewPurchase: async () => {},
+    appendPurchasedReview: async (_session, input) => withDefaults(await fileStore.appendCustomerReview(input)),
   });
   try {
     const { POST } = require("../app/api/reviews/route.ts");
@@ -435,6 +450,8 @@ test("review retries keep an ID and duplicated/deleted requests leave no orphan 
     assert.deepEqual(fs.readdirSync(path.join(directory, "images")), existingImages);
   } finally {
     Object.assign(store, originalStore);
+    Object.assign(reviewStore, originalReviewStore);
+    container.setServicesForTests(undefined);
     if (oldDirectory === undefined) {
       delete process.env.ADMIN_DATA_DIR;
     } else {
