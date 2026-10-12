@@ -292,7 +292,16 @@ export default function BowlMatchManager({
           }
         }}
       >
-        <DialogContent className="editor-dialog" onInteractOutside={(e) => e.preventDefault()}>
+        <DialogContent
+          className="editor-dialog"
+          closeDisabled={busy}
+          onEscapeKeyDown={(e) => {
+            if (busy) {
+              e.preventDefault();
+            }
+          }}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle>{choosing ? "재료 등록하기" : "bowl match 재료 설정"}</DialogTitle>
             <DialogDescription>
@@ -428,6 +437,9 @@ export default function BowlMatchManager({
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
+                if (busy) {
+                  return;
+                }
                 const source = items.find((item) => item.id === editing.id && !item.deleted);
                 if (!source) {
                   setError("등록 재료가 변경되었습니다. 목록을 다시 확인해주세요.");

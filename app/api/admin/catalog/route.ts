@@ -4,6 +4,7 @@ import { catalogSchema } from "@/modules/catalog/schema";
 import { readCatalog, writeCatalog } from "@/application/catalog";
 import { jsonError, sameOrigin, readLimited, BodyTooLarge } from "@/infrastructure/http/request";
 import { adminGate } from "@/application/admin-access";
+import { AppError } from "@/modules/shared/errors";
 
 export async function GET(request: Request) {
   await connection();
@@ -58,6 +59,9 @@ export async function PUT(request: Request) {
   } catch (e) {
     if (e instanceof BodyTooLarge) {
       return jsonError("저장할 데이터가 너무 큽니다.", 413);
+    }
+    if (e instanceof AppError) {
+      return jsonError(e.message, e.status);
     }
     console.error("Catalog save", e);
     return jsonError("저장하지 못했습니다. 입력한 내용을 유지하고 있으니 다시 시도해주세요.", 503);

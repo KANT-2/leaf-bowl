@@ -41,8 +41,10 @@ export default function ContentEditor({
     ],
   }));
   const [index, setIndex] = useState(0),
-    [uploading, setUploading] = useState(false),
+    [uploadCount, setUploadCount] = useState(0),
     [error, setError] = useState("");
+  const uploading = uploadCount > 0;
+  const setUploading = (active: boolean) => setUploadCount((count) => Math.max(0, count + (active ? 1 : -1)));
   const [bannerIndex, setBannerIndex] = useState(0);
   const [mobilePreview, setMobilePreview] = useState(false);
   const bannerPages = c.bannerPages ?? [];
@@ -72,6 +74,9 @@ export default function ContentEditor({
     <form
       onSubmit={async (e) => {
         e.preventDefault();
+        if (busy || uploading) {
+          return;
+        }
         setError("");
         try {
           await onSave(c);
@@ -91,7 +96,7 @@ export default function ContentEditor({
         </Button>
       </div>
       <div className="content-grid">
-        <fieldset disabled={busy || uploading}>
+        <fieldset disabled={busy}>
           <BannerPagesEditor
             originalSlides={originalSlides}
             pages={bannerPages}

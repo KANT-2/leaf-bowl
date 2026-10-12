@@ -96,3 +96,63 @@ test("purchase verification precedes photo writes and review requests are limite
   assert.equal((await POST(request(valid))).status, 404);
   assert.equal((await POST(request(valid))).status, 429);
 });
+
+test("review photos reject corrupt data, save three images and clean files after a failed database write", async () => {
+  const fs = require("node:fs/promises");
+  const path = require("node:path");
+  const directory = await fs.mkdtemp(path.join(require("node:os").tmpdir(), "review-images-"));
+  const previousDirectory = process.env.ADMIN_DATA_DIR;
+  const originalAppend = store.appendPurchasedReview;
+  const maintenance = require("../application/images.ts");
+  const originalMaintenance = maintenance.maintainImages;
+  const originalError = console.error;
+  process.env.ADMIN_DATA_DIR = directory;
+  maintenance.maintainImages = async () => {};
+  console.error = () => {};
+  const png = await require("sharp")({ create: { width: 1, height: 1, channels: 3, background: "white" } })
+    .png()
+    .toBuffer();
+  const photo = "data:image/png;base64," + png.toString("base64");
+  let written;
+  try {
+    for (const corrupt of [
+      "data:image/png;base64,AAAA",
+      "data:image/png;base64," + png.toString("base64") + "=",
+      "data:image/png;base64," + Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 1]).toString("base64"),
+    ]) {
+      assert.equal((await POST(request(JSON.stringify({ ...JSON.parse(valid), photos: [corrupt] })))).status, 400);
+    }
+    assert.deepEqual(await fs.readdir(directory), []);
+    store.appendPurchasedReview = async (_session, input) => {
+      written = input.images;
+      assert.equal(written.length, 3);
+      for (const url of written) {
+        assert.ok((await fs.stat(path.join(directory, "images", url.split("/").at(-1)))).isFile());
+      }
+      throw Error("synthetic database rollback");
+    };
+    const body = JSON.stringify({ ...JSON.parse(valid), photos: [photo, photo, photo] });
+    assert.equal((await POST(request(body))).status, 503);
+    assert.deepEqual(await fs.readdir(path.join(directory, "images")), []);
+    const { withDefaults } = require("./fixtures/settings.cjs");
+    const { customerSeed } = require("../seed/legacy/catalog.ts");
+    store.appendPurchasedReview = async (_session, input) => {
+      written = input.images;
+      const catalog = customerSeed();
+      catalog.reviews[0].images = written;
+      return withDefaults({ catalog, revision: 2, updatedAt: new Date().toISOString() });
+    };
+    assert.equal((await POST(request(body))).status, 200);
+    assert.equal((await fs.readdir(path.join(directory, "images"))).length, 3);
+  } finally {
+    store.appendPurchasedReview = originalAppend;
+    maintenance.maintainImages = originalMaintenance;
+    console.error = originalError;
+    if (previousDirectory === undefined) {
+      delete process.env.ADMIN_DATA_DIR;
+    } else {
+      process.env.ADMIN_DATA_DIR = previousDirectory;
+    }
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});

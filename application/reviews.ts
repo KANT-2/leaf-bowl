@@ -5,6 +5,7 @@ import { saveCatalogChanges } from "@/infrastructure/catalog/changes";
 import { readAppDefaults } from "@/infrastructure/settings/postgres";
 import { addReview, snapshot, type ReviewInput } from "@/modules/catalog/state";
 import { AppError } from "@/modules/shared/errors";
+import { validateNewImages } from "@/application/images";
 
 export type PurchasedReviewInput = ReviewInput & { orderItemId: string };
 
@@ -59,6 +60,7 @@ export function appendPurchasedReview(sessionId: string, input: PurchasedReviewI
       throw new AppError(409, "이미 사용된 리뷰 요청 번호입니다.");
     }
     const next = addReview(current, input, new Date().toISOString());
+    await validateNewImages(current.catalog, next.catalog);
     await tx.reviewSubmission.create({
       data: { orderItemId: BigInt(input.orderItemId), reviewId: input.id, customerSessionId: sessionId },
     });
