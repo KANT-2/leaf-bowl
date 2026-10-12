@@ -1,17 +1,17 @@
-// GET /api/products/0  → 상품 1개
-// 숫자가 아니거나 없는 번호면 404
-import type { NextRequest } from "next/server";
-import { findProductById } from "@/application/products";
-import type { ApiError } from "@/types/api";
+// GET /api/products/0 → 샐러드 상세 (알레르기, 드레싱·음료 옵션, 별점). id 는 고객 주소 번호.
+import { readCatalog } from "@/application/catalog";
+import { jsonResponse, run } from "@/infrastructure/http/response";
+import { findSalad, productDetail } from "@/modules/catalog/customer-api";
+import { AppError } from "@/modules/shared/errors";
 
-export async function GET(_request: NextRequest, ctx: RouteContext<"/api/products/[id]">) {
-  const { id } = await ctx.params;
-  const product = /^\d+$/.test(id) ? await findProductById(Number(id)) : undefined;
-
-  if (!product) {
-    const error: ApiError = { message: "상품을 찾을 수 없습니다" };
-    return Response.json(error, { status: 404 });
-  }
-
-  return Response.json(product);
+export async function GET(_request: Request, ctx: RouteContext<"/api/products/[id]">) {
+  return run(async () => {
+    const { id } = await ctx.params;
+    const { catalog } = await readCatalog();
+    const salad = /^\d+$/.test(id) ? findSalad(catalog, Number(id)) : undefined;
+    if (!salad) {
+      throw new AppError(404, "상품을 찾을 수 없습니다.");
+    }
+    return jsonResponse(productDetail(catalog, salad));
+  });
 }
