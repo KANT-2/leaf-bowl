@@ -24,6 +24,8 @@ const { applyDefaultSql } = require("../seed/sql.ts");
 const { customerCatalog } = require("../modules/catalog/customer-view.ts");
 const { getDeliveryHours } = require("../infrastructure/settings/postgres.ts");
 const { matchProduct } = require("../modules/bowl/operations.ts");
+const { createPostgresPaymentsRepository } = require("../infrastructure/payments/postgres.ts");
+const { createPaymentsService } = require("../modules/payments/service.ts");
 
 const url = process.env.DATABASE_URL;
 const name = decodeURIComponent(new URL(url).pathname.slice(1));
@@ -734,4 +736,269 @@ test("catalog persistence never restores removed ingredients or reviews from a s
   assert.equal(read.catalog.products[0].en, "");
   assert.equal(await db.ingredient.count(), 0);
   assert.equal(await db.review.count(), 0);
+});
+
+function testPayments(database = db, overrides = {}) {
+  const approved = new Map();
+  let approvals = 0;
+  const gateway = {
+    assertConfigured() {},
+    async lookup(id) {
+      return approved.get(id) ?? null;
+    },
+    async confirm(paymentKey, orderId, amount) {
+      if (!approved.has(orderId)) {
+        approvals++;
+        approved.set(orderId, {
+          paymentKey,
+          orderId,
+          totalAmount: amount,
+          currency: "KRW",
+          status: "DONE",
+          method: "카드",
+          approvedAt: now().toISOString(),
+        });
+      }
+      return approved.get(orderId);
+    },
+    ...overrides,
+  };
+  const repository = createPostgresPaymentsRepository(database);
+  return {
+    service: createPaymentsService({ repository, gateway, now }),
+    repository,
+    gateway,
+    approved,
+    count: () => approvals,
+  };
+}
+
+test("Toss prepares immutable server-priced drafts without creating unpaid orders", async () => {
+  const session = randomUUID();
+  const payments = testPayments();
+  const drafts = await Promise.all(
+    Array.from({ length: 5 }, () => payments.service.prepare(session, "toss-draft-001", input())),
+  );
+  assert.equal(new Set(drafts.map((draft) => draft.orderId)).size, 1);
+  assert.equal(await db.paymentCheckout.count(), 1);
+  assert.equal(await db.order.count(), 0);
+  const draft = drafts[0];
+  assert.equal(draft.amount, 32800);
+  const stored = await db.paymentCheckout.findUnique({ where: { id: draft.orderId } });
+  assert.equal(stored.orderSnapshot.total, "32800");
+  assert.equal(stored.paymentKey, null);
+  await assert.rejects(
+    payments.service.prepare(session, "toss-draft-001", input({ address: "다른 주소" })),
+    (error) => error.status === 409,
+  );
+  assert.equal((await payments.service.prepare(randomUUID(), "toss-draft-001", input())).amount, draft.amount);
+});
+
+test("Toss concurrent approvals and retries across fresh DB clients create exactly one paid order", async () => {
+  const session = randomUUID();
+  const payments = testPayments();
+  const draft = await payments.service.prepare(session, "toss-pay-001", input());
+  const approval = { orderId: draft.orderId, paymentKey: "toss_test_key", amount: draft.amount };
+  const results = await Promise.all(Array.from({ length: 5 }, () => payments.service.confirm(session, approval)));
+  assert.equal(new Set(results.map((order) => order.id)).size, 1);
+  assert.equal(await db.order.count(), 1);
+  assert.equal(await db.orderStatusHistory.count(), 1);
+  assert.equal(payments.count(), 1);
+  const row = await db.paymentCheckout.findUnique({ where: { id: draft.orderId } });
+  assert.equal(row.orderId, results[0].id);
+  assert.equal(row.paymentKey, "toss_test_key");
+  assert.equal(row.method, "카드");
+  const fresh = createPrismaClient(url);
+  try {
+    const restarted = createPaymentsService({
+      repository: createPostgresPaymentsRepository(fresh),
+      gateway: {
+        ...payments.gateway,
+        lookup() {
+          throw Error("Paid retries must not call the provider");
+        },
+      },
+      now,
+    });
+    assert.equal((await restarted.confirm(session, approval)).id, results[0].id);
+  } finally {
+    await fresh.$disconnect();
+  }
+  await assert.rejects(
+    orderService().cancelOrder(session, results[0].id),
+    (error) => error.status === 409 && /환불/.test(error.message),
+  );
+  assert.equal((await db.order.findUnique({ where: { id: results[0].id } })).status, "received");
+});
+
+test("Toss rejects foreign sessions, tampered amounts, a second payment key and expired drafts before contacting the provider", async () => {
+  const session = randomUUID();
+  const payments = testPayments();
+  const draft = await payments.service.prepare(session, "toss-guard-001", input());
+  const approval = { orderId: draft.orderId, paymentKey: "toss_test_key", amount: draft.amount };
+  await assert.rejects(payments.service.confirm(randomUUID(), approval), (error) => error.status === 404);
+  await assert.rejects(payments.service.confirm(session, { ...approval, amount: 1 }), (error) => error.status === 400);
+  assert.equal(payments.count(), 0);
+  assert.equal((await db.paymentCheckout.findUnique({ where: { id: draft.orderId } })).paymentKey, null);
+  await db.paymentCheckout.update({ where: { id: draft.orderId }, data: { expiresAt: new Date(now().getTime() - 1) } });
+  await assert.rejects(payments.service.confirm(session, approval), (error) => error.status === 409);
+  assert.equal(payments.count(), 0);
+  await db.paymentCheckout.update({
+    where: { id: draft.orderId },
+    data: { expiresAt: new Date(now().getTime() + 60000) },
+  });
+  await payments.repository.bindPaymentKey(draft.orderId, approval.paymentKey, now());
+  await assert.rejects(
+    payments.service.confirm(session, { ...approval, paymentKey: "other_key" }),
+    (error) => error.status === 409,
+  );
+  assert.equal(payments.count(), 0);
+});
+
+test("Toss approval response loss is recovered by lookup, and a changed catalog cannot change the charged snapshot", async () => {
+  const session = randomUUID();
+  const payments = testPayments();
+  const draft = await payments.service.prepare(session, "toss-recover-001", input());
+  const original = payments.gateway.confirm;
+  payments.gateway.confirm = async (...args) => {
+    await original(...args);
+    throw Error("provider response lost");
+  };
+  await db.product.update({ where: { id: "salad-0" }, data: { price: 19900, name: "변경된 상품명" } });
+  const order = await payments.service.confirm(session, {
+    orderId: draft.orderId,
+    paymentKey: "toss_recovery_key",
+    amount: draft.amount,
+  });
+  assert.equal(order.total, 32800n);
+  assert.equal(order.items[0].name, "레몬 치킨 아보카도");
+  assert.equal(order.items[0].unitPrice, 14900n);
+  assert.equal(payments.count(), 1);
+});
+
+test("Toss approval survives a real DB transaction rollback and is reconciled without another charge", async () => {
+  const session = randomUUID();
+  const payments = testPayments();
+  const draft = await payments.service.prepare(session, "toss-rollback-001", input());
+  const approval = { orderId: draft.orderId, paymentKey: "toss_rollback_key", amount: draft.amount };
+  await db.$executeRawUnsafe(
+    "CREATE FUNCTION toss_test_fail_order() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test order rollback'; END $$",
+  );
+  await db.$executeRawUnsafe(
+    "CREATE TRIGGER toss_test_fail_order BEFORE INSERT ON order_status_history FOR EACH ROW EXECUTE FUNCTION toss_test_fail_order()",
+  );
+  try {
+    await assert.rejects(payments.service.confirm(session, approval));
+    assert.equal(await db.order.count(), 0);
+    assert.equal((await db.paymentCheckout.findUnique({ where: { id: draft.orderId } })).orderId, null);
+    assert.equal(payments.count(), 1);
+  } finally {
+    await db.$executeRawUnsafe("DROP TRIGGER toss_test_fail_order ON order_status_history");
+    await db.$executeRawUnsafe("DROP FUNCTION toss_test_fail_order()");
+  }
+  // Recovery still works after the local draft expiry because authentication was already bound.
+  await db.paymentCheckout.update({ where: { id: draft.orderId }, data: { expiresAt: new Date(now().getTime() - 1) } });
+  assert.ok((await payments.service.confirm(session, approval)).id);
+  assert.equal(await db.order.count(), 1);
+  assert.equal(payments.count(), 1);
+});
+
+test("Toss approval preserves the quoted product identity even after catalog deletion", async () => {
+  const session = randomUUID();
+  const payments = testPayments();
+  const draft = await payments.service.prepare(session, "toss-deletion-001", input());
+  await db.product.delete({ where: { id: "salad-0" } });
+  const order = await payments.service.confirm(session, {
+    orderId: draft.orderId,
+    paymentKey: "deleted_product_key",
+    amount: draft.amount,
+  });
+  assert.equal(order.items[0].name, "레몬 치킨 아보카도");
+  assert.equal(order.items[0].unitPrice, 14900n);
+  const line = await db.orderItem.findFirstOrThrow({ where: { orderId: order.id } });
+  assert.equal(line.productId, null);
+  assert.equal(line.originalProductId, "salad-0");
+});
+
+test("Toss rejects a failed provider confirmation and mismatching provider data without receiving an order", async () => {
+  const session = randomUUID();
+  const payments = testPayments(db, {
+    async confirm() {
+      throw Error("provider rejected");
+    },
+  });
+  const draft = await payments.service.prepare(session, "toss-decline-001", input());
+  const approval = { orderId: draft.orderId, paymentKey: "toss_declined_key", amount: draft.amount };
+  await assert.rejects(payments.service.confirm(session, approval), /provider rejected/);
+  assert.equal(await db.order.count(), 0);
+  payments.approved.set(draft.orderId, {
+    ...approval,
+    totalAmount: 1,
+    currency: "KRW",
+    status: "DONE",
+    method: "카드",
+    approvedAt: now().toISOString(),
+  });
+  await assert.rejects(payments.service.confirm(session, approval), (error) => error.status === 409);
+  assert.equal(await db.order.count(), 0);
+});
+
+test("expired unbound drafts renew once, while uncertain approvals retain the same payment", async () => {
+  const session = randomUUID();
+  const payments = testPayments();
+  const key = "toss-expiry-001";
+  const old = await payments.service.prepare(session, key, input());
+  await db.paymentCheckout.update({ where: { id: old.orderId }, data: { expiresAt: new Date(now().getTime() - 1) } });
+  const renewals = await Promise.all(Array.from({ length: 5 }, () => payments.service.prepare(session, key, input())));
+  assert.equal(new Set(renewals.map((draft) => draft.orderId)).size, 1);
+  assert.notEqual(renewals[0].orderId, old.orderId);
+  await assert.rejects(
+    payments.service.confirm(session, { orderId: old.orderId, paymentKey: "expired_key", amount: old.amount }),
+    (error) => error.status === 409,
+  );
+  const renewed = renewals[0];
+  await payments.repository.bindPaymentKey(renewed.orderId, "uncertain_key", now());
+  await db.paymentCheckout.update({
+    where: { id: renewed.orderId },
+    data: { expiresAt: new Date(now().getTime() - 1) },
+  });
+  const uncertain = await payments.service.prepare(session, key, input());
+  assert.equal(uncertain.orderId, renewed.orderId);
+  assert.equal(uncertain.paymentKey, "uncertain_key");
+  assert.equal(await db.order.count(), 0);
+  assert.equal(payments.count(), 0);
+});
+
+test("only verified terminal provider failures allow another payment attempt", async () => {
+  const session = randomUUID();
+  const payments = testPayments();
+  const key = "toss-terminal-001";
+  const old = await payments.service.prepare(session, key, input());
+  await payments.repository.bindPaymentKey(old.orderId, "declined_key", now());
+  const terminal = {
+    orderId: old.orderId,
+    paymentKey: "declined_key",
+    totalAmount: old.amount,
+    currency: "KRW",
+    status: "ABORTED",
+    method: "카드",
+    approvedAt: null,
+  };
+  payments.approved.set(old.orderId, { ...terminal, paymentKey: "foreign_key" });
+  assert.equal((await payments.service.prepare(session, key, input())).orderId, old.orderId);
+  payments.approved.set(old.orderId, terminal);
+  const replacement = await payments.service.prepare(session, key, input());
+  assert.notEqual(replacement.orderId, old.orderId);
+  await assert.rejects(
+    payments.service.confirm(session, { orderId: old.orderId, paymentKey: "declined_key", amount: old.amount }),
+    (error) => error.status === 409,
+  );
+  const order = await payments.service.confirm(session, {
+    orderId: replacement.orderId,
+    paymentKey: "replacement_key",
+    amount: replacement.amount,
+  });
+  assert.ok(order.id);
+  assert.equal(await db.order.count(), 1);
+  assert.equal(payments.count(), 1);
 });

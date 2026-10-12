@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import Breadcrumb from "./Breadcrumb";
 import PageHeading from "./PageHeading";
@@ -11,7 +11,8 @@ import { type DeliveryHours } from "@/modules/delivery/hours";
 import { checkoutIssue } from "@/features/checkout/validation";
 import { customerCatalog } from "@/modules/catalog/customer-view";
 import { publicSnapshotSchema } from "@/modules/catalog/public-schema";
-import { submitOrder, orderRequestKey, clearOrderRequestKey } from "@/features/orders/client";
+import { orderRequestKey } from "@/features/orders/client";
+import { preparePayment, paymentResultUrl, rememberPaymentCart } from "@/features/checkout/payment";
 import { deliveryWindowKST, deliveryWindowUTC } from "@/modules/delivery/time";
 import { money } from "@/modules/shared/format";
 import { CardIcon, KakaoPayMark, TossMark } from "./icons/BrandMarks";
@@ -19,25 +20,15 @@ import { CardIcon, KakaoPayMark, TossMark } from "./icons/BrandMarks";
 type PayMethod = "toss" | "kakaopay" | "card";
 
 const PAY_METHODS: { key: PayMethod; label: string; className: string; icon: React.ReactNode }[] = [
-  { key: "toss", label: "토스페이먼츠", className: "pay-toss", icon: <TossMark /> },
+  { key: "toss", label: "토스페이", className: "pay-toss", icon: <TossMark /> },
   { key: "kakaopay", label: "카카오페이", className: "pay-kakao", icon: <KakaoPayMark /> },
   { key: "card", label: "신용·체크카드", className: "pay-card", icon: <CardIcon /> },
 ];
 
-const formatCardNumber = (v: string) =>
-  v
-    .replace(/[^0-9]/g, "")
-    .slice(0, 16)
-    .replace(/(.{4})(?=.)/g, "$1 ");
-
-const formatExpiry = (v: string) => {
-  const digits = v.replace(/[^0-9]/g, "").slice(0, 4);
-  return digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
-};
-
-export default function CheckoutView({ hours }: { hours: DeliveryHours }) {
+export default function CheckoutView({ hours, clientKey }: { hours: DeliveryHours; clientKey: string | null }) {
   const params = useSearchParams();
-  const { items, clear, open } = useCart();
+  const router = useRouter();
+  const { items, open } = useCart();
   const catalog = useCustomerCatalog();
   const { itemName, itemOptions, itemUnitPrice, deliveryFee } = catalog;
 
@@ -50,28 +41,21 @@ export default function CheckoutView({ hours }: { hours: DeliveryHours }) {
   const timeLabel = windowDisplay?.timeLabel ?? "";
 
   const [method, setMethod] = useState<PayMethod>("toss");
-  const [cardNumber, setCardNumber] = useState("");
-  const [cardExpiry, setCardExpiry] = useState("");
-  const [cardCvc, setCardCvc] = useState("");
   const [paying, setPaying] = useState(false);
   const [ordererName, setOrdererName] = useState("");
   const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
   const pending = useRef(false);
   const submission = useRef<{ body: string; key: string } | null>(null);
-  const [done, setDone] = useState(false);
-  const [doneTotal, setDoneTotal] = useState(0);
 
   const subtotal = items.reduce((n, i) => n + itemUnitPrice(i) * i.qty, 0);
   const fee = items.length ? deliveryFee(subtotal) : 0;
   const total = subtotal + fee;
 
-  const cardValid =
-    cardNumber.replace(/\s/g, "").length >= 14 && /^\d{2}\/\d{2}$/.test(cardExpiry) && /^\d{3}$/.test(cardCvc);
   const delivery = { address, day, timeLabel, hours };
   // 시간은 확정 동작에서도 다시 확인한다. 초기 렌더에서는 시각 의존 검사 없이 상태만 표시한다.
   const unavailable = items.some((i) => !catalog.itemAvailable(i));
-  const canPay = items.length > 0 && !unavailable && !paying && (method !== "card" || cardValid);
+  const canPay = items.length > 0 && !unavailable && !paying && clientKey !== null;
 
   const pay = async () => {
     if (!canPay || pending.current) {
@@ -98,57 +82,61 @@ export default function CheckoutView({ hours }: { hours: DeliveryHours }) {
         setError("메뉴 금액이 변경되었어요. 장바구니에서 금액을 확인해주세요.");
         return;
       }
-      const window = deliveryWindowUTC(day, timeLabel);
-      if (!window) {
+      const deliveryWindow = deliveryWindowUTC(day, timeLabel);
+      if (!deliveryWindow) {
         throw Error("받을 시간대를 다시 선택해주세요.");
       }
       if (!ordererName.trim() || !/^0\d[\d -]{7,27}$/.test(phone.trim())) {
         throw Error("받는 분의 이름과 연락처를 확인해주세요.");
       }
-      const input = { ...window, address, ordererName: ordererName.trim(), phone: phone.trim(), items };
+      const input = { ...deliveryWindow, address, ordererName: ordererName.trim(), phone: phone.trim(), items };
       const body = JSON.stringify(input);
       if (submission.current?.body !== body) {
         submission.current = { body, key: await orderRequestKey(input) };
       }
-      const order = await submitOrder(input, submission.current.key);
-      clearOrderRequestKey();
-      setDoneTotal(order.total);
-      clear();
-      setDone(true);
+      const checkout = await preparePayment(input, submission.current.key);
+      // An existing authentication must be reconciled instead of opening a second payment.
+      if (checkout.paymentKey) {
+        router.push(paymentResultUrl({ ...checkout, paymentKey: checkout.paymentKey }));
+        return;
+      }
+      if (checkout.amount !== total) {
+        throw new Error("메뉴 금액이 변경되었어요. 장바구니에서 금액을 확인해주세요.");
+      }
+      await rememberPaymentCart(checkout.orderId, items);
+      const { loadTossPayments } = await import("@tosspayments/tosspayments-sdk");
+      const toss = await loadTossPayments(clientKey!);
+      const payment = toss.payment({ customerKey: checkout.orderId });
+      await payment.requestPayment({
+        method: "CARD",
+        amount: { currency: "KRW", value: checkout.amount },
+        orderId: checkout.orderId,
+        orderName: checkout.orderName,
+        successUrl: window.location.origin + "/checkout/success",
+        failUrl: window.location.origin + "/checkout/fail",
+        customerName: ordererName.trim(),
+        card:
+          method === "card"
+            ? { flowMode: "DEFAULT" }
+            : {
+                flowMode: "DIRECT",
+                easyPay: method === "toss" ? "토스페이" : "카카오페이",
+              },
+      });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "주문을 확인하지 못했습니다. 다시 시도해주세요.");
+      const canceled = typeof cause === "object" && cause !== null && "code" in cause && cause.code === "USER_CANCEL";
+      setError(
+        canceled
+          ? "결제를 중단했어요. 장바구니는 그대로 보관했습니다."
+          : cause instanceof Error
+            ? cause.message
+            : "결제를 확인하지 못했습니다. 다시 시도해주세요.",
+      );
     } finally {
       pending.current = false;
       setPaying(false);
     }
   };
-
-  if (done) {
-    return (
-      <main className="wrap pv-wrap checkout-wrap">
-        <div className="checkout-done">
-          <div className="success-icon" aria-hidden="true">
-            ✓
-          </div>
-          <h1>주문이 접수되었어요</h1>
-          <p>
-            {money(doneTotal)} · {day} {timeLabel}
-          </p>
-          <p className="demo-note">체험용 결제입니다. 실제로 청구되지 않았어요.</p>
-          <div className="form-actions-stack">
-            <Link className="primary full form-btn" href="/mypage">
-              마이페이지에서 주문 확인
-            </Link>
-            <div className="form-actions-row">
-              <Link className="text-btn" href="/menu">
-                메뉴 더 보기
-              </Link>
-            </div>
-          </div>
-        </div>
-      </main>
-    );
-  }
 
   if (!items.length) {
     return (
@@ -166,7 +154,8 @@ export default function CheckoutView({ hours }: { hours: DeliveryHours }) {
     <main className="wrap pv-wrap checkout-wrap">
       <Breadcrumb items={[["홈", "/"], ["결제"]]} />
       <PageHeading>결제</PageHeading>
-      <p className="auth-note">체험용 결제 화면입니다. 실제로 청구되지 않아요.</p>
+      <p className="auth-note">토스페이먼츠 테스트 결제입니다. 실제로 청구되지 않아요.</p>
+      {!clientKey && <p role="alert">테스트 결제를 준비 중입니다. 잠시 후 다시 이용해주세요.</p>}
 
       {(error || unavailable) && (
         <div role="alert">
@@ -251,44 +240,7 @@ export default function CheckoutView({ hours }: { hours: DeliveryHours }) {
             </button>
           ))}
         </div>
-        {method === "card" ? (
-          <div className="mypage-form card-form">
-            <label className="field">
-              <span>카드 번호</span>
-              <input
-                inputMode="numeric"
-                placeholder="0000 0000 0000 0000"
-                value={cardNumber}
-                onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
-              />
-            </label>
-            <div className="two-fields">
-              <label className="field">
-                <span>유효기간 (MM/YY)</span>
-                <input
-                  inputMode="numeric"
-                  placeholder="MM/YY"
-                  value={cardExpiry}
-                  onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
-                />
-              </label>
-              <label className="field">
-                <span>CVC</span>
-                <input
-                  inputMode="numeric"
-                  maxLength={3}
-                  placeholder="000"
-                  value={cardCvc}
-                  onChange={(e) => setCardCvc(e.target.value.replace(/[^0-9]/g, "").slice(0, 3))}
-                />
-              </label>
-            </div>
-          </div>
-        ) : (
-          <p className="pay-redirect-note">
-            {method === "toss" ? "토스페이먼츠" : "카카오페이"} 결제 창으로 이동합니다 (체험용).
-          </p>
-        )}
+        <p className="pay-redirect-note">결제하기를 누르면 토스페이먼츠 결제 창에서 안전하게 결제할 수 있어요.</p>
       </section>
 
       <button type="button" className="primary full form-btn checkout-pay-btn" disabled={!canPay} onClick={pay}>

@@ -70,7 +70,7 @@ export function clearOrderRequestKey() {
   }
 }
 
-async function jsonRequest(url: string, init: RequestInit = {}) {
+export async function jsonRequest(url: string, init: RequestInit = {}) {
   let response;
   try {
     response = await fetch(url, {

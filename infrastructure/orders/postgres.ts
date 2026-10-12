@@ -5,6 +5,7 @@ import { databaseTransaction, type DatabaseTransaction } from "@/infrastructure/
 import { lockCatalog, readCatalogState } from "@/infrastructure/catalog/postgres";
 import { DuplicateRequestError, type OrdersRepository } from "@/modules/orders/repository";
 import type { ListQuery, NewOrder, OrderRecord, StatusUpdate } from "@/modules/orders/types";
+import { AppError } from "@/modules/shared/errors";
 
 const include = {
   items: { orderBy: [{ position: "asc" }, { id: "asc" }] },
@@ -42,7 +43,7 @@ async function findByRequest(db: Reader, customerSessionId: string, requestKey: 
   return row ? record(row) : null;
 }
 
-async function insert(tx: DatabaseTransaction, input: NewOrder): Promise<OrderRecord> {
+export async function insertOrder(tx: DatabaseTransaction, input: NewOrder): Promise<OrderRecord> {
   const { items, ...order } = input;
   try {
     return record(
@@ -54,7 +55,7 @@ async function insert(tx: DatabaseTransaction, input: NewOrder): Promise<OrderRe
               ...item,
               position,
               productType: item.productType ?? (item.productId ? "salad" : "custom"),
-              originalProductId: item.productId,
+              originalProductId: item.originalProductId ?? item.productId,
               options: item.options as unknown as Prisma.InputJsonValue,
             })),
           },
@@ -83,7 +84,7 @@ export function createPostgresOrdersRepository(db: PrismaClient): OrdersReposito
             await lockCatalog(tx, "read");
             return (await readCatalogState(tx)).catalog;
           },
-          create: (input) => insert(tx, input),
+          create: (input) => insertOrder(tx, input),
         }),
       ),
     findByRequest: (session, key) => findByRequest(db, session, key),
@@ -91,9 +92,12 @@ export function createPostgresOrdersRepository(db: PrismaClient): OrdersReposito
       const row = await db.order.findUnique({ where: { id }, include });
       return row ? record(row) : null;
     },
-    create: (input) => databaseTransaction(db, (tx) => insert(tx, input)),
+    create: (input) => databaseTransaction(db, (tx) => insertOrder(tx, input)),
     updateStatus: (update: StatusUpdate) =>
       databaseTransaction(db, async (tx) => {
+        if (update.to === "canceled" && (await tx.paymentCheckout.count({ where: { orderId: update.id } }))) {
+          throw new AppError(409, "결제 주문의 취소·환불은 매장에 문의해주세요.");
+        }
         const at = new Date();
         const changed = await tx.order.updateMany({
           where: {

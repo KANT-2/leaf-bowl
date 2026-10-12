@@ -1,7 +1,7 @@
 import { decodeCursor, encodeCursor } from "../shared/cursor";
 import { AppError } from "../shared/errors";
-import { assertDeliverySlot, seoulDayStart } from "./delivery";
-import { priceOrder } from "./pricing";
+import { seoulDayStart } from "./delivery";
+import { quoteOrder } from "./quote";
 import { requestHash } from "./request-hash";
 import { DuplicateRequestError, type OrdersRepository } from "./repository";
 import type { AdminOrderListQuery, ChangeStatusInput, CreateOrderInput, OwnOrderListQuery } from "./schema";
@@ -75,31 +75,7 @@ export function createOrdersService({ repository, now = () => new Date() }: Orde
           if (existing) {
             return sameRequest(existing, hash);
           }
-          const catalog = await tx.getCatalog();
-          assertDeliverySlot(input, await tx.getDeliveryHours(), now());
-          const priced = priceOrder(catalog, input.items, await tx.getPricingPolicy());
-          const order = await tx.create({
-            customerSessionId,
-            ordererName: input.ordererName,
-            phone: input.phone,
-            address: input.address,
-            addressDetail: input.addressDetail,
-            desiredStartAt: new Date(input.desiredStartAt),
-            desiredEndAt: new Date(input.desiredEndAt),
-            subtotal: priced.subtotal,
-            deliveryFee: priced.deliveryFee,
-            total: priced.total,
-            requestKey: idempotencyKey,
-            requestHash: hash,
-            items: priced.lines.map((l) => ({
-              productId: l.productId,
-              productType: l.productType,
-              name: l.name,
-              options: l.options,
-              unitPrice: l.unitPrice,
-              quantity: l.quantity,
-            })),
-          });
+          const order = await tx.create(await quoteOrder(tx, customerSessionId, idempotencyKey, hash, input, now()));
           return { order, created: true };
         });
       } catch (e) {

@@ -9,8 +9,11 @@ import { assertSameOrigin, jsonResponse, parseOrThrow, readJsonBody, run } from 
 export async function POST(request: Request) {
   return run(async () => {
     assertSameOrigin(request);
-    const { identity, orders, limits } = services();
+    const { identity, orders, limits, payments } = services();
     const session = await requireGuest(request, identity);
+    if (payments) {
+      throw new AppError(409, "결제 승인 후 주문을 접수할 수 있습니다. 결제 화면에서 진행해주세요.");
+    }
     limits.order.hit(session.id);
     const header = request.headers.get("idempotency-key");
     if (!header) {
