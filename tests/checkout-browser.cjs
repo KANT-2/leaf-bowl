@@ -16,7 +16,7 @@ fs.mkdirSync(shots, { recursive: true });
     const shot = (name) => page.screenshot({ path: path.join(shots, name + ".jpg"), type: "jpeg", quality: 80 });
     let snapshot = await (await page.request.get(base + "/api/catalog")).json();
     await page.route("**/api/catalog", (route) => route.fulfill({ json: snapshot }));
-    console.log("Checkout revalidates stock even before catalog polling");
+    console.log("Checkout revalidates stock without catalog polling");
     const seedCart = [
       { id: 0, dressing: -1, drinks: [], qty: 2, optionSelections: { dressing: ["dressing-0"], drinks: [] } },
     ];
