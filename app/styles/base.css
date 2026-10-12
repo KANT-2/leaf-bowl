@@ -817,9 +817,9 @@
     .header nav {
       order: 3;
       width: 100%;
-      gap: 16px;
+      gap: 20px;
       font-size: 14px;
-      justify-content: space-between;
+      justify-content: flex-start;
       padding-top: 6px;
       padding-bottom: 15px;
     }

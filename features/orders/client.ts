@@ -1,6 +1,6 @@
 import { type CartItem } from "@/modules/cart/types";
 import { hasCustomIngredientIds, isCustom, isDrink } from "@/modules/cart/identity";
-import { dressingKey, drinkKey, drinkKeys } from "@/modules/cart/identifiers";
+import { dressingKeys, drinkKey, drinkKeys } from "@/modules/cart/identifiers";
 import { deliveryWindowKST } from "@/modules/delivery/time";
 import type { OrderRecord } from "@/modules/orders/customer-record";
 
@@ -15,7 +15,7 @@ export function orderItems(items: CartItem[]) {
       }
       return {
         ingredientKeys: item.ingredientIds,
-        dressingKey: dressingKey(item),
+        dressingKeys: dressingKeys(item),
         quantity: item.qty,
       };
     }
@@ -24,7 +24,7 @@ export function orderItems(items: CartItem[]) {
       quantity: item.qty,
       ...(item.optionSelections
         ? { optionSelections: item.optionSelections }
-        : { dressingKey: dressingKey(item), drinkKeys: drinkKeys(item) }),
+        : { dressingKeys: dressingKeys(item), drinkKeys: drinkKeys(item) }),
     };
   });
 }

@@ -1,4 +1,4 @@
-import { dressingKey, drinkKey, drinkKeys } from "@/modules/cart/identifiers";
+import { dressingKey, dressingKeys, drinkKey, drinkKeys } from "@/modules/cart/identifiers";
 import { readBrowserJSON as readJSON, writeBrowserJSON as writeJSON } from "@/infrastructure/browser/json";
 
 export const CART_KEY = "bb-cart";
@@ -64,6 +64,7 @@ export function loadCart(): CartItem[] {
     if (
       !validKey(v.dressingKey) ||
       !validKey(v.drinkKey) ||
+      (v.dressingKeys !== undefined && !isStringList(v.dressingKeys, 5)) ||
       (v.drinkKeys !== undefined && !isStringList(v.drinkKeys, 30))
     ) {
       continue;
@@ -81,6 +82,7 @@ export function loadCart(): CartItem[] {
         allergens: [...allergens],
         dressing,
         dressingKey: dressingKey(v),
+        dressingKeys: dressingKeys(v),
         price,
         photo,
         qty,
@@ -98,6 +100,7 @@ export function loadCart(): CartItem[] {
         id,
         dressing,
         dressingKey: dressingKey(v),
+        dressingKeys: dressingKeys(v),
         drinks: [...drinks],
         drinkKeys: drinkKeys(v),
         qty,

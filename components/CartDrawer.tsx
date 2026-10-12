@@ -1,13 +1,12 @@
 "use client";
 
-import { type DeliveryHours } from "@/modules/delivery/hours";
 import { useEffect, useRef } from "react";
 import CartBody from "./cart/CartBody";
 import { useCart } from "./CartProvider";
 
 const FOCUSABLE = "a[href],button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled)";
 
-export default function CartDrawer({ hours }: { hours: DeliveryHours }) {
+export default function CartDrawer() {
   const { isOpen, openedAt, close } = useCart();
   const drawer = useRef<HTMLElement>(null);
   const closeBtn = useRef<HTMLButtonElement>(null);
@@ -65,7 +64,7 @@ export default function CartDrawer({ hours }: { hours: DeliveryHours }) {
         aria-hidden={!isOpen}
         inert={!isOpen}
       >
-        {openedAt !== null && <CartBody openedAt={openedAt} hours={hours} closeBtn={closeBtn} />}
+        {openedAt !== null && <CartBody closeBtn={closeBtn} />}
       </aside>
     </>
   );

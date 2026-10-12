@@ -9,12 +9,54 @@
   padding: 34px 0 20px;
   align-items: start;
 }
-.pv-photo {
+.pv-left {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
   position: sticky;
   top: 20px;
+}
+.pv-photo {
+  position: relative;
   background: var(--color-pale);
   border-radius: 12px;
   overflow: hidden;
+}
+.origin-box {
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  padding: 16px 18px;
+  background: #fff;
+}
+.origin-box summary {
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--color-ink);
+}
+.origin-box table {
+  width: 100%;
+  margin-top: 14px;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.origin-box th,
+.origin-box td {
+  text-align: left;
+  padding: 9px 6px;
+  border-bottom: 1px solid var(--color-line);
+}
+.origin-box th {
+  color: var(--color-muted);
+  font-weight: 600;
+}
+.origin-box tr:last-child td {
+  border-bottom: 0;
+}
+.origin-note {
+  margin: 12px 0 0;
+  font-size: 11px;
+  color: var(--color-muted);
 }
 .pv-photo .food-image {
   padding: 7%;

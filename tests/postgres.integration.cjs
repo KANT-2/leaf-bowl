@@ -54,7 +54,7 @@ function input(extra = {}) {
     address: "서울 중구 세종대로 110",
     desiredStartAt: "2026-10-13T03:00:00.000Z",
     desiredEndAt: "2026-10-13T04:00:00.000Z",
-    items: [{ productId: 0, dressingKey: "dressing-0", drinkKeys: ["drink-1"], quantity: 2 }],
+    items: [{ productId: 0, dressingKeys: ["dressing-0"], drinkKeys: ["drink-1"], quantity: 2 }],
     ...extra,
   });
 }
@@ -315,7 +315,7 @@ test("database policy and hours drive both customer totals and order validation"
   const { order } = await orderService().createOrder(
     session.id,
     "sql-policy-order",
-    input({ items: [{ ingredientKeys: ["romaine", "chicken"], dressingKey: "dressing-0", quantity: 2 }] }),
+    input({ items: [{ ingredientKeys: ["romaine", "chicken"], dressingKeys: ["dressing-0"], quantity: 2 }] }),
   );
   assert.equal(order.subtotal, 22000n);
   assert.equal(order.deliveryFee, 700n);

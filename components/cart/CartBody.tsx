@@ -1,14 +1,10 @@
 "use client";
 import { hasCustomIngredientIds, isCustom, isDrink, itemKey, withChoice } from "@/modules/cart/identity";
 import { drinkKey } from "@/modules/cart/identifiers";
-import { deliveryWindowUTC } from "@/modules/delivery/time";
-import { type DeliveryHours } from "@/modules/delivery/hours";
-import { dateValue, isAtLeast30MinAhead, timeOptions } from "@/modules/delivery/slots";
 import { money } from "@/modules/shared/format";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { useAuth } from "../AuthProvider";
 import { useCart } from "../CartProvider";
 import { useCustomerCatalog } from "../CustomerCatalogProvider";
 import { useToast } from "../ToastProvider";
@@ -16,12 +12,10 @@ import { useToast } from "../ToastProvider";
 import { type ChoiceSlot } from "@/features/cart/choice";
 import CartLine from "./CartLine";
 interface BodyProps {
-  openedAt: number;
-  hours: DeliveryHours;
   closeBtn: React.RefObject<HTMLButtonElement | null>;
 }
 
-export default function CartBody({ openedAt, hours, closeBtn }: BodyProps) {
+export default function CartBody({ closeBtn }: BodyProps) {
   const cat = useCustomerCatalog();
   const { deliveryFee } = cat;
   const MIN_DELIVERY_ORDER = cat.pricingPolicy.minDeliveryOrder;
@@ -54,25 +48,7 @@ export default function CartBody({ openedAt, hours, closeBtn }: BodyProps) {
     focusLine.current = null;
     document.getElementById(`choice-${at}`)?.focus();
   }, [items]);
-  const { user } = useAuth();
-  const defaultAddr = user?.addresses.find((a) => a.isDefault);
-  const defaultAddress = defaultAddr
-    ? `${defaultAddr.address}${defaultAddr.detail ? `, ${defaultAddr.detail}` : ""}`
-    : "";
-  const [date, setDate] = useState("");
-  const [time, setTime] = useState("");
-  // 아직 직접 입력하지 않았으면(null) 기본 배송지를 보여준다.
-  const [addressInput, setAddressInput] = useState<string | null>(null);
-  const address = addressInput ?? defaultAddress;
-  const setAddress = (v: string) => setAddressInput(v);
   const [ack, setAck] = useState(false);
-
-  // 날짜·시간대는 드로어를 연 시각 기준으로 계산하고, 고른 값이 범위를 벗어나면 기본값으로 돌린다.
-  const minDate = dateValue(openedAt, 0);
-  const maxDate = dateValue(openedAt, 14);
-  const day = date >= minDate && date <= maxDate ? date : dateValue(openedAt, 1);
-  const options = timeOptions(day, openedAt, hours);
-  const slot = options.find((o) => o.value === time) ?? options[0];
 
   const unavailable = items.some((i) => !itemAvailable(i));
   const subtotal = items.reduce((n, i) => n + itemUnitPrice(i) * i.qty, 0);
@@ -95,20 +71,7 @@ export default function CartBody({ openedAt, hours, closeBtn }: BodyProps) {
     if (!items.length || deliveryIssue) {
       return;
     }
-    if (!slot) {
-      toast("받을 시간대를 선택해주세요");
-      return;
-    }
-    if (!isAtLeast30MinAhead(day, slot.value)) {
-      toast("현재 시간 이후의 시간대를 선택해주세요");
-      return;
-    }
-    const delivery = deliveryWindowUTC(day, slot.label);
-    if (!delivery) {
-      toast("받을 시간대를 다시 선택해주세요");
-      return;
-    }
-    router.push(`/checkout?${new URLSearchParams({ address, ...delivery }).toString()}`);
+    router.push("/checkout");
     close(false);
   };
 
@@ -172,49 +135,9 @@ export default function CartBody({ openedAt, hours, closeBtn }: BodyProps) {
         </div>
       )}
       <form onSubmit={submit}>
-        <label className="field">
-          <span>배달 주소</span>
-          <input
-            name="address"
-            required
-            minLength={2}
-            maxLength={150}
-            placeholder="배달 주소를 입력해주세요"
-            autoComplete="street-address"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-          />
-          <small className="field-hint">
-            최소 주문 {money(MIN_DELIVERY_ORDER)} · {money(FREE_DELIVERY_FROM)} 이상 무료배달
-          </small>
-        </label>
-        <div className="two-fields">
-          <label className="field">
-            <span>받을 날짜</span>
-            <input
-              type="date"
-              required
-              min={minDate}
-              max={maxDate}
-              value={day}
-              onChange={(e) => setDate(e.target.value)}
-            />
-          </label>
-          <label className="field">
-            <span>시간대</span>
-            <select required value={slot?.value ?? ""} onChange={(e) => setTime(e.target.value)}>
-              {options.length ? (
-                options.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))
-              ) : (
-                <option value="">오늘은 마감되었어요. 다른 날짜를 선택해주세요.</option>
-              )}
-            </select>
-          </label>
-        </div>
+        <small className="field-hint">
+          최소 주문 {money(MIN_DELIVERY_ORDER)} · {money(FREE_DELIVERY_FROM)} 이상 무료배달
+        </small>
         <div className="totals">
           <div>
             <span>상품 금액</span>

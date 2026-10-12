@@ -53,7 +53,7 @@ test("payment routes require the guest cookie, same origin and validated inputs,
     address: "서울 중구",
     desiredStartAt: "2026-10-13T03:00:00.000Z",
     desiredEndAt: "2026-10-13T04:00:00.000Z",
-    items: [{ productId: 0, quantity: 2, dressingKey: "dressing-0" }],
+    items: [{ productId: 0, quantity: 2, dressingKeys: ["dressing-0"] }],
   };
   const approval = { orderId: randomUUID(), paymentKey: "test_payment", amount: 24800 };
   for (const route of [prepare, confirm]) {

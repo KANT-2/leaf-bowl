@@ -88,7 +88,7 @@ fs.mkdirSync(shots, { recursive: true });
       const response = await context.request.post(base + "/api/v1/orders", {
         headers: { "Idempotency-Key": "timezone-" + timezoneId.replaceAll("/", "-") },
         data: {
-          items: [{ productId: 0, dressingKey: "dressing-0", quantity: 2 }],
+          items: [{ productId: 0, dressingKeys: ["dressing-0"], quantity: 2 }],
           ordererName: "시간대 검증",
           phone: "010-1234-5678",
           address: "서울 중구",

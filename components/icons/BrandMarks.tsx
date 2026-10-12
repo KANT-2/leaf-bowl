@@ -1,7 +1,8 @@
 /**
- * 로그인·결제 버튼에 쓰는 브랜드 마크. 각 서비스의 실제 브랜드 컬러와 워드마크로
- * 표시한다 (정확한 로고 벡터 파일을 가져올 수는 없어 텍스트 워드마크로 재현).
+ * 로그인·결제 버튼에 쓰는 브랜드 마크.
  */
+
+import Image from "next/image";
 
 export function GoogleIcon() {
   return (
@@ -29,33 +30,7 @@ export function GoogleIcon() {
 export function TossMark() {
   return (
     <span className="brand-mark brand-toss" aria-hidden="true">
-      toss
+      <Image src="/images/brand/toss.jpg" alt="" width={28} height={28} />
     </span>
-  );
-}
-
-export function KakaoPayMark() {
-  return (
-    <span className="brand-mark brand-kakaopay" aria-hidden="true">
-      kakao<b>pay</b>
-    </span>
-  );
-}
-
-export function CardIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      aria-hidden="true"
-    >
-      <rect x="2.5" y="5" width="19" height="14" rx="2" />
-      <path d="M2.5 9.5h19" />
-      <path d="M6 14h4" />
-    </svg>
   );
 }

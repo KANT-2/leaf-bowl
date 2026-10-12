@@ -1,4 +1,4 @@
-import { dressingKey, drinkKey, drinkKeys } from "@/modules/cart/identifiers";
+import { dressingKeys, drinkKey, drinkKeys } from "@/modules/cart/identifiers";
 import { type CartItem, type CustomItem, type DrinkItem, type MenuItem } from "@/modules/cart/types";
 
 export const isCustom = (i: CartItem): i is CustomItem => "kind" in i && i.kind === "custom";
@@ -25,9 +25,9 @@ export function itemKey(i: CartItem): string {
     const ingredients = i.ingredientIds?.length
       ? ["ids", [...i.ingredientIds].sort()]
       : ["legacy-names", i.ingredients];
-    return `c:${JSON.stringify([i.name, dressingKey(i) ?? "", ingredients])}`;
+    return `c:${JSON.stringify([i.name, [...dressingKeys(i)].sort().join("."), ingredients])}`;
   }
-  return `m:${i.id}:${dressingKey(i) ?? ""}:${[...drinkKeys(i)].sort().join(".")}:${selectionKey(i.optionSelections)}`;
+  return `m:${i.id}:${[...dressingKeys(i)].sort().join(".")}:${[...drinkKeys(i)].sort().join(".")}:${selectionKey(i.optionSelections)}`;
 }
 
 export function selectionKey(selections?: Record<string, string[]>): string {
@@ -38,13 +38,31 @@ export function selectionKey(selections?: Record<string, string[]>): string {
   );
 }
 
+/** 드레싱 하나를 담긴 목록에서 토글한 새 줄 (여러 드레싱을 동시에 담을 수 있다, 음료 줄은 그대로) */
+export function withDressingToggle(i: CartItem, groupId: string | null, value: string): CartItem {
+  if (isDrink(i)) {
+    return i;
+  }
+  if (groupId !== null) {
+    if (isCustom(i)) {
+      return i;
+    }
+    const current = i.optionSelections?.[groupId] ?? [];
+    const next = current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
+    return { ...i, optionSelections: { ...(i.optionSelections ?? {}), [groupId]: next } };
+  }
+  const current = dressingKeys(i);
+  const next = current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
+  return { ...i, dressing: -1, dressingKey: next[0], dressingKeys: next };
+}
+
 /** 한 줄의 단일 선택 옵션을 바꾼 새 줄 (음료 줄은 그대로) */
 export function withChoice(i: CartItem, groupId: string | null, value: string): CartItem {
   if (isDrink(i)) {
     return i;
   }
   if (groupId === null) {
-    return { ...i, dressing: -1, dressingKey: value };
+    return { ...i, dressing: -1, dressingKey: value, dressingKeys: [value] };
   }
   if (isCustom(i)) {
     return i;

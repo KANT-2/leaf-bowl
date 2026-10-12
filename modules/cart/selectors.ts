@@ -3,7 +3,7 @@ import type { Product } from "@/modules/catalog/customer-product";
 import { type Ingredient } from "@/modules/bowl/ingredient";
 import { type CartItem } from "@/modules/cart/types";
 import { hasCustomIngredientIds, isCustom, isDrink } from "@/modules/cart/identity";
-import { dressingKey, drinkKey, drinkKeys } from "@/modules/cart/identifiers";
+import { dressingKeys, drinkKey, drinkKeys } from "@/modules/cart/identifiers";
 import { optionChoices } from "@/modules/catalog/options";
 
 const split = (value: string) =>
@@ -36,8 +36,10 @@ export function createCartSelectors(
   },
 ) {
   const salads = catalog.products.filter((p) => p.type === "salad");
-  const dressingOf = (item: { dressing: number; dressingKey?: string }) =>
-    DRESSINGS.find((d) => d.id === dressingKey(item));
+  const dressingsOf = (item: { dressing: number; dressingKey?: string; dressingKeys?: string[] }) =>
+    dressingKeys(item)
+      .map((id) => DRESSINGS.find((d) => d.id === id))
+      .filter((d): d is CartOption => !!d);
 
   const drinkOf = (item: { drink: number; drinkKey?: string }) => DRINKS.find((d) => d.id === drinkKey(item));
 
@@ -59,7 +61,7 @@ export function createCartSelectors(
     }
     if (isCustom(i)) {
       return (
-        !!dressingOf(i)?.available &&
+        dressingsOf(i).every((d) => d.available) &&
         hasCustomIngredientIds(i) &&
         i.ingredientIds.every((id) => ingredients.some((x) => x.id === id))
       );
@@ -89,14 +91,15 @@ export function createCartSelectors(
         (g) =>
           g.required &&
           (g.source === "custom" ||
-            (g.source === "dressings" && !dressingKey(i)) ||
+            (g.source === "dressings" && !dressingKeys(i).length) ||
             (g.source === "drinks" && !drinkKeys(i).length)),
       )
     ) {
       return false;
     }
     return (
-      (!dressingKey(i) || !!dressingOf(i)?.available) &&
+      dressingsOf(i).every((d) => d.available) &&
+      dressingKeys(i).every((id) => DRESSINGS.some((d) => d.id === id)) &&
       drinkKeys(i).every((id) => DRINKS.some((d) => d.id === id && d.available))
     );
   };
@@ -131,12 +134,12 @@ export function createCartSelectors(
         ? (i.ingredientIds
             ? baseBowlPrice +
               ingredients.filter((x) => i.ingredientIds?.includes(x.id)).reduce((n, x) => n + x.price, 0)
-            : i.price) + (dressingOf(i)?.price ?? 0)
+            : i.price) + dressingsOf(i).reduce((n, d) => n + d.price, 0)
         : i.optionSelections
           ? (PRODUCTS[i.id]?.price ?? 0) + selectedOptions(i).reduce((n, c) => n + c.price, 0)
           : (PRODUCTS[i.id]?.price ?? 0) +
             drinkKeys(i).reduce((sum, id) => sum + (DRINKS.find((d) => d.id === id)?.price ?? 0), 0) +
-            (dressingOf(i)?.price ?? 0) +
+            dressingsOf(i).reduce((n, d) => n + d.price, 0) +
             (i.extraPrice ?? 0);
 
   const itemName = (i: CartItem) =>
@@ -158,7 +161,7 @@ export function createCartSelectors(
                     : i.ingredients),
                 ]
               : []),
-            dressingOf(i)?.name,
+            ...dressingsOf(i).map((d) => d.name),
             ...(!isCustom(i) ? drinkKeys(i).map((id) => DRINKS.find((d) => d.id === id)?.name) : []),
             ...(!isCustom(i) ? (i.extraOptions ?? []) : []),
           ]
@@ -169,7 +172,7 @@ export function createCartSelectors(
     isDrink(i)
       ? []
       : isCustom(i)
-        ? [...i.allergens, ...(dressingOf(i)?.allergens ?? [])]
+        ? [...i.allergens, ...dressingsOf(i).flatMap((d) => d.allergens ?? [])]
         : i.optionSelections
           ? [
               ...new Set([
@@ -179,7 +182,7 @@ export function createCartSelectors(
                 ),
               ]),
             ]
-          : [...new Set([...(PRODUCTS[i.id]?.allergens ?? []), ...(dressingOf(i)?.allergens ?? [])])];
+          : [...new Set([...(PRODUCTS[i.id]?.allergens ?? []), ...dressingsOf(i).flatMap((d) => d.allergens ?? [])])];
   return {
     itemAvailable,
     defaultItem,

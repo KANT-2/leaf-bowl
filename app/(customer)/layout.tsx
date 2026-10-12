@@ -43,7 +43,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                     <Header />
                     {children}
                     <Footer hours={hours} />
-                    <CartDrawer hours={hours} />
+                    <CartDrawer />
                   </CartProvider>
                 </ReviewWriteProvider>
               </ReviewsProvider>
