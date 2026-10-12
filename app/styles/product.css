@@ -112,30 +112,39 @@
 .pv-info .allergen-box {
   margin-top: 12px;
 }
-.option-list {
+.option-choices {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
-.option-list label {
+.option-choices label {
+  display: inline-flex;
+  align-items: center;
   border: 1px solid #d0dbcb;
   padding: 10px 12px;
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
 }
-.option-list label:has(input:checked) {
+.option-choices label:has(input:checked) {
   border-color: #78905f;
   background: var(--color-soft);
   color: var(--color-brand);
 }
-.option-list label:has(input:focus-visible) {
+.option-choices label:has(input:focus-visible) {
   outline: 3px solid var(--color-focus);
   outline-offset: 2px;
 }
-.option-list input {
+.option-choices input {
   accent-color: var(--color-brand);
   margin: 0 5px 0 0;
+}
+/* 데스크톱은 기존처럼 항상 펼쳐 보여준다. summary(드롭다운 버튼)는 모바일에서만 쓴다. */
+.option-picker summary {
+  display: none;
+}
+.opt-thumb {
+  display: none;
 }
 .drink-toggle {
   width: 100%;
@@ -236,6 +245,71 @@
   .pv-buy {
     box-shadow: 0 -10px 14px -10px #00000018;
   }
+
+  /* 옵션 선택을 접힌 드롭다운으로 — 선택한 항목(사진 포함)만 보이다가 누르면 펼쳐진다 */
+  .option-picker {
+    border: 1px solid #d0dbcb;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .option-picker summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    list-style: none;
+  }
+  .option-picker summary::-webkit-details-marker {
+    display: none;
+  }
+  .option-picker:not([open]) .option-choices {
+    display: none;
+  }
+  .opt-summary-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .opt-caret {
+    color: var(--color-muted);
+    transition: transform 0.15s ease;
+  }
+  .option-picker[open] .opt-caret {
+    transform: rotate(180deg);
+  }
+  .option-choices {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 0;
+    padding: 4px;
+    border-top: 1px solid var(--color-line);
+  }
+  .option-choices label {
+    display: flex;
+    width: 100%;
+    border: 0;
+    border-radius: 6px;
+    padding: 10px 8px;
+  }
+  .opt-thumb {
+    display: block;
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    margin-right: 8px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--color-pale);
+  }
+  .opt-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
 }
 @media (max-width: 600px) {
   .pv-meta {
@@ -256,7 +330,7 @@
   display: none;
 }
 @media (hover: hover) and (pointer: fine) {
-  .option-list label,
+  .option-choices label,
   .drink-list label {
     position: relative;
   }
@@ -314,7 +388,7 @@
     line-height: 1.4;
     color: var(--color-ink);
   }
-  :is(.option-list, .drink-list) label:is(:hover, :has(input:focus-visible)) .opt-preview {
+  :is(.option-choices, .drink-list) label:is(:hover, :has(input:focus-visible)) .opt-preview {
     opacity: 1;
     visibility: visible;
     transform: translate(-50%, 0);

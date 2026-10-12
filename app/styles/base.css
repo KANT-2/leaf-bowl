@@ -767,7 +767,31 @@
       grid-template-columns: 1fr;
     }
     .review-card {
-      padding: 22px;
+      padding: 16px;
+    }
+    .review-card h3 {
+      font-size: 14px;
+      margin: 14px 0 6px;
+    }
+    .review-card p {
+      font-size: 12.5px;
+      line-height: 1.7;
+      margin: 0 0 12px;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+      overflow: hidden;
+    }
+    .review-stars {
+      font-size: 15px;
+    }
+    .review-author {
+      margin-top: 12px;
+      padding-top: 10px;
+    }
+    .review-avatar {
+      width: 26px;
+      height: 26px;
     }
   }
   @media (max-width: 600px) {
