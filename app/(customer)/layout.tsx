@@ -12,6 +12,7 @@ import ReviewWriteProvider from "@/components/ReviewWrite";
 import ReviewsProvider from "@/components/ReviewsProvider";
 import ToastProvider from "@/components/ToastProvider";
 import { getDeliveryHours } from "@/infrastructure/settings/postgres";
+import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "../globals.css";
 
 export const instant = false;

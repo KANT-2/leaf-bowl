@@ -21,7 +21,11 @@ const assert = require("assert/strict");
   const response = await page.request.get(base + "/api/catalog");
   const original = await response.json();
   let snapshot = structuredClone(original);
-  await page.route("**/api/catalog", (route) => route.fulfill({ json: publicSnapshot(snapshot) }));
+  let catalogRequests = 0;
+  await page.route("**/api/catalog", (route) => {
+    catalogRequests++;
+    return route.fulfill({ json: publicSnapshot(snapshot) });
+  });
   console.log("Checking menu");
   await page.route("**/api/reviews", async (route) => {
     const body = route.request().postDataJSON();
@@ -79,8 +83,13 @@ const assert = require("assert/strict");
   });
   await page.getByRole("link", { name: product.name + " 상세 보기", exact: true }).waitFor({ timeout: 12000 });
   assert.ok(await page.getByText("17,700원", { exact: true }).count());
-  product.ingredients = "폴링으로 갱신한 구성 재료";
+  product.ingredients = "저장 알림으로 갱신한 구성 재료";
   snapshot.revision++;
+  const beforeIdle = catalogRequests;
+  await page.waitForTimeout(6500);
+  assert.equal(catalogRequests, beforeIdle, "Idle customer pages must not poll the catalog");
+  assert.equal(await page.getByText(product.ingredients, { exact: true }).count(), 0);
+  await page.evaluate(() => window.dispatchEvent(new Event("catalog-saved")));
   await page.getByText(product.ingredients, { exact: true }).waitFor({ timeout: 12000 });
   const hidden = snapshot.catalog.products.find((p) => p.customerId === 1);
   hidden.status = "hidden";
@@ -156,7 +165,17 @@ const assert = require("assert/strict");
     .getByRole("heading", { name: "공통 리뷰 등록 검증", exact: true })
     .waitFor({ state: "hidden", timeout: 12000 });
   console.log("Checking admin preview");
-  await page.goto(base + "/admin");
+  let adminCatalogRequests = 0;
+  await page.route("**/api/admin/catalog", async (route) => {
+    adminCatalogRequests++;
+    await route.fulfill({ json: snapshot });
+  });
+  await page.goto(base + "/admin#reviews");
+  await page.getByRole("heading", { name: "고객 리뷰 관리", exact: true }).waitFor();
+  assert.ok(adminCatalogRequests > 0, "Admin must load the initial catalog");
+  const adminBeforeIdle = adminCatalogRequests;
+  await page.waitForTimeout(6500);
+  assert.equal(adminCatalogRequests, adminBeforeIdle, "Idle admin review pages must not poll the catalog");
   await page.getByRole("button", { name: "고객 미리보기", exact: true }).click();
   await page
     .frameLocator('iframe[title="고객 페이지 미리보기"]')
@@ -168,7 +187,7 @@ const assert = require("assert/strict");
   });
   assert.deepEqual(errors, []);
   console.log(
-    "Browser passed: live name/price update, polling, hidden products, cart option repricing, ingredients, customer preview; no page errors.",
+    "Browser passed: no customer/admin catalog polling, save notifications, hidden products, cart option repricing, ingredients, customer preview; no page errors.",
   );
   await browser.close();
 })().catch((error) => {

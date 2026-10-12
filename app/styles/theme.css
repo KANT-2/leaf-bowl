@@ -20,6 +20,22 @@
   --color-success-surface: #e5edda;
   --color-sidebar-surface: #f0f1e6;
   --color-sidebar-highlight: #dfe7cf;
-  --font-sans: Pretendard, "Noto Sans KR", Arial, sans-serif;
-  --font-serif: Georgia, serif;
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  /* 가격·제목·큰 숫자도 같은 글꼴로 통일한다. 숫자 높이가 들쭉날쭉한 명조(Georgia)는 쓰지 않는다. */
+  --font-serif: var(--font-sans);
+  /* 필기체 느낌의 장식 문구(italic)에만 쓴다. */
+  --font-script: Georgia, serif;
+}
+
+body {
+  letter-spacing: -0.01em;
+}
+h1,
+h2,
+h3 {
+  letter-spacing: -0.02em;
+}
+.pv-meta dt,
+.pv-meta dd {
+  font-weight: 500;
 }
