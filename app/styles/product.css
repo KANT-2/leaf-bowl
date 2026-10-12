@@ -60,10 +60,7 @@
 }
 .pv-price {
   display: block;
-  font:
-    700 28px/1.4 Georgia,
-    "Noto Sans KR",
-    serif;
+  font: 800 28px/1.4 var(--font-sans);
   color: var(--color-brand);
   margin: 6px 0 18px;
 }

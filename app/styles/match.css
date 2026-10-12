@@ -112,7 +112,7 @@
   color: #7b8674;
   font-size: 14px;
   line-height: 1.7;
-  font-family: var(--font-serif);
+  font-family: var(--font-script);
 }
 .bm .little-note i {
   font-size: 17px;
@@ -393,7 +393,7 @@
   justify-content: space-between;
 }
 .bm .bowl-top h2 {
-  font: italic 24px var(--font-serif);
+  font: italic 24px var(--font-script);
   letter-spacing: -0.6px;
   margin: 0;
 }
