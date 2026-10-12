@@ -6,17 +6,13 @@ import PageHeading from "./PageHeading";
 import { useAuth } from "./AuthProvider";
 import { useToast } from "./ToastProvider";
 import { GoogleIcon } from "./icons/BrandMarks";
-
-/** 로그인 후 돌아갈 주소. 외부 주소로 보내지 않도록 "/"로 시작하는 상대 경로만 받는다. */
-function safeNext(value: string | null): string {
-  return value && value.startsWith("/") && !value.startsWith("//") ? value : "/mypage";
-}
+import { safeReturnPath } from "@/modules/shared/return-path";
 
 export default function LoginView() {
   const { isLoggedIn, login } = useAuth();
   const router = useRouter();
   const toast = useToast();
-  const next = safeNext(useSearchParams().get("next"));
+  const next = safeReturnPath(useSearchParams().get("next"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
