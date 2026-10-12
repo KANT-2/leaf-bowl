@@ -294,9 +294,9 @@ export default function BowlMatchManager({
       >
         <DialogContent
           className="editor-dialog"
-          closeDisabled={busy || uploading}
+          closeDisabled={busy}
           onEscapeKeyDown={(e) => {
-            if (busy || uploading) {
+            if (busy) {
               e.preventDefault();
             }
           }}
@@ -437,7 +437,7 @@ export default function BowlMatchManager({
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
-                if (busy || uploading) {
+                if (busy) {
                   return;
                 }
                 const source = items.find((item) => item.id === editing.id && !item.deleted);
