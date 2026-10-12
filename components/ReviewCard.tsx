@@ -30,7 +30,7 @@ export default function ReviewCard({ review: r }: { review: Review }) {
         <span>
           {r.author}
           <small>
-            {reviewDisplayDate(r)} · {r.mine ? "내가 작성" : r.sample ? "예시 리뷰" : "고객 리뷰"}
+            {reviewDisplayDate(r)} · {r.mine ? "내가 작성" : "고객 리뷰"}
           </small>
         </span>
       </div>

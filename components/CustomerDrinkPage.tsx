@@ -54,10 +54,7 @@ export default function CustomerDrinkPage({ id }: { id: string }) {
             {kcal !== undefined && (
               <>
                 <dt>영양</dt>
-                <dd>
-                  약 {kcal}kcal
-                  <small>체험용 예시 값</small>
-                </dd>
+                <dd>약 {kcal}kcal</dd>
               </>
             )}
           </dl>

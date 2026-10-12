@@ -186,7 +186,7 @@ export default function ProductDetail({ product: p }: { product: Product }) {
               {kcalOf(p.id, dressing, drinks)}
               kcal
             </b>
-            <span>영양 예시 값 · 추가 토핑 영양은 포함되지 않습니다.</span>
+            <span>추가 토핑 영양은 포함되지 않습니다.</span>
           </p>
         )}
         <div className="allergen-box">

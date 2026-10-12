@@ -114,7 +114,7 @@ export default function OrdersTab() {
                 </div>
                 <p className="meta">{o.address}</p>
                 <p className="meta">
-                  {"status" in o ? (statusLabels[String(o.status)] ?? String(o.status)) : "이전 브라우저의 체험 주문"}
+                  {"status" in o ? (statusLabels[String(o.status)] ?? String(o.status)) : "주문 완료"}
                 </p>
                 <ul className="order-item-lines">
                   {o.items.map((it, i) => {

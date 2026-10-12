@@ -237,9 +237,6 @@ export default function CheckoutView({ hours, clientKey }: { hours: DeliveryHour
                   value={address}
                   onChange={(event) => setAddressInput(event.target.value)}
                 />
-                <div className="map-mock" aria-hidden="true">
-                  <span>지도 영역 (주소 API 연동 예정)</span>
-                </div>
               </label>
               <div className="two-fields">
                 <label className="field">
