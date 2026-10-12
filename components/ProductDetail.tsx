@@ -1,6 +1,6 @@
 "use client";
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useCustomerCatalog } from "./CustomerCatalogProvider";
 import { useCart } from "./CartProvider";
 import { useToast } from "./ToastProvider";
@@ -13,6 +13,31 @@ export default function ProductDetail({ product: p }: { product: Product }) {
   const toast = useToast();
   const [selected, setSelected] = useState<Record<string, string[]>>({});
   const [qty, setQty] = useState(1);
+  const [openGroupId, setOpenGroupId] = useState<string | null>(null);
+
+  // 모바일 드롭다운 바깥을 누르거나 Esc를 누르면 닫는다. (데스크톱에서는 CSS 로 항상 펼쳐 보여서 영향 없다.)
+  useEffect(() => {
+    if (openGroupId === null) {
+      return;
+    }
+    const onPointer = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest(".option-picker")) {
+        setOpenGroupId(null);
+      }
+    };
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpenGroupId(null);
+      }
+    };
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [openGroupId]);
   const groups = groupsFor(p.id).map((g) => ({
     ...g,
     choices:
@@ -83,8 +108,13 @@ export default function ProductDetail({ product: p }: { product: Product }) {
                 {g.required ? " (필수)" : ""}
               </legend>
               {/* 모바일에서는 접힌 드롭다운으로, 데스크톱에서는 기존처럼 항상 펼쳐 보여준다(CSS 로만 제어). */}
-              <details className="option-picker">
-                <summary>
+              <div className={`option-picker${openGroupId === g.id ? " open" : ""}`}>
+                <button
+                  type="button"
+                  className="option-picker-trigger"
+                  aria-expanded={openGroupId === g.id}
+                  onClick={() => setOpenGroupId((current) => (current === g.id ? null : g.id))}
+                >
                   {thumb?.image && (
                     <span className="opt-thumb" aria-hidden="true">
                       <Image src={thumb.image} alt="" width={64} height={64} sizes="32px" />
@@ -94,7 +124,7 @@ export default function ProductDetail({ product: p }: { product: Product }) {
                   <span className="opt-caret" aria-hidden="true">
                     ⌄
                   </span>
-                </summary>
+                </button>
                 <div className="option-choices">
                   {g.choices.length ? (
                     g.choices.map((c) => (
@@ -115,9 +145,9 @@ export default function ProductDetail({ product: p }: { product: Product }) {
                                   ? [c.id]
                                   : [],
                             }));
-                            // 하나만 고르는 그룹은 고르면 바로 접는다(여러 개 고르는 그룹은 계속 열어둔다).
-                            if (!g.multiple) {
-                              e.currentTarget.closest("details")?.removeAttribute("open");
+                            // 골랐으면(체크 해제가 아니라 선택했으면) 드롭다운을 접는다.
+                            if (e.target.checked) {
+                              setOpenGroupId(null);
                             }
                           }}
                         />
@@ -140,7 +170,7 @@ export default function ProductDetail({ product: p }: { product: Product }) {
                     <p>현재 선택 가능한 옵션이 없습니다.</p>
                   )}
                 </div>
-              </details>
+              </div>
               {!g.required && !g.multiple && (
                 <button type="button" onClick={() => setSelected((s) => ({ ...s, [g.id]: [] }))}>
                   선택 안 함
