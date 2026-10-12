@@ -26,6 +26,8 @@ export interface Product {
   allergens: string[];
   /** 주요 재료, " · " 로 구분 */
   ingredients: string;
+  /** 재료별 원산지·알레르기 (관리자가 등록한 재료만 매칭, 없으면 origin 이 빈 문자열) */
+  ingredientOrigins?: { name: string; origin: string; allergens: string }[];
   /** 판매 중 여부. 관리자가 판매 중지하면 false (없으면 판매 중) */
   isOnSale?: boolean;
 }

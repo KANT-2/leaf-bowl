@@ -4,6 +4,7 @@ import type { PublicSnapshot } from "@/modules/catalog/public-schema";
 import type { Product } from "@/modules/catalog/customer-product";
 import { deliveryFee } from "@/modules/settings/pricing";
 import { type Ingredient } from "@/modules/bowl/ingredient";
+import { ingredientOrigins } from "@/modules/catalog/allergens";
 import { reviewDisplayDate, type Review } from "@/modules/reviews/model";
 import { createCartSelectors } from "@/modules/cart/selectors";
 
@@ -24,6 +25,7 @@ export function customerCatalog(snapshot: PublicSnapshot) {
   const defaults = snapshot.defaults;
   const pricingPolicy = defaults.pricingPolicy;
   const salads = catalog.products.filter((p) => p.type === "salad");
+  const registeredIngredients = (catalog.ingredients ?? []).filter((i) => !i.deleted);
   const PRODUCTS: Product[] = [];
   for (const p of salads) {
     const id = p.customerId!;
@@ -33,6 +35,7 @@ export function customerCatalog(snapshot: PublicSnapshot) {
       en: p.en ?? "",
       description: p.description,
       ingredients: p.ingredients ?? p.description,
+      ingredientOrigins: ingredientOrigins(p.ingredients ?? p.description, registeredIngredients),
       price: p.price,
       isNew: p.isNew,
       isOnSale: !p.deleted && p.status === "active",
