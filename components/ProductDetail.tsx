@@ -82,8 +82,9 @@ export default function ProductDetail({ product: p }: { product: Product }) {
                 {g.name}
                 {g.required ? " (필수)" : ""}
               </legend>
-              {/* 모바일에서는 접힌 드롭다운으로, 데스크톱에서는 기존처럼 항상 펼쳐 보여준다(CSS 로만 제어). */}
-              <details className="option-picker">
+              {/* 모바일에서는 접힌 드롭다운으로, 데스크톱에서는 기존처럼 항상 펼쳐 보여준다. details는 기본으로 펼쳐두고
+                  모바일 쪽 CSS가 닫힌 상태([open] 아님)만 따로 접어 보여준다. */}
+              <details className="option-picker" open>
                 <summary>
                   {thumb?.image && (
                     <span className="opt-thumb" aria-hidden="true">

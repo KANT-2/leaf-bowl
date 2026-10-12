@@ -7,6 +7,14 @@ export function dressingKey(item: { dressing: number; dressingKey?: string }): s
   return item.dressingKey ?? legacyDressingKey(item.dressing);
 }
 
+export function dressingKeys(item: { dressing: number; dressingKey?: string; dressingKeys?: string[] }): string[] {
+  if (item.dressingKeys) {
+    return item.dressingKeys;
+  }
+  const key = dressingKey(item);
+  return key ? [key] : [];
+}
+
 export function drinkKey(item: { drink: number; drinkKey?: string }): string {
   return item.drinkKey ?? legacyDrinkKey(item.drink);
 }

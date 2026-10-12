@@ -21,7 +21,7 @@ export interface PricedLine {
   name: string;
   /** 주문 당시 선택 내역 (스냅샷) */
   options: {
-    dressing?: PricedOption;
+    dressings: PricedOption[];
     drinks: PricedOption[];
     ingredients: PricedOption[];
     custom?: PricedOption[];
@@ -91,7 +91,7 @@ function priceMenu(catalog: Catalog, item: OrderItemInput, customerId: number): 
   const dressingGroup = linkedGroups.find((g) => g.id === "dressing" || g.source === "dressings");
   const drinksGroup = linkedGroups.find((g) => g.source === "drinks");
   if (item.optionSelections === undefined) {
-    if (item.dressingKey !== undefined && !dressingGroup) {
+    if (item.dressingKeys.length && !dressingGroup) {
       throw new AppError(400, "선택할 수 없는 드레싱입니다.");
     }
     if (item.drinkKeys.length && !drinksGroup) {
@@ -103,13 +103,7 @@ function priceMenu(catalog: Catalog, item: OrderItemInput, customerId: number): 
     Object.fromEntries(
       linkedGroups.map((group) => [
         group.id,
-        group === dressingGroup
-          ? item.dressingKey === undefined
-            ? []
-            : [item.dressingKey]
-          : group === drinksGroup
-            ? item.drinkKeys
-            : [],
+        group === dressingGroup ? item.dressingKeys : group === drinksGroup ? item.drinkKeys : [],
       ]),
     );
   if (Object.keys(selections).some((id) => !linkedGroups.some((g) => g.id === id))) {
@@ -124,7 +118,9 @@ function priceMenu(catalog: Catalog, item: OrderItemInput, customerId: number): 
     if (duplicates(keys)) {
       throw new AppError(400, `같은 ${label}를 중복해서 선택할 수 없습니다.`);
     }
-    if (!group.multiple && keys.length > 1) {
+    // 드레싱은 장바구니 줄에서 여러 개를 함께 담을 수 있다. 다른 관리자 정의 옵션의 다중 선택 제한은 그대로 유지한다.
+    const allowsMultiple = group.multiple || group === dressingGroup;
+    if (!allowsMultiple && keys.length > 1) {
       throw new AppError(400, `${label}는 하나만 선택할 수 있습니다.`);
     }
     const choices = keys.map((key): PricedOption => {
@@ -139,12 +135,11 @@ function priceMenu(catalog: Catalog, item: OrderItemInput, customerId: number): 
     });
     return { group, choices };
   });
-  const dressingChoices = priced.find((p) => p.group === dressingGroup)?.choices ?? [];
+  const dressings = priced.find((p) => p.group === dressingGroup)?.choices ?? [];
   const drinks = priced.filter((p) => p.group.source === "drinks").flatMap((p) => p.choices);
-  const custom = [
-    ...dressingChoices.slice(1),
-    ...priced.filter((p) => p.group !== dressingGroup && p.group.source !== "drinks").flatMap((p) => p.choices),
-  ];
+  const custom = priced
+    .filter((p) => p.group !== dressingGroup && p.group.source !== "drinks")
+    .flatMap((p) => p.choices);
   const unitPrice =
     BigInt(product.price) +
     priced.flatMap((p) => p.choices).reduce((sum, choice) => sum + BigInt(choice.price), BigInt(0));
@@ -153,7 +148,7 @@ function priceMenu(catalog: Catalog, item: OrderItemInput, customerId: number): 
     productType: "salad",
     name: product.name,
     options: {
-      dressing: dressingChoices[0],
+      dressings,
       drinks,
       ingredients: [],
       ...(custom.length ? { custom } : {}),
@@ -181,10 +176,12 @@ function priceCustomBowl(catalog: Catalog, item: OrderItemInput, settings: Prici
     }
     return { key: found.id, name: found.name, price: found.price };
   });
-  let dressing: PricedOption | undefined;
-  if (item.dressingKey !== undefined) {
+  if (duplicates(item.dressingKeys)) {
+    throw new AppError(400, "같은 드레싱을 중복해서 선택할 수 없습니다.");
+  }
+  const dressings = item.dressingKeys.map((key): PricedOption => {
     const p = catalog.products.find(
-      (x) => x.type === "dressing" && x.id === item.dressingKey && !x.deleted && x.status !== "hidden",
+      (x) => x.type === "dressing" && x.id === key && !x.deleted && x.status !== "hidden",
     );
     if (!p) {
       throw new AppError(400, "선택할 수 없는 드레싱입니다.");
@@ -192,17 +189,17 @@ function priceCustomBowl(catalog: Catalog, item: OrderItemInput, settings: Prici
     if (!sellable(p)) {
       throw new AppError(400, `품절된 드레싱입니다: ${p.name}`);
     }
-    dressing = { key: p.id, name: p.name, price: p.price };
-  }
+    return { key: p.id, name: p.name, price: p.price };
+  });
   const unitPrice =
     BigInt(settings.baseBowlPrice) +
     ingredients.reduce((n, i) => n + BigInt(i.price), BigInt(0)) +
-    BigInt(dressing?.price ?? 0);
+    dressings.reduce((n, d) => n + BigInt(d.price), BigInt(0));
   return {
     productId: null,
     productType: "custom",
     name: "내 취향 볼",
-    options: { dressing, drinks: [], ingredients },
+    options: { dressings, drinks: [], ingredients },
     unitPrice,
     quantity: item.quantity,
   };
@@ -222,7 +219,7 @@ function priceDrinkOnly(catalog: Catalog, item: OrderItemInput): PricedLine {
     productId: drink.id,
     productType: "drink",
     name: drink.name,
-    options: { drinks: [], ingredients: [] },
+    options: { dressings: [], drinks: [], ingredients: [] },
     unitPrice: BigInt(drink.price),
     quantity: item.quantity,
   };

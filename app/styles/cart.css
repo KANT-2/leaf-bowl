@@ -148,6 +148,27 @@ body.lock {
   }
 }
 
+/* 저장된 배송지 빠른 선택 */
+.address-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 8px;
+}
+.address-chips button {
+  border: 1px solid #bbcab6;
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: #637561;
+  background: #fff;
+}
+.address-chips button.active {
+  background: var(--color-brand);
+  border-color: var(--color-brand);
+  color: #fff;
+}
+
 /* 배달 정책 안내 · 커스텀 볼 */
 .field-hint {
   display: block;
@@ -260,11 +281,18 @@ body.lock {
 
 /* 받을 날짜·시간대 칸 높이를 맞춘다 (date 입력은 달력 아이콘 때문에 더 높아진다) */
 .two-fields .field :is(input, select) {
+  box-sizing: border-box;
   height: 48px;
+  padding: 0 12px;
+  line-height: 46px;
+}
+.two-fields .field select {
+  padding-block: 0;
 }
 @media (max-width: 600px) {
   .two-fields .field :is(input, select) {
     height: 44px;
+    line-height: 42px;
   }
 }
 
@@ -276,6 +304,36 @@ body.lock {
   margin-top: 8px;
   font-size: 11px;
   color: #637561;
+}
+.cart-dressing-multi {
+  align-items: flex-start;
+}
+.cart-dressing-label {
+  flex-shrink: 0;
+  padding-top: 4px;
+}
+.dressing-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dressing-chip {
+  border: 1px solid #c4cfba;
+  border-radius: 20px;
+  padding: 4px 11px;
+  font-size: 11px;
+  color: #637561;
+  background: #fff;
+}
+.dressing-chip.is-on {
+  background: var(--color-brand);
+  border-color: var(--color-brand);
+  color: #fff;
+}
+.dressing-chip:disabled {
+  color: #a7b29e;
+  border-style: dashed;
+  cursor: not-allowed;
 }
 .cart-dressing select {
   flex: 1;

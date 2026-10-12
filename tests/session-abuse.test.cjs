@@ -337,7 +337,7 @@ test("기존 주문 조회: 세션 정리와 새 방문자 발급이 있어도 �
       cookie,
       headers: { "idempotency-key": "keep-order-0001" },
       body: {
-        items: [{ productId: 0, dressingKey: dressing, quantity: 2 }],
+        items: [{ productId: 0, dressingKeys: [dressing], quantity: 2 }],
         ordererName: "A",
         phone: "010-1234-5678",
         address: "x",

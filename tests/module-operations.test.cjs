@@ -163,7 +163,7 @@ test("memory order adapter receives catalog and policy at construction, and roll
     address: "서울 중구",
     desiredStartAt: "2026-10-13T03:00:00.000Z",
     desiredEndAt: "2026-10-13T04:00:00.000Z",
-    items: [{ productId: 0, dressingKey: "dressing-0", quantity: 1 }],
+    items: [{ productId: 0, dressingKeys: ["dressing-0"], quantity: 1 }],
   });
   const result = await service.createOrder("guest", "injected-policy", input);
   assert.equal(result.order.deliveryFee, 700n);

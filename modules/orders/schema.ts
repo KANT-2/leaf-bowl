@@ -19,7 +19,7 @@ export const orderItemSchema = z
   .object({
     /** 메뉴의 고객 주소 번호 (/product/0 의 0). 내 취향 조합·음료 단품이면 없다 */
     productId: z.number().int().min(0).max(10000).optional(),
-    dressingKey: key.optional(),
+    dressingKeys: z.array(key).max(5).default([]),
     /** 관리자 정의 옵션도 그룹·선택의 고정 ID로 전달한다. 기존 필드와 함께 보내지 않는다. */
     optionSelections: z
       .record(key, z.array(key).max(30))
@@ -35,8 +35,8 @@ export const orderItemSchema = z
     (v) => {
       const menu = v.productId !== undefined;
       const custom = v.ingredientKeys.length > 0;
-      const drinkOnly = !menu && !custom && v.drinkKeys.length === 1 && v.dressingKey === undefined;
-      if (v.optionSelections !== undefined && (!menu || v.dressingKey !== undefined || v.drinkKeys.length > 0)) {
+      const drinkOnly = !menu && !custom && v.drinkKeys.length === 1 && v.dressingKeys.length === 0;
+      if (v.optionSelections !== undefined && (!menu || v.dressingKeys.length > 0 || v.drinkKeys.length > 0)) {
         return false;
       }
       return (menu && !custom) || (custom && !menu) || drinkOnly;
