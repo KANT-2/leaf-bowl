@@ -245,38 +245,50 @@ function Results() {
           <h3 className="review-calendar-heading">
             {deliveryGroupLabel(key)} 배달<span>{rows.length}건</span>
           </h3>
+          <div className="delivery-list-labels" aria-hidden="true">
+            <span>배달 예정</span>
+            <span>주문 정보</span>
+            <span>배달 주소</span>
+          </div>
           {rows.map((order) => (
-            <article key={order.id} className="delivery-order">
-              <div className="section-heading">
-                <strong>
-                  {order.ordererName} · {order.phone}
-                </strong>
+            <article key={order.id} className="delivery-order delivery-order-compact">
+              <div>
+                <strong>배달 예정 {order.desiredSlot}</strong>
+                <p className="meta">
+                  접수 <time dateTime={order.createdAt}>{receivedTime(order.createdAt)}</time>
+                </p>
                 <span className="pill">{STATUS_LABEL[order.status]}</span>
               </div>
-              <p>
-                <strong>배달 예정 {order.desiredSlot}</strong>
-              </p>
-              <p className="meta">
-                접수 <time dateTime={order.createdAt}>{receivedTime(order.createdAt)}</time> · 주문번호 {order.id}
-              </p>
-              <p>
-                배달 주소: {order.address} {order.addressDetail}
-              </p>
-              <ul>
-                {order.items.map((item, i) => (
-                  <li key={i}>
-                    <strong>
-                      {item.name} × {item.quantity}
-                    </strong>
-                    {item.options && <span className="meta"> · {item.options}</span>}
-                  </li>
-                ))}
-              </ul>
-              <p>결제 금액 {Number(order.total).toLocaleString("ko-KR")}원</p>
+              <div>
+                <strong>{order.ordererName}</strong>
+                <p className="meta">{order.phone}</p>
+                <ul>
+                  {order.items.map((item, i) => (
+                    <li key={i}>
+                      <strong>
+                        {item.name} × {item.quantity}
+                      </strong>
+                      {item.options && <p className="meta">{item.options}</p>}
+                    </li>
+                  ))}
+                </ul>
+                <p className="meta">
+                  주문번호 {order.id} · {Number(order.total).toLocaleString("ko-KR")}원
+                </p>
+              </div>
+              <div>
+                <p>{order.address}</p>
+                <p>{order.addressDetail}</p>
+              </div>
             </article>
           ))}
         </section>
       ))}
+      {!!filtered.length && (
+        <p className="meta" aria-live="polite">
+          총 {filtered.length}건 중 {paged.items.length}건 표시 · 한 페이지 {DELIVERY_PAGE_SIZE}건
+        </p>
+      )}
       {filtered.length > DELIVERY_PAGE_SIZE && (
         <div className="menu-pagination">
           <nav aria-label="배달 이력 페이지">
