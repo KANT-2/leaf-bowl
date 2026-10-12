@@ -3,12 +3,14 @@ import Image from "next/image";
 import { useState } from "react";
 import { useCustomerCatalog } from "./CustomerCatalogProvider";
 import { useCart } from "./CartProvider";
+import { useToast } from "./ToastProvider";
 import { money } from "@/modules/shared/format";
 import { type Product } from "@/modules/catalog/customer-product";
 
 export default function ProductDetail({ product: p }: { product: Product }) {
   const { catalog, groupsFor, DRESSINGS, DRINKS, kcalOf } = useCustomerCatalog();
   const { add, open } = useCart();
+  const toast = useToast();
   const [selected, setSelected] = useState<Record<string, string[]>>({});
   const [qty, setQty] = useState(1);
   const groups = groupsFor(p.id).map((g) => ({
@@ -42,7 +44,14 @@ export default function ProductDetail({ product: p }: { product: Product }) {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (!complete || p.status !== "active") {
+          if (p.status !== "active") {
+            return;
+          }
+          if (!complete) {
+            const missing = groups.find(
+              (g) => g.required && !g.choices.some((c) => (selected[g.id] ?? []).includes(c.id)),
+            );
+            toast(missing ? `${missing.name} 옵션을 선택해주세요.` : "필수 옵션을 선택해주세요.");
             return;
           }
           add({
@@ -133,7 +142,7 @@ export default function ProductDetail({ product: p }: { product: Product }) {
               +
             </button>
           </div>
-          <button className="primary" type="submit" disabled={p.status !== "active" || !complete}>
+          <button className="primary" type="submit" disabled={p.status !== "active"}>
             {p.status === "soldout" ? "품절 · 주문할 수 없어요" : money((p.price + optionPrice) * qty) + " · 담기"}
           </button>
         </div>
