@@ -36,7 +36,7 @@ test("review authorization enforces ownership, completion, product, uniqueness a
       addressDetail: "",
       desiredStartAt: future.toISOString(),
       desiredEndAt: new Date(future.getTime() + 3600_000).toISOString(),
-      items: [{ productId: product.customerId, dressingKey: "dressing-0", drinkKeys: ["drink-1"], quantity: 2 }],
+      items: [{ productId: product.customerId, dressingKeys: ["dressing-0"], drinkKeys: ["drink-1"], quantity: 2 }],
     }),
   );
   const review = {
