@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { useCustomerCatalog } from "@/components/CustomerCatalogProvider";
 import { useReviews } from "@/components/ReviewsProvider";
@@ -27,7 +27,7 @@ const MAX_PAGES = 10;
 export function useReviewableOrderItems(): { loading: boolean; items: ReviewableOrderItem[] } {
   const { isLoggedIn } = useAuth();
   const { catalog, getProduct } = useCustomerCatalog();
-  const { userReviews } = useReviews();
+  const { reviewedOrderItemIds } = useReviews();
   const [fetched, setFetched] = useState<ReviewableOrderItem[] | null>(null);
   const requestId = useRef(0);
 
@@ -79,12 +79,8 @@ export function useReviewableOrderItems(): { loading: boolean; items: Reviewable
     });
   }, [isLoggedIn, catalog, getProduct]);
 
-  const reviewed = useMemo(
-    () => new Set(userReviews.filter((r) => r.orderItemId).map((r) => r.orderItemId)),
-    [userReviews],
-  );
   return {
     loading: isLoggedIn && fetched === null,
-    items: isLoggedIn ? (fetched ?? []).filter((it) => !reviewed.has(it.orderItemId)) : [],
+    items: isLoggedIn ? (fetched ?? []).filter((it) => !reviewedOrderItemIds.has(it.orderItemId)) : [],
   };
 }

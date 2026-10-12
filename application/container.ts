@@ -24,6 +24,8 @@ export interface Limits {
   clientSession: RateLimiter;
   globalSession: RateLimiter;
   order: RateLimiter;
+  review: RateLimiter;
+  globalReview: RateLimiter;
 }
 
 export function createLimits(
@@ -34,6 +36,8 @@ export function createLimits(
     clientSession?: number;
     globalSession?: number;
     order?: number;
+    review?: number;
+    globalReview?: number;
   } = {},
   now?: () => number,
 ): Limits {
@@ -45,6 +49,8 @@ export function createLimits(
     clientSession: make(perMinute.clientSession ?? 30),
     globalSession: make(perMinute.globalSession ?? 120),
     order: make(perMinute.order ?? 20),
+    review: make(perMinute.review ?? 10),
+    globalReview: make(perMinute.globalReview ?? 60),
   };
 }
 

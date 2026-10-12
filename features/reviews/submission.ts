@@ -6,7 +6,7 @@ type Draft = Pick<Review, "pid" | "author" | "stars" | "title" | "text" | "via">
 export function createReviewSubmission() {
   let pending: { fingerprint: string; review: Review } | undefined;
   return (draft: Draft, ownerEmail: string, orderItemId: string, photos: string[] = []): Review => {
-    const fingerprint = JSON.stringify([draft, photos]);
+    const fingerprint = JSON.stringify([draft, ownerEmail, orderItemId, photos]);
     if (pending?.fingerprint === fingerprint) {
       return pending.review;
     }

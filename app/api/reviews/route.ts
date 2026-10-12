@@ -5,7 +5,11 @@ import { z } from "zod";
 import { unstable_rethrow } from "next/navigation";
 import { AppError } from "@/modules/shared/errors";
 import { readJsonBody } from "@/infrastructure/http/response";
-import { appendCustomerReview, dataDirectory } from "@/application/catalog";
+import { dataDirectory } from "@/application/catalog";
+import { appendPurchasedReview, ownReviewSubmissions, verifyReviewPurchase } from "@/application/reviews";
+import { services } from "@/application/container";
+import { requireGuest } from "@/modules/identity/guard";
+import { run, jsonResponse } from "@/infrastructure/http/response";
 import { sameOrigin, jsonError } from "@/infrastructure/http/request";
 const schema = z.object({
   id: z
@@ -13,6 +17,10 @@ const schema = z.object({
     .regex(/^[a-zA-Z0-9_-]+$/)
     .max(80),
   pid: z.number().int().nonnegative(),
+  orderItemId: z
+    .string()
+    .regex(/^[1-9][0-9]{0,18}$/)
+    .refine((id) => /^[1-9][0-9]{0,18}$/.test(id) && BigInt(id) <= BigInt("9223372036854775807")),
   author: z.string().trim().min(1).max(80),
   stars: z.number().int().min(1).max(5),
   title: z.string().trim().min(2).max(200),
@@ -50,12 +58,17 @@ export async function POST(request: Request) {
     return jsonError("허용되지 않은 요청입니다.", 403);
   }
   try {
+    const { identity, limits } = services();
+    const session = await requireGuest(request, identity);
+    limits.globalReview.hit("all");
+    limits.review.hit(session.id);
     const body = await readJsonBody(request, 5 * 1024 * 1024);
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
       return jsonError("리뷰 내용을 확인해주세요.");
     }
     const { photos = [], ...review } = parsed.data;
+    await verifyReviewPurchase(session.id, review);
     const decoded = photos.map(decodePhoto);
     if (decoded.some((d) => d === null)) {
       return jsonError("사진은 JPG·PNG·WebP, 장당 1MB 이하로 올려주세요.");
@@ -74,7 +87,7 @@ export async function POST(request: Request) {
         saved.push(key);
         await writeFile(path.join(directory, key), bytes);
       }
-      const snapshot = await appendCustomerReview({
+      const snapshot = await appendPurchasedReview(session.id, {
         ...review,
         images: saved.map((key) => "/api/admin/images/" + key),
       });
@@ -105,4 +118,11 @@ export async function POST(request: Request) {
     console.error("[reviews] unexpected error:", e instanceof Error ? (e.stack ?? e.message) : String(e));
     return jsonError("리뷰를 저장하지 못했습니다. 다시 시도해주세요.", 503);
   }
+}
+
+export async function GET(request: Request) {
+  return run(async () => {
+    const session = await requireGuest(request, services().identity);
+    return jsonResponse({ submissions: await ownReviewSubmissions(session.id) });
+  });
 }

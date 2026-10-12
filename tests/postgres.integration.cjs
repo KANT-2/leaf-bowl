@@ -39,7 +39,7 @@ async function reset() {
   const [{ name: actualName }] = await db.$queryRaw`SELECT current_database() AS name`;
   assert.equal(actualName, name, "Test connection must resolve to the guarded database");
   await db.$executeRawUnsafe(
-    "TRUNCATE app_settings, catalog_meta, catalog_imports, deleted_review_ids, products, ingredients, option_groups, allergens, categories, reviews, site_content, season_pages, store_location, orders, admin_users, sessions RESTART IDENTITY CASCADE",
+    "TRUNCATE review_submissions, app_settings, catalog_meta, catalog_imports, deleted_review_ids, products, ingredients, option_groups, allergens, categories, reviews, site_content, season_pages, store_location, orders, admin_users, sessions RESTART IDENTITY CASCADE",
   );
 }
 
