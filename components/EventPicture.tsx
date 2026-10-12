@@ -14,14 +14,15 @@ export default function EventPicture({
   event: CustomerEvent;
   className: string;
   sizes: string;
-  /** 이 폭(px) 이하에서 모바일 이미지를 쓴다 */
-  mobileUpTo: number;
+  /** 이 폭(px) 이하에서 모바일 이미지를 쓴다. 생략하면 화면 폭과 관계없이 PC 이미지만 쓴다. */
+  mobileUpTo?: number;
 }) {
   const alt = event.alt || event.title;
   const { props } = getImageProps({ src: event.image, alt, width: 1200, height: 900, sizes, loading: "lazy" });
-  const mobile = event.mobileImage
-    ? getImageProps({ src: event.mobileImage, alt, width: 900, height: 1200, sizes }).props
-    : null;
+  const mobile =
+    event.mobileImage && mobileUpTo
+      ? getImageProps({ src: event.mobileImage, alt, width: 900, height: 1200, sizes }).props
+      : null;
   return (
     <picture className={className}>
       {mobile && <source media={`(max-width: ${mobileUpTo}px)`} srcSet={mobile.srcSet} sizes={mobile.sizes} />}
