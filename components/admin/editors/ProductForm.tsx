@@ -84,12 +84,10 @@ export default function ProductForm({
               placeholder="예: 레몬 치킨 아보카도"
             />
           </label>
-          {p.type === "salad" && (
-            <label className="field">
-              영문 이름
-              <Input maxLength={100} value={p.en ?? ""} onChange={(e) => set("en", e.target.value)} />
-            </label>
-          )}
+          <label className="field">
+            영문 이름
+            <Input maxLength={100} value={p.en ?? ""} onChange={(e) => set("en", e.target.value)} />
+          </label>
           <label className="field">
             가격(원)
             <Input
@@ -119,11 +117,17 @@ export default function ProductForm({
               value={p.description}
               maxLength={600}
               onChange={(e) => set("description", e.target.value)}
-              placeholder="로메인 · 치킨 · 아보카도"
+              placeholder={
+                p.type === "drink"
+                  ? "음료의 맛과 특징을 입력해주세요."
+                  : p.type === "dressing"
+                    ? "소스의 맛과 추천 조합을 입력해주세요."
+                    : "로메인 · 치킨 · 아보카도"
+              }
             />
           </label>
         </div>
-        <details className="menu-extra" open={p.type !== "salad"}>
+        <details className="menu-extra">
           <summary>분류·판매 상태·배지·옵션 설정</summary>
           <div className="menu-settings-grid">
             <label className="field">
@@ -192,17 +196,6 @@ export default function ProductForm({
                 ))}
                 {!groups.length && <div className="meta">옵션 관리에서 그룹을 먼저 등록해주세요.</div>}
               </div>
-            )}
-            {p.type !== "salad" && (
-              <label className="field">
-                알레르기 안내
-                <Input
-                  value={p.allergens}
-                  maxLength={400}
-                  onChange={(e) => set("allergens", e.target.value)}
-                  placeholder="예: 우유, 대두, 밀"
-                />
-              </label>
             )}
           </div>
         </details>
