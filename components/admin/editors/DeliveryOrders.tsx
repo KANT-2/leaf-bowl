@@ -194,28 +194,23 @@ function Results() {
             </select>
           </label>
         )}
+        {groupBy === "day" && day && (
+          <label>
+            시간 선택
+            <select aria-label="배달 시간대 선택" value={hour} onChange={(e) => setHour(e.target.value)}>
+              <option value="">전체 시간</option>
+              {Array.from({ length: 24 }, (_, h) => (
+                <option key={h} value={String(h)}>
+                  {String(h).padStart(2, "0")}:00–{String(h + 1).padStart(2, "0")}:00
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <span className="meta" role="status">
           조회 {filtered.length}건 · 배달 날짜순 · 한국 시간 기준
         </span>
       </div>
-      {day && (
-        <div className="delivery-hours" role="group" aria-label="배달 시간대 선택">
-          <Button type="button" variant={hour === "" ? "default" : "outline"} onClick={() => setHour("")}>
-            전체 시간
-          </Button>
-          {Array.from({ length: 24 }, (_, h) => (
-            <Button
-              key={h}
-              type="button"
-              variant={hour === String(h) ? "default" : "outline"}
-              aria-pressed={hour === String(h)}
-              onClick={() => setHour(String(h))}
-            >
-              {String(h).padStart(2, "0")}:00–{String(h + 1).padStart(2, "0")}:00
-            </Button>
-          ))}
-        </div>
-      )}
       <div className="section-heading">
         <p className="meta" aria-live="polite">
           {loading ? "주문 불러오는 중…" : `불러온 주문 ${orders.length}건 · 30초마다 자동 갱신`}
