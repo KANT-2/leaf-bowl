@@ -397,7 +397,13 @@ test("review retries keep an ID and duplicated/deleted requests leave no orphan 
     text: "아주 신선하고 맛있어요.",
     via: "delivery",
   };
-  const photo = "data:image/png;base64," + Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 1]).toString("base64");
+  const photo =
+    "data:image/png;base64," +
+    (
+      await require("sharp")({ create: { width: 1, height: 1, channels: 3, background: "white" } })
+        .png()
+        .toBuffer()
+    ).toString("base64");
   const first = submit(draft, "owner@example.test", "1", [photo]);
   assert.equal(submit(draft, "owner@example.test", "1", [photo]).id, first.id);
   assert.notEqual(
@@ -417,8 +423,11 @@ test("review retries keep an ID and duplicated/deleted requests leave no orphan 
     identity: { resolve: async () => ({ id: "own-session" }) },
     limits: container.createLimits(),
   });
+  const imageMaintenance = require("../application/images.ts");
+  const originalMaintenance = imageMaintenance.maintainImages;
+  imageMaintenance.maintainImages = async () => {};
   const fileStore = require("./fixtures/file-catalog.ts");
-  Object.assign(store, fileStore, {
+  Object.assign(store, {
     readCatalog: async () => withDefaults(await fileStore.readCatalog()),
     appendCustomerReview: async (input) => withDefaults(await fileStore.appendCustomerReview(input)),
   });
@@ -449,9 +458,11 @@ test("review retries keep an ID and duplicated/deleted requests leave no orphan 
     assert.equal((await POST(request())).status, 200);
     assert.deepEqual(fs.readdirSync(path.join(directory, "images")), existingImages);
   } finally {
-    Object.assign(store, originalStore);
     Object.assign(reviewStore, originalReviewStore);
     container.setServicesForTests(undefined);
+    store.readCatalog = originalStore.readCatalog;
+    store.appendCustomerReview = originalStore.appendCustomerReview;
+    imageMaintenance.maintainImages = originalMaintenance;
     if (oldDirectory === undefined) {
       delete process.env.ADMIN_DATA_DIR;
     } else {

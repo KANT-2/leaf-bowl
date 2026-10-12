@@ -16,6 +16,7 @@ import { type Catalog } from "@/modules/catalog/schema";
 import GroupForm from "./editors/GroupForm";
 import ProductForm from "./editors/ProductForm";
 import type { CatalogEditors } from "./use-catalog-editors";
+import { useState } from "react";
 export default function CatalogDialogs({
   catalog,
   originCountries,
@@ -35,17 +36,27 @@ export default function CatalogDialogs({
 }) {
   const { product, setProduct, group, setGroup, deleting, setDeleting, purging, setPurging, preview, setPreview } =
     editors;
+  const [uploading, setUploading] = useState(false);
   return (
     <>
       <Dialog
         open={!!product}
         onOpenChange={(v) => {
-          if (!busy && !v) {
+          if (!busy && !uploading && !v) {
             setProduct(null);
           }
         }}
       >
-        <DialogContent className="editor-dialog menu-editor-dialog" onInteractOutside={(e) => e.preventDefault()}>
+        <DialogContent
+          className="editor-dialog menu-editor-dialog"
+          closeDisabled={busy || uploading}
+          onEscapeKeyDown={(e) => {
+            if (busy || uploading) {
+              e.preventDefault();
+            }
+          }}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle>
               {product && catalog.products.some((p) => p.id === product.id) ? "메뉴 수정" : "새 메뉴 등록"}
@@ -65,6 +76,7 @@ export default function CatalogDialogs({
                 setProduct(null);
                 window.location.hash = "origins";
               }}
+              onUploadBusy={setUploading}
               onRefresh={load}
               onCancel={() => setProduct(null)}
               onSave={async (p) => {

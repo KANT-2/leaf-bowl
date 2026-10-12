@@ -29,7 +29,9 @@ export default function EventManager() {
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [uploadCount, setUploadCount] = useState(0);
+  const uploading = uploadCount > 0;
+  const setUploading = (active: boolean) => setUploadCount((count) => Math.max(0, count + (active ? 1 : -1)));
   const [deleting, setDeleting] = useState<string | null>(null);
   const load = async () => {
     setBusy(true);
@@ -141,6 +143,9 @@ export default function EventManager() {
           <form
             onSubmit={async (e) => {
               e.preventDefault();
+              if (busy || uploading) {
+                return;
+              }
               const result = eventSchema.safeParse(draft);
               if (!result.success) {
                 setError(result.error.issues[0]?.message || "입력 내용을 확인해주세요.");
@@ -154,7 +159,7 @@ export default function EventManager() {
               }
             }}
           >
-            <fieldset disabled={busy || uploading} className="event-form-grid">
+            <fieldset disabled={busy} className="event-form-grid">
               <label>
                 이벤트 제목
                 <Input
