@@ -1,0 +1,92 @@
+[
+  {
+    "id": "bm-romaine",
+    "origin": "국내산",
+    "originDetail": ""
+  },
+  {
+    "id": "bm-kale",
+    "origin": "국내산",
+    "originDetail": ""
+  },
+  {
+    "id": "bm-chicken",
+    "origin": "국내산",
+    "originDetail": ""
+  },
+  {
+    "id": "bm-shrimp",
+    "origin": "베트남산",
+    "originDetail": ""
+  },
+  {
+    "id": "bm-salmon",
+    "origin": "노르웨이산",
+    "originDetail": ""
+  },
+  {
+    "id": "bm-tofu",
+    "origin": "대두: 국내산",
+    "originDetail": ""
+  },
+  {
+    "id": "bm-chickpea",
+    "origin": "미국산",
+    "originDetail": ""
+  },
+  {
+    "id": "bm-avocado",
+    "origin": "멕시코산",
+    "originDetail": ""
+  },
+  {
+    "id": "bm-tomato",
+    "origin": "국내산",
+    "originDetail": ""
+  },
+  {
+    "id": "bm-cucumber",
+    "origin": "국내산",
+    "originDetail": ""
+  },
+  {
+    "id": "bm-mango",
+    "origin": "태국산",
+    "originDetail": ""
+  },
+  {
+    "id": "bm-corn",
+    "origin": "미국산",
+    "originDetail": ""
+  },
+  {
+    "id": "bm-mushroom",
+    "origin": "국내산",
+    "originDetail": ""
+  },
+  {
+    "id": "bm-burrata",
+    "origin": "이탈리아산",
+    "originDetail": ""
+  },
+  {
+    "id": "bm-quinoa",
+    "origin": "페루산",
+    "originDetail": ""
+  },
+  {
+    "id": "bm-crouton",
+    "origin": "밀: 미국산",
+    "originDetail": ""
+  },
+  {
+    "id": "bm-nuts",
+    "origin": "땅콩: 중국산 / 호두·아몬드: 미국산",
+    "originDetail": ""
+  },
+  {
+    "id": "bm-olive",
+    "origin": "스페인산",
+    "originDetail": ""
+  }
+]

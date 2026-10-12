@@ -57,10 +57,7 @@ export default function OriginAllergyManager({
   const pagedIngredients = filteredIngredients.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const usedBy = (ingredient: Ingredient) =>
     catalog.products.filter(
-      (p) =>
-        !p.deleted &&
-        p.type === "salad" &&
-        (p.ingredients ?? "").split(/[·,，、;\n]+/).some((t) => matchesIngredient(t, ingredient)),
+      (p) => !p.deleted && (p.ingredients ?? "").split(/[·,，、;\n]+/).some((t) => matchesIngredient(t, ingredient)),
     );
 
   const open = (ingredient: Ingredient) => {
@@ -82,7 +79,6 @@ export default function OriginAllergyManager({
       const products = catalog.products.map((p) => {
         if (
           p.deleted ||
-          p.type !== "salad" ||
           !(p.ingredients ?? "").split(/[·,，、;\n]+/).some((t) => matchesIngredient(t, previous ?? editing))
         ) {
           return p;

@@ -8,16 +8,18 @@ const sharp = require("sharp");
 const files = require("../infrastructure/images/files.ts");
 const maintenance = require("../application/images.ts");
 const store = require("../application/catalog.ts");
+const eventStore = require("../application/events.ts");
 const { setServicesForTests } = require("../application/container.ts");
 const { customerSeed } = require("../seed/legacy/catalog.ts");
 const { withDefaults } = require("./fixtures/settings.cjs");
 const { POST } = require("../app/api/admin/images/route.ts");
 const { GET } = require("../app/api/admin/images/[key]/route.ts");
 const { readLimited } = require("../infrastructure/http/request.ts");
-let directory, png, snapshot;
+let directory, png, snapshot, events;
 const originalDirectory = process.env.ADMIN_DATA_DIR;
 const originalMaintenance = maintenance.maintainImages;
 const originalRead = store.readCatalog;
+const originalReadEvents = eventStore.readEvents;
 before(async () => {
   directory = await fs.mkdtemp(path.join(os.tmpdir(), "leaf-bowl-images-"));
   process.env.ADMIN_DATA_DIR = directory;
@@ -26,6 +28,8 @@ before(async () => {
     .toBuffer();
   snapshot = withDefaults({ catalog: customerSeed(), revision: 1, updatedAt: new Date().toISOString() });
   store.readCatalog = async () => snapshot;
+  events = [];
+  eventStore.readEvents = async () => ({ events, revision: 1 });
   maintenance.maintainImages = async () => {};
   setServicesForTests({
     identity: {
@@ -37,6 +41,7 @@ before(async () => {
 after(async () => {
   maintenance.maintainImages = originalMaintenance;
   store.readCatalog = originalRead;
+  eventStore.readEvents = originalReadEvents;
   setServicesForTests(undefined);
   if (originalDirectory === undefined) {
     delete process.env.ADMIN_DATA_DIR;
@@ -126,6 +131,12 @@ test("admin upload enforces authority, body limits, form syntax and full image v
   assert.match(published.headers.get("cache-control"), /no-store/);
   snapshot.catalog.products[0].deleted = true;
   assert.equal((await imageRequest(key)).status, 404);
+  const event = { id: "autumn", title: "가을", image: url, mobileImage: "", visible: false };
+  events.push(event);
+  assert.equal((await imageRequest(key)).status, 404);
+  event.visible = true;
+  assert.equal((await imageRequest(key)).status, 200);
+  events.length = 0;
   assert.equal((await imageRequest("../secret.png")).status, 404);
 });
 test("atomic storage cleans partial writes and failed renames without publishing files", async () => {
