@@ -1,0 +1,1 @@
+ALTER TABLE site_content ADD COLUMN main_image VARCHAR(200) NOT NULL DEFAULT '', ADD COLUMN main_mobile_image VARCHAR(200) NOT NULL DEFAULT '';

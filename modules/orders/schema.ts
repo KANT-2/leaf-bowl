@@ -122,11 +122,16 @@ const day = z
 export const adminOrderListQuerySchema = z
   .object({
     status: z.enum(ORDER_STATUSES).optional(),
+    deliveryDate: day.optional(),
+    deliveryHour: z.coerce.number().int().min(0).max(23).optional(),
     /** 접수일 범위 (한국 시간 기준 날짜, 양 끝 포함) */
     from: day.optional(),
     to: day.optional(),
     limit: z.coerce.number().int().min(1).max(50).default(20),
     cursor: z.string().min(1).max(300).optional(),
+  })
+  .refine((q) => q.deliveryHour === undefined || !!q.deliveryDate, {
+    message: "시간대를 조회할 배달 날짜를 선택해주세요.",
   })
   .refine((q) => !q.from || !q.to || q.from <= q.to, {
     message: "조회 기간을 확인해주세요.",

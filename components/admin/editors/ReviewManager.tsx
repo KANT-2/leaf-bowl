@@ -144,6 +144,30 @@ export default function ReviewManager({
               setImageIndex(0);
             }}
           >
+            {!!r.images?.length && (
+              <div className="review-list-photos" role="group" aria-label={r.author + " 리뷰 첨부 사진"}>
+                {r.images.map((src, i) => (
+                  <button
+                    key={`${src}-${i}`}
+                    type="button"
+                    aria-label={r.author + " 리뷰 사진 " + (i + 1) + " 크게 보기"}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDetailId(r.id);
+                      setImageIndex(i);
+                    }}
+                  >
+                    <Image
+                      unoptimized
+                      width={160}
+                      height={160}
+                      src={src}
+                      alt={r.author + " 리뷰 첨부 사진 " + (i + 1)}
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="section-heading">
               <div>
                 <strong>{r.author}</strong>

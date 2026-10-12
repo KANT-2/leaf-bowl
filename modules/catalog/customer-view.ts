@@ -115,13 +115,14 @@ export function customerCatalog(snapshot: PublicSnapshot) {
       i === 0
         ? {
             ...s,
+            originalIndex: i,
             title: (() => {
               const lines = catalog.content.heroTitle.split(/\n|(?<=,)\s+/);
               return [lines[0], lines.slice(1).join(" ")] as [string, string];
             })(),
             body: [catalog.content.heroDescription, ""] as [string, string],
           }
-        : s,
+        : { ...s, originalIndex: i },
     )
     .filter((s) => !s.href.startsWith("/product/") || visibleProducts.some((p) => s.href === `/product/${p.id}`));
   const getProduct = (id: number) => visibleProducts.find((p) => p.id === id);

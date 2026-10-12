@@ -86,7 +86,40 @@ export const seasonPageSchema = z.object({
   productId: z.string().max(80),
   visible: z.boolean(),
 });
+export const bannerPageSchema = z.object({
+  id,
+  originalIndex: z.number().int().min(0).max(19).optional(),
+  image,
+  mobileImage: image.default(""),
+  alt: z.string().trim().max(300).default(""),
+  href: z
+    .string()
+    .trim()
+    .max(300)
+    .refine((v) => v === "" || /^\/(?!\/)[^\s\\]*$/.test(v), "사이트 내부 경로를 입력해주세요.")
+    .default(""),
+  visible: z.boolean(),
+});
+export type BannerPage = z.infer<typeof bannerPageSchema>;
 export const contentSchema = z.object({
+  bannerIncludesOriginals: z.boolean().default(false),
+  bannerPages: z
+    .array(bannerPageSchema)
+    .max(40)
+    .refine((pages) => new Set(pages.map((p) => p.id)).size === pages.length, "배너 페이지 ID가 중복되었습니다.")
+    .optional(),
+  bannerVisible: z.boolean().default(true),
+  mainImage: image.default(""),
+  mainMobileImage: image.default(""),
+  heroImage: image.default(""),
+  heroMobileImage: image.default(""),
+  heroAlt: z.string().trim().max(300).default(""),
+  heroHref: z
+    .string()
+    .trim()
+    .max(300)
+    .refine((v) => v === "" || /^\/(?!\/)[^\s\\]*$/.test(v), "사이트 내부 경로를 입력해주세요.")
+    .default(""),
   heroTitle: z.string().trim().min(1).max(200),
   heroDescription: z.string().max(600),
   seasonTitle: z.string().trim().min(1).max(200),

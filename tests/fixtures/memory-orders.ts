@@ -114,12 +114,15 @@ export function createMemoryOrdersRepository({
       }
       return copy(o);
     },
-    async list({ status, customerSessionId, from, to, limit, after }) {
+    async list({ status, customerSessionId, from, to, desiredFrom, desiredTo, limit, after }) {
       const afterAt = after ? Date.parse(after.createdAt) : 0;
       return [...orders.values()]
         .filter((o) => !status || o.status === status)
         .filter((o) => !customerSessionId || o.customerSessionId === customerSessionId)
         .filter((o) => (!from || o.createdAt >= from) && (!to || o.createdAt < to))
+        .filter(
+          (o) => (!desiredFrom || o.desiredStartAt >= desiredFrom) && (!desiredTo || o.desiredStartAt < desiredTo),
+        )
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0))
         .filter(
           (o) => !after || o.createdAt.getTime() < afterAt || (o.createdAt.getTime() === afterAt && o.id < after.id),

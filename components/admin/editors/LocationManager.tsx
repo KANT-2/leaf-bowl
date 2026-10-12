@@ -1,4 +1,5 @@
 "use client";
+import DeliveryOrders from "./DeliveryOrders";
 import { Button } from "@/components/admin/button";
 import { Input } from "@/components/admin/input";
 import { type Catalog } from "@/modules/catalog/schema";
@@ -35,6 +36,7 @@ export default function LocationManager({
           <p className="muted">매장 위치를 설정하고 지도에서 확인하세요.</p>
         </div>
       </div>
+      <DeliveryOrders />
       <section className="surface">
         <div className="section-heading">
           <h2>매장 위치</h2>
@@ -165,13 +167,6 @@ export default function LocationManager({
             )}
           </div>
         </div>
-      </section>
-      <section className="surface delivery-pending">
-        <div className="section-heading">
-          <h2>배달 관리</h2>
-          <span className="pill">보류</span>
-        </div>
-        <p className="muted">배달 설정은 운영 방식이 정해진 뒤 추가할 예정입니다.</p>
       </section>
     </>
   );

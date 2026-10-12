@@ -1,8 +1,8 @@
 "use client";
 import type { CatalogConfig } from "@/modules/settings/schema";
 
-import { useState } from "react";
-import { Plus, Pencil } from "lucide-react";
+import { Fragment, useState } from "react";
+import { Plus, Pencil, Search } from "lucide-react";
 import { Button } from "./button";
 import { Input } from "./input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./dialog";
@@ -30,12 +30,27 @@ export default function OriginAllergyManager({
 }) {
   const [editing, setEditing] = useState<Ingredient | null>(null);
   const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("");
+  const [allergen, setAllergen] = useState("");
   const [page, setPage] = useState(1);
   const [showAll, setShowAll] = useState(false);
   const [error, setError] = useState("");
   const ingredients = (catalog.ingredients ?? []).filter((i) => !i.deleted);
-  const filteredIngredients = ingredients.filter((i) =>
-    [i.name, i.origin ?? "", i.originDetail ?? ""].some((t) => t.includes(query)),
+  const categories = [...new Set(ingredients.map((ingredient) => ingredient.category))];
+  const allergens = [...new Set(ingredients.flatMap((ingredient) => split(ingredient.allergens)))];
+  const filteredIngredients = categories.flatMap((group) =>
+    ingredients.filter(
+      (ingredient) =>
+        ingredient.category === group &&
+        (!category || ingredient.category === category) &&
+        (!allergen ||
+          (allergen === "__none"
+            ? !split(ingredient.allergens).length
+            : split(ingredient.allergens).includes(allergen))) &&
+        [ingredient.name, ingredient.origin ?? "", ingredient.originDetail ?? ""].some((text) =>
+          text.toLowerCase().includes(query.trim().toLowerCase()),
+        ),
+    ),
   );
   const pageCount = Math.max(1, Math.ceil(filteredIngredients.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
@@ -121,19 +136,58 @@ export default function OriginAllergyManager({
           재료 추가
         </Button>
       </div>
-      <div className="toolbar">
-        <Input
-          aria-label="원산지 재료 검색"
-          placeholder="재료 이름, 원산지 검색"
-          value={query}
+      <div className="origin-category-tabs" role="group" aria-label="재료 분류 필터">
+        {["", ...categories].map((value) => (
+          <Button
+            key={value}
+            variant={category === value ? "default" : "outline"}
+            aria-pressed={category === value}
+            onClick={() => {
+              setCategory(value);
+              setPage(1);
+            }}
+          >
+            {value || "전체"}
+            <span>
+              {value ? ingredients.filter((ingredient) => ingredient.category === value).length : ingredients.length}
+            </span>
+          </Button>
+        ))}
+      </div>
+      <div className="origin-filters">
+        <div className="origin-search">
+          <Search size={18} aria-hidden="true" />
+          <Input
+            aria-label="원산지 재료 검색"
+            placeholder="재료 이름, 원산지 검색"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
+        <select
+          aria-label="알레르기 필터"
+          value={allergen}
           onChange={(e) => {
-            setQuery(e.target.value);
+            setAllergen(e.target.value);
             setPage(1);
           }}
-          style={{ maxWidth: 360 }}
-        />
+        >
+          <option value="">알레르기 전체</option>
+          <option value="__none">등록된 안내 없음</option>
+          {allergens.map((value) => (
+            <option key={value} value={value}>
+              {value}
+            </option>
+          ))}
+        </select>
       </div>
-      <section className="surface menu-table">
+      <p className="origin-result-count" role="status">
+        {category || "전체"} 재료 {filteredIngredients.length}개
+      </p>
+      <section className="surface menu-table origin-table">
         <Table>
           <TableHeader>
             <TableRow>
@@ -146,32 +200,64 @@ export default function OriginAllergyManager({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {pagedIngredients.map((i) => (
-              <TableRow key={i.id}>
-                <TableCell>
-                  <strong>{i.name}</strong>
-                </TableCell>
-                <TableCell>{i.category}</TableCell>
-                <TableCell>
-                  {i.origin || "미입력"}
-                  {i.originDetail && <div className="meta">{i.originDetail}</div>}
-                </TableCell>
-                <TableCell>{i.allergens || "등록된 안내 없음"}</TableCell>
-                <TableCell>{usedBy(i).length}개</TableCell>
-                <TableCell>
-                  <div className="row-actions">
-                    <Button variant="outline" disabled={busy} onClick={() => open(i)}>
-                      <Pencil size={15} />
-                      수정
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
+            {categories.map((group) => {
+              const rows = pagedIngredients.filter((ingredient) => ingredient.category === group);
+              if (!rows.length) {
+                return null;
+              }
+              return (
+                <Fragment key={group}>
+                  <TableRow className="origin-group-heading">
+                    <TableCell colSpan={6}>
+                      <strong>{group}</strong>
+                      <span>{filteredIngredients.filter((ingredient) => ingredient.category === group).length}</span>
+                    </TableCell>
+                  </TableRow>
+                  {rows.map((i) => (
+                    <TableRow key={i.id}>
+                      <TableCell>
+                        <strong>{i.name}</strong>
+                      </TableCell>
+                      <TableCell>{i.category}</TableCell>
+                      <TableCell>
+                        {i.origin || "미입력"}
+                        {i.originDetail && <div className="meta">{i.originDetail}</div>}
+                      </TableCell>
+                      <TableCell>
+                        {split(i.allergens).length ? (
+                          <div className="origin-allergen-tags">
+                            {split(i.allergens).map((value) => (
+                              <span key={value}>{value}</span>
+                            ))}
+                          </div>
+                        ) : (
+                          "등록된 안내 없음"
+                        )}
+                      </TableCell>
+                      <TableCell>{usedBy(i).length}개</TableCell>
+                      <TableCell>
+                        <div className="row-actions">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={busy}
+                            aria-label={`${i.name} 수정`}
+                            onClick={() => open(i)}
+                          >
+                            <Pencil size={15} />
+                            수정
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </Fragment>
+              );
+            })}
           </TableBody>
         </Table>
         {!filteredIngredients.length && (
-          <p className="empty">{query ? "검색 결과가 없습니다." : "등록된 재료가 없습니다."}</p>
+          <p className="empty">{query || category || allergen ? "검색 결과가 없습니다." : "등록된 재료가 없습니다."}</p>
         )}
       </section>
       {filteredIngredients.length > 0 && (

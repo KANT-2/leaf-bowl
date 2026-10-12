@@ -1216,3 +1216,41 @@
   padding: 0;
   object-fit: cover;
 }
+
+.hero-inner.hero-ad-slide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-cream);
+}
+.hero-ad-slide > section {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  display: grid;
+  align-items: center;
+}
+.hero-ad-slide picture,
+.hero-ad-slide > section > a {
+  display: block;
+  width: 100%;
+}
+.hero-ad-slide img {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-inline: auto;
+  max-height: none;
+  object-fit: contain;
+  object-position: center;
+}
+
+.hero-arrow {
+  border: 0;
+  background: transparent;
+  color: var(--color-cream);
+  cursor: pointer;
+  min-width: 36px;
+  min-height: 36px;
+  font-size: 20px;
+}

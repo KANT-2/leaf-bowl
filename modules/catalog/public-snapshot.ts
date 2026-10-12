@@ -1,5 +1,6 @@
 import type { Snapshot } from "./schema";
 import type { PublicSnapshot } from "./public-schema";
+import { visibleBannerPages } from "./banner-pages";
 
 /** Keep option slots stable while withholding hidden and deleted content. */
 export function publicSnapshot(snapshot: Snapshot): PublicSnapshot {
@@ -33,6 +34,7 @@ export function publicSnapshot(snapshot: Snapshot): PublicSnapshot {
       reviews: catalog.reviews?.filter((r) => !r.deleted),
       content: {
         ...catalog.content,
+        bannerPages: catalog.content.bannerPages === undefined ? undefined : visibleBannerPages(catalog.content),
         seasonPages: catalog.content.seasonPages?.filter((p) => p.visible),
       },
     },

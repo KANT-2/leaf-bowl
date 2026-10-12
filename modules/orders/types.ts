@@ -82,6 +82,8 @@ export interface ListQuery {
   from?: Date;
   to?: Date;
   /** 최대 개수. 다음 쪽이 있는지 보려고 서비스가 limit + 1 을 요청한다 */
+  desiredFrom?: Date;
+  desiredTo?: Date;
   limit: number;
   after?: { createdAt: string; id: string };
 }

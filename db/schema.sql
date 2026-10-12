@@ -134,6 +134,17 @@ CREATE TABLE review_drinks (
 
 -- 메인 문구·시즌 스페셜 (1행)
 CREATE TABLE site_content (
+  banner_includes_originals BOOLEAN NOT NULL DEFAULT FALSE,
+  banner_pages JSONB NOT NULL DEFAULT '[]',
+  has_banner_pages BOOLEAN NOT NULL DEFAULT FALSE,
+  banner_visible BOOLEAN NOT NULL DEFAULT TRUE,
+  main_image VARCHAR(200) NOT NULL DEFAULT '',
+  main_mobile_image VARCHAR(200) NOT NULL DEFAULT '',
+  hero_image VARCHAR(200) NOT NULL DEFAULT '',
+  hero_mobile_image VARCHAR(200) NOT NULL DEFAULT '',
+  hero_alt VARCHAR(300) NOT NULL DEFAULT '',
+  hero_href VARCHAR(300) NOT NULL DEFAULT '',
+
   id                  SMALLINT     PRIMARY KEY DEFAULT 1 CHECK (id = 1),
   hero_title          VARCHAR(200) NOT NULL,
   hero_description    VARCHAR(600) NOT NULL DEFAULT '',
@@ -389,3 +400,11 @@ CREATE TABLE app_settings (
   updated_at TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 COMMIT;
+
+-- Administrator-only event drafts; no customer catalog linkage.
+CREATE TABLE admin_event_settings (
+  id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+  events JSONB NOT NULL DEFAULT '[]' CHECK (jsonb_typeof(events) = 'array')
+);
+INSERT INTO admin_event_settings (id) VALUES (1);

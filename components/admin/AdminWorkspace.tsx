@@ -16,13 +16,24 @@ import {
 } from "@/components/admin/sidebar";
 import { type Product } from "@/modules/catalog/schema";
 import { blankProduct } from "@/features/admin/editor-helpers";
-import { BarChart3, Eye, LayoutTemplate, Leaf, MapPin, MessageSquare, SlidersHorizontal, Trash2 } from "lucide-react";
+import {
+  BarChart3,
+  CalendarDays,
+  Eye,
+  LayoutTemplate,
+  Leaf,
+  MapPin,
+  MessageSquare,
+  SlidersHorizontal,
+  Trash2,
+} from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Toaster } from "sonner";
 import CatalogDialogs from "./CatalogDialogs";
 import BowlMatchManager from "./editors/BowlMatchManager";
 import ContentEditor from "./editors/ContentEditor";
+import EventManager from "./editors/EventManager";
 import LocationManager from "./editors/LocationManager";
 import ReviewManager from "./editors/ReviewManager";
 import OptionsPanel from "./OptionsPanel";
@@ -41,7 +52,18 @@ export default function Admin() {
     const restore = () => {
       const id = window.location.hash.slice(1);
       setView(
-        ["products", "options", "bowlmatch", "content", "reviews", "location", "origins", "sales", "trash"].includes(id)
+        [
+          "products",
+          "options",
+          "bowlmatch",
+          "content",
+          "events",
+          "reviews",
+          "location",
+          "origins",
+          "sales",
+          "trash",
+        ].includes(id)
           ? id
           : "products",
       );
@@ -137,6 +159,7 @@ export default function Admin() {
     { id: "options", name: "옵션 관리", icon: SlidersHorizontal },
     { id: "bowlmatch", name: "bowl match 관리", icon: Leaf },
     { id: "content", name: "고객 페이지 편집", icon: LayoutTemplate },
+    { id: "events", name: "이달의 이벤트 관리", icon: CalendarDays },
     { id: "sales", name: "제품 판매 현황", icon: BarChart3 },
     { id: "reviews", name: "고객 리뷰 관리", icon: MessageSquare },
     { id: "location", name: "위치 및 배달 관리", icon: MapPin },
@@ -245,8 +268,10 @@ export default function Admin() {
               {view === "location" && <LocationManager catalog={catalog} busy={busy} onSave={save} />}
               {view === "reviews" && <ReviewManager catalog={catalog} busy={busy} onSave={save} />}
               {view === "bowlmatch" && <BowlMatchManager catalog={catalog} busy={busy} onSave={save} />}
+              {view === "events" && <EventManager />}
               {view === "content" && (
                 <ContentEditor
+                  originalSlides={snapshot?.defaults?.heroSlides ?? []}
                   catalog={catalog}
                   busy={busy}
                   onRefresh={load}
