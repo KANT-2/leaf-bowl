@@ -3,6 +3,33 @@
 import { useAuth } from "../AuthProvider";
 import { useCustomerCatalog } from "../CustomerCatalogProvider";
 
+const CATEGORY_ICONS: Record<string, string> = {
+  "든든한 단백질": "🍗",
+  "플랜트 베이스": "🌱",
+  "새로운 조합": "✨",
+  기타: "🍽️",
+};
+const DEFAULT_CATEGORY_ICON = "🍽️";
+
+const ALLERGEN_ICONS: Record<string, string> = {
+  닭고기: "🍗",
+  토마토: "🍅",
+  연어: "🐟",
+  새우: "🦐",
+  대두: "🫘",
+  우유: "🥛",
+  쇠고기: "🥩",
+  참치: "🐡",
+  밀: "🌾",
+  계란: "🥚",
+  생선: "🐠",
+  참깨: "🌿",
+  땅콩: "🥜",
+  호두: "🌰",
+  아몬드: "🌰",
+};
+const DEFAULT_ALLERGEN_ICON = "🌿";
+
 export default function PreferencesTab() {
   const { user, setPreferences } = useAuth();
   const { catalog, catalogConfig } = useCustomerCatalog();
@@ -39,6 +66,9 @@ export default function PreferencesTab() {
               aria-pressed={user.preferredCategories.includes(c)}
               onClick={() => toggleCategory(c)}
             >
+              <span className="chip-icon" aria-hidden="true">
+                {CATEGORY_ICONS[c] ?? DEFAULT_CATEGORY_ICON}
+              </span>
               {c}
             </button>
           ))}
@@ -55,6 +85,9 @@ export default function PreferencesTab() {
               aria-pressed={user.excludedAllergens.includes(a)}
               onClick={() => toggleAllergen(a)}
             >
+              <span className="chip-icon" aria-hidden="true">
+                {ALLERGEN_ICONS[a] ?? DEFAULT_ALLERGEN_ICON}
+              </span>
               {user.excludedAllergens.includes(a) ? "✕ " : ""}
               {a}
             </button>
