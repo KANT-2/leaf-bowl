@@ -18,3 +18,4 @@
 @import "./styles/cart.css" layer(components);
 @import "./styles/match.css" layer(components);
 @import "./styles/account.css" layer(components);
+@import "./styles/event.css" layer(components);

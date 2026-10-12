@@ -6,7 +6,12 @@ import { lockCatalog } from "@/infrastructure/catalog/postgres";
 import { eventImageKeys } from "@/modules/images/references";
 import { maintainImages, validateNewImageKeys } from "@/application/images";
 
-export { readEvents } from "@/infrastructure/events/postgres";
+import { readEvents as readEventsRow } from "@/infrastructure/events/postgres";
+
+/** 테스트에서 바꿔 끼울 수 있도록 재수출 대신 함수로 감싼다. */
+export function readEvents(): Promise<EventSnapshot> {
+  return readEventsRow();
+}
 
 export async function writeEvents(events: ManagedEvent[], revision: number): Promise<EventSnapshot> {
   const removed = await databaseTransaction(prisma(), async (tx) => {
