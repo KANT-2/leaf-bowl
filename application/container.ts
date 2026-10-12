@@ -5,6 +5,9 @@ import { createIdentityService, type IdentityService } from "@/modules/identity/
 import { createPostgresOrdersRepository } from "@/infrastructure/orders/postgres";
 import { createOrdersService, type OrdersService } from "@/modules/orders/service";
 import { createRateLimiter, type RateLimiter } from "@/modules/shared/rate-limit";
+import { createPaymentsService, type PaymentsService } from "@/modules/payments/service";
+import { createPostgresPaymentsRepository } from "@/infrastructure/payments/postgres";
+import { createTossGateway } from "@/infrastructure/payments/toss";
 
 /**
  * 요청 제한 묶음 (분당).
@@ -49,6 +52,8 @@ export interface Services {
   orders: OrdersService;
   identity: IdentityService;
   limits: Limits;
+  /** Omitted only by legacy isolated test doubles. The running app always has payments. */
+  payments?: PaymentsService;
 }
 
 /**
@@ -62,6 +67,7 @@ export function createServices(): Services {
       repository: createPostgresOrdersRepository(db),
     }),
     identity: createIdentityService({ repository: identityRepository }),
+    payments: createPaymentsService({ repository: createPostgresPaymentsRepository(db), gateway: createTossGateway() }),
     limits: createLimits(),
   };
 }

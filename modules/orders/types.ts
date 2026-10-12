@@ -5,6 +5,8 @@ export type ChangedBy = "customer" | "admin" | "system";
 
 export interface OrderItemRecord {
   productId: string | null;
+  /** Preserve the quoted identity if its live catalog row was deleted before approval. */
+  originalProductId?: string | null;
   productType?: "salad" | "drink" | "custom";
   name: string;
   options: PricedLine["options"];

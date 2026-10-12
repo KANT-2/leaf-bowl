@@ -1,6 +1,6 @@
 # PostgreSQL 실행과 기존 데이터 이관
 
-서버의 카탈로그·리뷰·주문·관리자와 비회원 세션은 PostgreSQL에 저장한다. 이미지 파일은 `ADMIN_DATA_DIR/images`에 둔다. 고객 프로필·장바구니·취향·저장한 조합은 기존 브라우저 저장을 유지하며 실제 회원 인증·청구는 이번 작업 범위에 포함하지 않는다.
+서버의 카탈로그·리뷰·주문·결제 초안·관리자와 비회원 세션은 PostgreSQL에 저장한다. 이미지 파일은 `ADMIN_DATA_DIR/images`에 둔다. 고객 프로필·장바구니·취향·저장한 조합은 기존 브라우저 저장을 유지한다. 토스 테스트 결제 설정과 복구 절차는 [payments.md](payments.md)에 있다. 실제 회원 인증·청구는 포함하지 않는다.
 
 ## 처음 실행
 
@@ -36,7 +36,7 @@ psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f db/schema.sql
 psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f db/seed.sql
 ```
 
-직접 생성한 DB에는 Prisma의 적용 이력이 없다. 이후 Prisma로 관리하려면 스키마 일치를 확인한 뒤 `prisma migrate resolve --applied`로 `0001_baseline`부터 `0005_catalog_config`까지 각각 등록한다. 처음부터 Prisma를 사용할 앱에는 `npm run db:migrate`를 권장한다.
+직접 생성한 DB에는 Prisma의 적용 이력이 없다. 이후 Prisma로 관리하려면 스키마 일치를 확인한 뒤 `prisma migrate resolve --applied`로 `0001_baseline`부터 `0006_toss_test_payments`까지 각각 등록한다. 처음부터 Prisma를 사용할 앱에는 `npm run db:migrate`를 권장한다.
 
 서버와 고객 화면은 DB 설정을 읽으며 주문 합계도 DB 가격 정책으로 계산한다. SQL로 설정을 바꿀 때는 `updated_at`도 갱신해야 열린 고객 화면이 새 설정을 감지한다.
 
@@ -98,13 +98,13 @@ npx --no-install tsc --noEmit
 
 `test:db`는 URL의 이름과 서버의 실제 DB 이름을 확인한 뒤 **테스트 DB의 앱 테이블을 비운다**. 개발·운영 DB 주소를 전달하지 않는다. GitHub Actions는 독립 PostgreSQL 18 서비스에서 같은 마이그레이션과 통합 테스트를 실행한다.
 
-브라우저 검증은 테스트 DB에 `db:seed`를 실행하고, 그 DB를 사용하는 앱을 `localhost:3419`에서 실행한 뒤 Playwright가 설치된 환경에서 수행한다.
+브라우저 검증은 테스트 DB에 `db:seed`를 실행하고, 토스 테스트 키를 설정한 앱을 `localhost:3419`에서 실행한 뒤 Playwright가 설치된 환경에서 수행한다.
 
 ```sh
-FRONT5_BASE_URL=http://localhost:3419 node tests/postgres-browser.cjs
+FRONT5_BASE_URL=http://localhost:3419 node tests/payments-browser.cjs
 ```
 
-이 검증은 주문 저장 후 응답을 강제로 끊고 새로고침·재시도를 수행해 같은 요청 키로 주문 하나만 만들어지는지 확인한다. 카드 입력값이 주문 API에 전달되지 않는지, 장바구니 보존·비우기와 DB 주문 내역 표시도 검사한다. 결과 화면은 `docs/screenshots/postgres/`에 저장한다. 실제 결제 승인을 의미하지 않는다. SQL 설정 연결 후 실제 개발 DB에서도 판매 중인 상품으로 같은 흐름을 확인했고, 결과는 `docs/screenshots/sql-defaults/`에 보관했다. 서버 재시작 후 같은 쿠키로 주문을 조회하는 검증도 통과했다. 검증용 주문·세션만 확인 후 정리했다.
+이 검증은 실제 토스 테스트 결제창 열기·취소, 동일 결제 초안 재시도를 확인한다. 콜백 UI의 승인 API 응답 유실·장바구니 보호는 대체 응답으로 검사하며 실제 결제를 승인하지 않는다. 서버 승인·주문 저장·롤백 복구는 실제 PostgreSQL 통합 테스트에서 대체 토스 응답으로 확인한다. 본인 카드로 최종 인증하는 수동 확인 방법과 제한은 [payments.md](payments.md)에 있다. 결과는 `docs/screenshots/toss/`에 저장한다. 과거 결제 없는 주문 저장 검증 스크린샷은 `docs/screenshots/postgres/`와 `docs/screenshots/sql-defaults/`에 남아 있으며 현재 결제 흐름을 나타내지 않는다.
 
 ## 배포 환경
 
