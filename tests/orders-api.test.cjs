@@ -641,3 +641,42 @@ test("재전송 해시: 옵션 선택 순서만 다르면 기존 주문을 돌�
   assert.equal((await place(cookie, "hash-order-0002", order([ab[1], ab[0]]))).status, 409);
   assert.equal((await place(cookie, "hash-order-0002", order(ab))).status, 200);
 });
+
+test("관리자 배달일·시간대 필터는 전체 주문에 적용되고 최신 접수순 및 배송 정보가 유지된다", async () => {
+  const catalog = await setup();
+  const cookie = await guest();
+  const first = await json(await place(cookie, "delivery-filter-01", orderBody(catalog)));
+  const second = await json(
+    await place(cookie, "delivery-filter-02", orderBody(catalog, { desiredSlot: "13:00–14:00" })),
+  );
+  const third = await json(
+    await place(cookie, "delivery-filter-03", orderBody(catalog, { desiredDate: "2026-10-14" })),
+  );
+  const admin = await adminCookie();
+  const list = (query) => routes.adminOrders.GET(req(`/api/v1/admin/orders?${query}`, { cookie: admin }));
+  const all = await json(await list("limit=50"));
+  assert.deepEqual(
+    all.items.map((o) => o.id),
+    [third.id, second.id, first.id],
+  );
+  const day = await json(await list("deliveryDate=2026-10-13&limit=1"));
+  assert.equal(day.items[0].id, second.id);
+  assert.ok(day.nextCursor);
+  const next = await json(await list(`deliveryDate=2026-10-13&limit=1&cursor=${encodeURIComponent(day.nextCursor)}`));
+  assert.equal(next.items[0].id, first.id);
+  const hour = await json(await list("deliveryDate=2026-10-13&deliveryHour=12"));
+  assert.deepEqual(
+    hour.items.map((o) => o.id),
+    [first.id],
+  );
+  assert.equal(hour.items[0].phone, "010-1234-5678");
+  assert.equal(hour.items[0].addressDetail, "5층");
+  assert.equal(hour.items[0].address, "서울 중구 세종대로 110");
+  assert.equal(hour.items[0].items[0].quantity, 2);
+  assert.ok(hour.items[0].items[0].name);
+  assert.ok(hour.items[0].items[0].options);
+  assert.equal((await json(await list("deliveryDate=2026-10-13&deliveryHour=14"))).items.length, 0);
+  assert.equal((await list("deliveryHour=12")).status, 400);
+  assert.equal((await list("deliveryDate=2026-10-13&deliveryHour=24")).status, 400);
+  assert.equal((await list("deliveryDate=2026-02-30")).status, 400);
+});

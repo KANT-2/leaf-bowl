@@ -145,6 +145,15 @@ export function createOrdersService({ repository, now = () => new Date() }: Orde
     listOrders(query: AdminOrderListQuery): Promise<Page> {
       return page(query.limit, query.cursor, {
         status: query.status,
+        desiredFrom: query.deliveryDate
+          ? new Date(seoulDayStart(query.deliveryDate).getTime() + (query.deliveryHour ?? 0) * 3600_000)
+          : undefined,
+        desiredTo: query.deliveryDate
+          ? new Date(
+              seoulDayStart(query.deliveryDate).getTime() +
+                (query.deliveryHour === undefined ? 24 : query.deliveryHour + 1) * 3600_000,
+            )
+          : undefined,
         from: query.from ? seoulDayStart(query.from) : undefined,
         to: query.to ? new Date(seoulDayStart(query.to).getTime() + 24 * 3600_000) : undefined,
       });

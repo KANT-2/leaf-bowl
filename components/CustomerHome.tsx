@@ -9,10 +9,10 @@ import { useCustomerCatalog } from "./CustomerCatalogProvider";
 import { MATCH_URL } from "@/features/customer/routes";
 
 export default function CustomerHome() {
-  const { revision, heroSlides: slides, visibleProducts: PRODUCTS } = useCustomerCatalog();
+  const { catalog, revision, heroSlides: slides, visibleProducts: PRODUCTS } = useCustomerCatalog();
   return (
     <main>
-      <HeroCarousel key={revision} slides={slides} />
+      <HeroCarousel key={revision} slides={slides} advertisement={catalog.content} />
 
       <section className="section wrap" id="best">
         <div className="section-title">

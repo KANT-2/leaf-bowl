@@ -16,7 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/admin/textarea";
 import { type Catalog, type Ingredient } from "@/modules/catalog/schema";
 import { uid } from "@/features/admin/editor-helpers";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { GripVertical, Info, Pencil, Plus, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Photo, Picker, Upload } from "./EditorFields";
@@ -37,13 +37,23 @@ export default function BowlMatchManager({
     [dragged, setDragged] = useState<string | null>(null),
     [over, setOver] = useState<string | null>(null);
   const drag = useRef<string | null>(null);
-  const items = catalog.ingredients || [],
-    visible = items.filter((i) => !i.deleted);
+  const [order, setOrder] = useState<string[] | null>(null);
+  const savedItems = catalog.ingredients || [];
+  const items = order
+    ? [...savedItems].sort((a, b) => {
+        const ai = order.indexOf(a.id),
+          bi = order.indexOf(b.id);
+        return (ai < 0 ? order.length : ai) - (bi < 0 ? order.length : bi);
+      })
+    : savedItems;
+  const visible = items.filter((i) => !i.deleted);
+  const categories = [...new Set(visible.map((item) => item.category))];
   const labels = { active: "노출", soldout: "품절", hidden: "숨김" };
   async function persist(next: Ingredient[]) {
     setError("");
     try {
       await onSave({ ...catalog, ingredients: next });
+      setOrder(null);
       return true;
     } catch (e) {
       setError((e as Error).message);
@@ -61,11 +71,24 @@ export default function BowlMatchManager({
     if (a < 0 || b < 0) {
       return;
     }
-    const [moved] = next.splice(a, 1);
-    next.splice(b, 0, moved);
-    if (await persist(next)) {
-      toast.success("재료 순서를 저장했습니다.");
+    if (next[a].category !== next[b].category) {
+      return;
     }
+    const categorySlots = next
+      .map((item, index) => (!item.deleted && item.category === next[a].category ? index : -1))
+      .filter((index) => index >= 0);
+    const group = categorySlots.map((index) => next[index]);
+    const fromIndex = group.findIndex((item) => item.id === from),
+      toIndex = group.findIndex((item) => item.id === to);
+    if (fromIndex < 0 || toIndex < 0) {
+      return;
+    }
+    const [moved] = group.splice(fromIndex, 1);
+    group.splice(toIndex, 0, moved);
+    categorySlots.forEach((slot, index) => {
+      next[slot] = group[index];
+    });
+    setOrder(next.map((item) => item.id));
   }
   return (
     <>
@@ -73,148 +96,174 @@ export default function BowlMatchManager({
         <div>
           <div className="eyebrow">MAKE YOUR OWN BOWL</div>
           <h1>bowl match 관리</h1>
-          <p className="muted">재료 카드와 표시 순서를 관리하세요.</p>
+          <p className="muted">재료를 드래그해 같은 분류 안에서 순서를 변경하세요.</p>
         </div>
-        <Button
-          disabled={busy}
-          onClick={() => {
-            setError("");
-            setEditing({
-              id: uid(),
-              name: "",
-              description: "",
-              category: "채소",
-              image: "",
-              allergens: "",
-              status: "active",
-              deleted: false,
-            });
-          }}
-        >
-          <Plus size={18} />
-          재료 추가
-        </Button>
+        <div className="bowl-heading-actions">
+          <Button
+            disabled={busy}
+            onClick={() => {
+              setError("");
+              setEditing({
+                id: uid(),
+                name: "",
+                description: "",
+                category: "채소",
+                image: "",
+                allergens: "",
+                status: "active",
+                deleted: false,
+              });
+            }}
+          >
+            <Plus size={18} />
+            재료 추가
+          </Button>
+          <Button
+            variant="outline"
+            disabled={busy || !order}
+            onClick={async () => {
+              if (await persist(items)) {
+                toast.success("재료 순서를 저장했습니다.");
+              }
+            }}
+          >
+            순서 저장
+          </Button>
+        </div>
       </div>
-      <section className="surface menu-table">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>순서</TableHead>
-              <TableHead>재료</TableHead>
-              <TableHead>분류</TableHead>
-              <TableHead>상태</TableHead>
-              <TableHead className="text-right">관리</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {visible.map((item, index) => (
-              <TableRow
-                key={item.id}
-                draggable={!busy}
-                className={
-                  "ingredient-drag-row" +
-                  (dragged === item.id ? " dragging" : "") +
-                  (over === item.id && dragged !== item.id ? " drag-over" : "")
-                }
-                tabIndex={0}
-                aria-label={item.name + " 재료, 드래그 또는 Alt와 위아래 방향키로 순서 변경"}
-                onDragStart={(e) => {
-                  if (busy || (e.target as HTMLElement).closest("button")) {
-                    e.preventDefault();
-                    return;
-                  }
-                  drag.current = item.id;
-                  setDragged(item.id);
-                  e.dataTransfer.effectAllowed = "move";
-                  e.dataTransfer.setData("text/plain", item.id);
-                }}
-                onDragOver={(e) => {
-                  if (!drag.current || busy) {
-                    return;
-                  }
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect = "move";
-                  setOver(item.id);
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const from = drag.current;
-                  drag.current = null;
-                  setDragged(null);
-                  setOver(null);
-                  if (from) {
-                    void reorder(from, item.id);
-                  }
-                }}
-                onDragEnd={() => {
-                  drag.current = null;
-                  setDragged(null);
-                  setOver(null);
-                }}
-                onKeyDown={(e) => {
-                  if (e.target !== e.currentTarget || !e.altKey || busy) {
-                    return;
-                  }
-                  const step = e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
-                  if (step && visible[index + step]) {
-                    e.preventDefault();
-                    void reorder(item.id, visible[index + step].id);
-                  }
-                }}
-              >
-                <TableCell>
-                  <span className="category-grip" aria-hidden="true">
-                    ⠿
-                  </span>
-                  {index + 1}
-                </TableCell>
-                <TableCell>
-                  <div className="product-cell">
-                    <Photo src={item.image} name={item.name} />
-                    <div>
-                      <strong>{item.name}</strong>
-                      <div className="ingredient">{item.description}</div>
-                      {item.allergens && <div className="meta">알레르기: {item.allergens}</div>}
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell>{item.category}</TableCell>
-                <TableCell>
-                  <span className={"status-tag " + item.status}>{labels[item.status]}</span>
-                </TableCell>
-                <TableCell>
-                  <div className="row-actions">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={busy}
-                      onClick={() => {
-                        setError("");
-                        setEditing(structuredClone(item));
-                      }}
-                    >
-                      <Pencil size={14} />
-                      수정
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label={item.name + " 재료 삭제"}
-                      disabled={busy}
-                      onClick={() => setRemoving(item)}
-                    >
-                      <Trash2 size={16} />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        {!visible.length && (
-          <div className="empty">등록된 재료가 없습니다. 재료 추가 버튼으로 첫 카드를 등록해주세요.</div>
-        )}
-      </section>
+      <div className="bowl-reorder-note" role="status">
+        <Info size={18} aria-hidden="true" />
+        같은 분류 안에서만 이동할 수 있어요. 다른 분류로는 이동되지 않습니다.
+        {order && <strong>변경한 순서를 저장해주세요.</strong>}
+      </div>
+      {categories.map((category) => {
+        const categoryItems = visible.filter((item) => item.category === category);
+        return (
+          <section key={category} className="surface menu-table bowl-category-table">
+            <div className="bowl-category-heading">
+              <h2>{category}</h2>
+              <span>{categoryItems.length}개</span>
+              <p className="meta">분류 내 순서 변경</p>
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>순서</TableHead>
+                  <TableHead>재료</TableHead>
+                  <TableHead>상태</TableHead>
+                  <TableHead className="text-right">관리</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {categoryItems.map((item, index) => (
+                  <TableRow
+                    key={item.id}
+                    draggable={!busy}
+                    className={
+                      "ingredient-drag-row" +
+                      (dragged === item.id ? " dragging" : "") +
+                      (over === item.id && dragged !== item.id ? " drag-over" : "")
+                    }
+                    tabIndex={0}
+                    aria-label={item.name + " 재료, 드래그 또는 Alt와 위아래 방향키로 순서 변경"}
+                    onDragStart={(e) => {
+                      if (busy || (e.target as HTMLElement).closest("button")) {
+                        e.preventDefault();
+                        return;
+                      }
+                      drag.current = item.id;
+                      setDragged(item.id);
+                      e.dataTransfer.effectAllowed = "move";
+                      e.dataTransfer.setData("text/plain", item.id);
+                    }}
+                    onDragOver={(e) => {
+                      if (
+                        !drag.current ||
+                        busy ||
+                        items.find((item) => item.id === drag.current)?.category !== category
+                      ) {
+                        return;
+                      }
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                      setOver(item.id);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const from = drag.current;
+                      drag.current = null;
+                      setDragged(null);
+                      setOver(null);
+                      if (from) {
+                        void reorder(from, item.id);
+                      }
+                    }}
+                    onDragEnd={() => {
+                      drag.current = null;
+                      setDragged(null);
+                      setOver(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.target !== e.currentTarget || !e.altKey || busy) {
+                        return;
+                      }
+                      const step = e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
+                      if (step && categoryItems[index + step]) {
+                        e.preventDefault();
+                        void reorder(item.id, categoryItems[index + step].id);
+                      }
+                    }}
+                  >
+                    <TableCell>
+                      <GripVertical className="bowl-drag-handle" size={20} aria-hidden="true" />
+                      {index + 1}
+                    </TableCell>
+                    <TableCell>
+                      <div className="product-cell">
+                        <Photo src={item.image} name={item.name} />
+                        <div>
+                          <strong>{item.name}</strong>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className={"status-tag " + item.status}>{labels[item.status]}</span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="row-actions">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={busy}
+                          onClick={() => {
+                            setError("");
+                            setEditing(structuredClone(item));
+                          }}
+                        >
+                          <Pencil size={14} />
+                          수정
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={item.name + " 재료 삭제"}
+                          disabled={busy}
+                          onClick={() => setRemoving(item)}
+                        >
+                          <Trash2 size={16} />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </section>
+        );
+      })}
+      {!visible.length && (
+        <div className="surface empty">등록된 재료가 없습니다. 재료 추가 버튼으로 첫 카드를 등록해주세요.</div>
+      )}
       {items.some((i) => i.deleted) && (
         <details className="surface ingredient-trash">
           <summary>삭제된 재료 · 복원</summary>

@@ -1,5 +1,6 @@
 /** 홈 상단 배너 한 장 */
 export interface HeroSlide {
+  originalIndex?: number;
   eyebrow: string;
   title: [string, string];
   body: [string, string];

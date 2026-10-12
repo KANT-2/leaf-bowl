@@ -45,12 +45,12 @@ export default function CatalogDialogs({
           }
         }}
       >
-        <DialogContent className="editor-dialog" onInteractOutside={(e) => e.preventDefault()}>
+        <DialogContent className="editor-dialog menu-editor-dialog" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>
               {product && catalog.products.some((p) => p.id === product.id) ? "메뉴 수정" : "새 메뉴 등록"}
             </DialogTitle>
-            <DialogDescription>저장한 메뉴는 고객 미리보기에 바로 반영됩니다.</DialogDescription>
+            <DialogDescription className="sr-only">메뉴 정보와 구성 재료를 수정합니다.</DialogDescription>
           </DialogHeader>
           {product && (
             <ProductForm
@@ -61,6 +61,10 @@ export default function CatalogDialogs({
               groups={catalog.groups.filter((g) => !g.deleted)}
               originCountries={originCountries}
               busy={busy}
+              onManageIngredients={() => {
+                setProduct(null);
+                window.location.hash = "origins";
+              }}
               onRefresh={load}
               onCancel={() => setProduct(null)}
               onSave={async (p) => {

@@ -139,6 +139,7 @@ export function createPostgresOrdersRepository(db: PrismaClient): OrdersReposito
         status: query.status,
         customerSessionId: query.customerSessionId,
         createdAt: { gte: query.from, lt: query.to },
+        desiredStartAt: { gte: query.desiredFrom, lt: query.desiredTo },
         ...(query.after
           ? {
               OR: [

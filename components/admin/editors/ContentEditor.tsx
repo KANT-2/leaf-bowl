@@ -1,6 +1,10 @@
 "use client";
 import { Button } from "@/components/admin/button";
 import { Switch } from "@/components/admin/switch";
+import BannerPagesEditor from "./BannerPagesEditor";
+import { allBannerPages } from "@/modules/catalog/banner-pages";
+import HeroBanner from "@/components/HeroBanner";
+import type { HeroSlide } from "@/modules/settings/hero";
 import { Textarea } from "@/components/admin/textarea";
 import { type Catalog, type Content } from "@/modules/catalog/schema";
 import { uid } from "@/features/admin/editor-helpers";
@@ -9,18 +13,22 @@ import { useState } from "react";
 import { Photo, Picker, Upload } from "./EditorFields";
 
 export default function ContentEditor({
+  originalSlides = [],
   catalog,
   busy,
   onSave,
   onRefresh,
 }: {
   catalog: Catalog;
+  originalSlides?: HeroSlide[];
   busy: boolean;
   onSave: (c: Content) => Promise<void>;
   onRefresh: () => Promise<void>;
 }) {
   const [c, setC] = useState<Content>(() => ({
     ...catalog.content,
+    bannerPages: allBannerPages(catalog.content, originalSlides),
+    bannerIncludesOriginals: true,
     seasonPages: catalog.content.seasonPages ?? [
       {
         id: uid(),
@@ -35,6 +43,12 @@ export default function ContentEditor({
   const [index, setIndex] = useState(0),
     [uploading, setUploading] = useState(false),
     [error, setError] = useState("");
+  const [bannerIndex, setBannerIndex] = useState(0);
+  const [mobilePreview, setMobilePreview] = useState(false);
+  const bannerPages = c.bannerPages ?? [];
+  const selectedBanner = bannerPages[bannerIndex];
+  const originalBanner =
+    selectedBanner?.originalIndex === undefined ? undefined : originalSlides[selectedBanner.originalIndex];
   const pages = c.seasonPages || [];
   const current = pages[index];
   const featured = catalog.products.find((p) => p.id === current?.productId);
@@ -70,7 +84,7 @@ export default function ContentEditor({
         <div>
           <div className="eyebrow">FRESH BOWL, FRESH DAY</div>
           <h1>고객 페이지 편집</h1>
-          <p className="muted">시즌 샐러드를 한 페이지씩 소개하세요.</p>
+          <p className="muted">메인 광고와 시즌 스페셜을 페이지별로 관리하세요.</p>
         </div>
         <Button type="submit" disabled={busy || uploading}>
           변경 저장
@@ -78,26 +92,16 @@ export default function ContentEditor({
       </div>
       <div className="content-grid">
         <fieldset disabled={busy || uploading}>
-          <section className="surface">
-            <h2>메인 화면</h2>
-            <label className="field">
-              메인 문구
-              <Textarea
-                required
-                maxLength={200}
-                value={c.heroTitle}
-                onChange={(e) => setC({ ...c, heroTitle: e.target.value })}
-              />
-            </label>
-            <label className="field">
-              소개 문구
-              <Textarea
-                maxLength={600}
-                value={c.heroDescription}
-                onChange={(e) => setC({ ...c, heroDescription: e.target.value })}
-              />
-            </label>
-          </section>
+          <BannerPagesEditor
+            originalSlides={originalSlides}
+            pages={bannerPages}
+            visible={c.bannerVisible}
+            index={bannerIndex}
+            onIndex={setBannerIndex}
+            onChange={(bannerPages) => setC((value) => ({ ...value, bannerPages }))}
+            onVisible={(bannerVisible) => setC((value) => ({ ...value, bannerVisible }))}
+            onBusy={setUploading}
+          />
           <section className="surface">
             <h2>시즌 스페셜</h2>
             <div className="toggle-row">
@@ -228,10 +232,85 @@ export default function ContentEditor({
         </fieldset>
         <div className="live-preview">
           <div className="eyebrow">LIVE PREVIEW · 저장 전 미리보기</div>
-          <section className="mini-home">
-            <div className="brand">leaf & bowl</div>
-            <h2>{c.heroTitle}</h2>
-            <p>{c.heroDescription}</p>
+          <section className="surface" aria-label="메인 광고 미리보기">
+            <div className="section-heading">
+              <h2>메인 광고 · {bannerIndex + 1}페이지</h2>
+              <div className="row-actions">
+                <Button
+                  type="button"
+                  variant={!mobilePreview ? "default" : "outline"}
+                  aria-pressed={!mobilePreview}
+                  onClick={() => setMobilePreview(false)}
+                >
+                  PC
+                </Button>
+                <Button
+                  type="button"
+                  variant={mobilePreview ? "default" : "outline"}
+                  aria-pressed={mobilePreview}
+                  onClick={() => setMobilePreview(true)}
+                >
+                  모바일
+                </Button>
+              </div>
+            </div>
+            {selectedBanner?.image ? (
+              <div style={mobilePreview ? { maxWidth: 390, marginInline: "auto" } : undefined}>
+                <HeroBanner
+                  content={{
+                    ...c,
+                    heroImage: mobilePreview
+                      ? selectedBanner.mobileImage || selectedBanner.image
+                      : selectedBanner.image,
+                    heroMobileImage: "",
+                    heroAlt: selectedBanner.alt,
+                    heroHref: selectedBanner.href,
+                  }}
+                  preview
+                />
+                {(!c.bannerVisible || !selectedBanner.visible) && (
+                  <p className="meta">이 페이지는 고객 화면에서 숨겨져 있습니다.</p>
+                )}
+              </div>
+            ) : originalBanner ? (
+              <section
+                className="mini-home"
+                style={mobilePreview ? { maxWidth: 390, marginInline: "auto" } : undefined}
+                aria-label="기존 기본 배너 미리보기"
+              >
+                <span className="eyebrow">{originalBanner.eyebrow}</span>
+                <h2>{selectedBanner.originalIndex === 0 ? c.heroTitle : originalBanner.title.join("\n")}</h2>
+                <p>{selectedBanner.originalIndex === 0 ? c.heroDescription : originalBanner.body.join("\n")}</p>
+                <Photo src={originalBanner.src} name={originalBanner.alt} className="original-banner-photo" />
+                <p>{originalBanner.cta}</p>
+                {(!c.bannerVisible || !selectedBanner.visible) && <p>이 페이지는 고객 화면에서 숨겨져 있습니다.</p>}
+              </section>
+            ) : (
+              <p className="muted">PC 광고 이미지를 등록하면 여기에 표시됩니다.</p>
+            )}
+            {bannerPages.length > 0 && (
+              <nav className="season-preview-arrows" aria-label="메인 광고 미리보기 페이지">
+                <button
+                  type="button"
+                  aria-label="이전 광고 페이지"
+                  disabled={bannerIndex === 0}
+                  onClick={() => setBannerIndex(bannerIndex - 1)}
+                >
+                  ←
+                </button>
+                <span>
+                  {bannerIndex + 1} / {bannerPages.length}
+                </span>
+                <button
+                  type="button"
+                  aria-label="다음 광고 페이지"
+                  disabled={bannerIndex === bannerPages.length - 1}
+                  onClick={() => setBannerIndex(bannerIndex + 1)}
+                >
+                  →
+                </button>
+              </nav>
+            )}
           </section>
           {c.seasonVisible && current?.visible ? (
             <section className="season-preview season-layout-preview" aria-label="시즌 스페셜 고객 화면 미리보기">
