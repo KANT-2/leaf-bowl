@@ -76,7 +76,6 @@ export default function AddressSearchModal({
           <li>건물명, 아파트명 (예: 반포자이아파트)</li>
         </ul>
       </div>
-      <p className="demo-note">체험용 화면이라 실제 주소 검색은 되지 않아요. 입력한 내용을 그대로 주소로 사용합니다.</p>
     </dialog>
   );
 }

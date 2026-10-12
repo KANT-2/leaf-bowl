@@ -73,10 +73,7 @@ export default function CustomerProductPage({ id, hours }: { id: number; hours: 
               {NUTRITION[p.id]
                 ? `${NUTRITION[p.id]!.kcal}kcal · 단백질 ${NUTRITION[p.id]!.protein}g · ${NUTRITION[p.id]!.weight}g`
                 : "영양 정보 준비 중"}
-              <small>
-                체험용 예시 값 · 샐러드만 기준(드레싱
-                {p.name.includes("세트") ? "·세트 음료" : ""} 제외)
-              </small>
+              <small>샐러드만 기준(드레싱{p.name.includes("세트") ? "·세트 음료" : ""} 제외)</small>
             </dd>
             <dt>배달</dt>
             <dd>

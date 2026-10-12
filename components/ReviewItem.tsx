@@ -33,7 +33,7 @@ export default function ReviewItem({ review: r, showMenu }: { review: Review; sh
           </Link>
         )}
         <span>{r.author}</span>
-        <span className={r.mine ? "rv-mine" : ""}>{r.mine ? "내가 작성" : r.sample ? "예시 리뷰" : "고객 리뷰"}</span>
+        <span className={r.mine ? "rv-mine" : ""}>{r.mine ? "내가 작성" : "고객 리뷰"}</span>
       </div>
     </li>
   );

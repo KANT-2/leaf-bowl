@@ -86,7 +86,6 @@ export default function PaymentResult({ failed = false }: { failed?: boolean }) 
               : error || "화면을 닫지 말고 잠시 기다려주세요."}
           </p>
         )}
-        <p className="demo-note">토스페이먼츠 테스트 결제입니다. 실제로 청구되지 않아요.</p>
         <div className="form-actions-stack">
           {order ? (
             <Link className="primary full form-btn" href="/mypage">
