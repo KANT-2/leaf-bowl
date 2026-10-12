@@ -1,7 +1,8 @@
 import { readCatalog } from "@/application/catalog";
 import { adminGate } from "@/application/admin-access";
 import { readImage } from "@/infrastructure/images/files";
-import { imageKeyPattern, catalogImageKeys } from "@/modules/images/references";
+import { readEvents } from "@/application/events";
+import { imageKeyPattern, catalogImageKeys, eventImageKeys } from "@/modules/images/references";
 import { publicSnapshot } from "@/modules/catalog/public-snapshot";
 import { connection } from "next/server";
 import { unstable_rethrow } from "next/navigation";
@@ -28,7 +29,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ key:
         seasonPages: content.seasonVisible ? content.seasonPages : [],
       },
     };
-    if (!catalogImageKeys(visible).has(key)) {
+    // 고객 이벤트 목록(/event)에 보이는 이벤트 배너도 공개 이미지로 취급한다.
+    if (
+      !catalogImageKeys(visible).has(key) &&
+      !eventImageKeys((await readEvents()).events.filter((event) => event.visible)).has(key)
+    ) {
       const denied = await adminGate(request);
       if (denied) {
         return new Response("Image unavailable", {
