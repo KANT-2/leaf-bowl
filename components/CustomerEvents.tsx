@@ -1,20 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { eventStatusLabel, type EventStatus } from "@/modules/events/schema";
-
-export interface CustomerEvent {
-  id: string;
-  title: string;
-  description: string;
-  startDate: string;
-  endDate: string;
-  image: string;
-  mobileImage: string;
-  alt: string;
-  href: string;
-  status: EventStatus;
-}
+import { eventStatusLabel, type CustomerEvent, type EventStatus } from "@/modules/events/schema";
 
 type Filter = "all" | EventStatus;
 
