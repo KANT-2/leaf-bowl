@@ -110,7 +110,7 @@ FRONT5_BASE_URL=http://localhost:3419 node tests/payments-browser.cjs
 
 Next.js와 Prisma CLI는 저장소 루트 `.env*`를 `@next/env` 규칙으로 읽는다. 환경변수로 직접 주입한 값이 우선한다. Docker 개발 컨테이너 안에서는 호스트의 `127.0.0.1` 대신 동일 네트워크의 PostgreSQL 서비스 이름·별칭을 사용한다. DB URL·비밀번호는 브라우저로 전달하지 않고 `NEXT_PUBLIC_*`로 설정하지 않는다.
 
-배포 supervisor를 시작할 때 `DATABASE_URL`과 고정된 `ADMIN_DATA_DIR`를 환경으로 주입한다. TLS 프록시가 내부 Host·scheme을 바꾸는 환경에서는 `APP_ORIGIN`을 실제 앱 주소(예: `https://kant2-front5-staging.dev.crasnec.com`)로 지정한다. 쓰기 API는 이 주소를 정확히 비교하며 임의의 `X-Forwarded-*` 헤더를 신뢰하지 않는다. 주소 설정 변경 후에는 서버를 재시작한다. 릴리스 디렉터리 안의 `.env.local`이나 상대 이미지 경로에 의존하지 않는다. 기존 `ops/mcp_cicd.py`는 자신의 환경을 빌드·후보·운영 서버에 전달한다. 운영 배포 전에 전용 DB에 migration·import/seed를 적용하고, 보호된 브랜치의 리뷰와 CI를 통과한 뒤 배포한다. migration이나 seed를 빌드·앱 요청마다 자동 실행하지 않는다.
+배포 supervisor를 시작할 때 `DATABASE_URL`과 고정된 `ADMIN_DATA_DIR`를 환경으로 주입한다. TLS 프록시가 내부 Host·scheme을 바꾸는 환경에서는 `APP_ORIGIN`을 실제 앱 주소(예: `https://kant2-front5-staging.dev.crasnec.com`)로 지정한다. 쓰기 API는 이 주소를 정확히 비교하며 임의의 `X-Forwarded-*` 헤더를 신뢰하지 않는다. 주소 설정 변경 후에는 서버를 재시작한다. 릴리스 디렉터리 안의 `.env.local`이나 상대 이미지 경로에 의존하지 않는다. `ops/mcp_cicd.py`는 자신의 환경을 빌드·후보·운영 서버에 전달한다. 보호된 브랜치의 리뷰와 CI를 통과한 릴리스에 대해 후보 서버 시작 전에 `prisma migrate deploy`를 자동 실행하며, 실패하면 기존 서버를 유지한다. 빌드 캐시 재사용·저장된 릴리스 복원에도 같은 확인을 적용한다. import/seed는 최초 이관·초기화 시 별도로 실행하며 앱 요청이나 빌드마다 실행하지 않는다. DB 변경은 이전 서버와 호환되게 단계적으로 적용하고, 백업·데이터가 있는 DB에서의 검증을 배포 전에 완료한다. 후보 검사 실패나 앱 복구가 DB 변경을 자동으로 되돌리지는 않는다. 상세 적용 순서와 실패 복구는 [개발 MCP CI/CD](../ops/README.md)를 따른다.
 
 이번 마이그레이션은 기존 SQL 규칙을 유지하며 신규 열·테이블을 추가한다. DB 구조·데이터를 보관하고 앱 버전을 되돌릴 수 있지만 과거 JSON 앱을 재활성화하면 DB와 파일이 따로 수정된다. 복구 시 쓰기를 잠시 멈추고 저장소를 하나로 유지한다.
 
