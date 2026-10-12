@@ -104,7 +104,7 @@ export default function ProductDetail({ product: p }: { product: Product }) {
                           name={g.id}
                           disabled={c.soldout}
                           checked={(selected[g.id] ?? []).includes(c.id)}
-                          onChange={(e) =>
+                          onChange={(e) => {
                             setSelected((current) => ({
                               ...current,
                               [g.id]: g.multiple
@@ -114,8 +114,12 @@ export default function ProductDetail({ product: p }: { product: Product }) {
                                 : e.target.checked
                                   ? [c.id]
                                   : [],
-                            }))
-                          }
+                            }));
+                            // 하나만 고르는 그룹은 고르면 바로 접는다(여러 개 고르는 그룹은 계속 열어둔다).
+                            if (!g.multiple) {
+                              e.currentTarget.closest("details")?.removeAttribute("open");
+                            }
+                          }}
                         />
                         {"image" in c && typeof c.image === "string" && c.image && (
                           <span className="opt-thumb" aria-hidden="true">

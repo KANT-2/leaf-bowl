@@ -867,6 +867,23 @@
       right: 8px;
       bottom: 8px;
     }
+    .soldout-cover {
+      gap: 6px;
+    }
+    .soldout-cover strong {
+      font-size: 13px;
+      padding: 6px 14px;
+    }
+    .soldout-cover span {
+      font-size: 10px;
+      padding: 4px 8px;
+    }
+    .soldout-chip {
+      right: 8px;
+      bottom: 8px;
+      padding: 4px 8px;
+      font-size: 10px;
+    }
     .review-cards {
       gap: 14px;
     }
