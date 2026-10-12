@@ -46,7 +46,7 @@ export default function Admin() {
   const [type, setType] = useState<Product["type"]>("salad");
   const editors = useCatalogEditors();
   const { setProduct, setGroup, setDeleting, setPurging, setPreview } = editors;
-  const { snapshot, loadError, busy, load, save, action } = useAdminCatalog(view === "reviews");
+  const { snapshot, loadError, busy, load, save, action } = useAdminCatalog();
   const [navigationReady, setNavigationReady] = useState(false);
   useEffect(() => {
     const restore = () => {
@@ -294,7 +294,15 @@ export default function Admin() {
         </main>
       </SidebarInset>
       {catalog && (
-        <CatalogDialogs catalog={catalog} busy={busy} editors={editors} load={load} save={save} action={action} />
+        <CatalogDialogs
+          catalog={catalog}
+          originCountries={snapshot?.defaults?.catalogConfig.originCountries ?? []}
+          busy={busy}
+          editors={editors}
+          load={load}
+          save={save}
+          action={action}
+        />
       )}
       <Toaster
         richColors

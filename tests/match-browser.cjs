@@ -16,6 +16,12 @@ fs.mkdirSync(shots, { recursive: true });
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
     const shot = (name) => page.screenshot({ path: path.join(shots, name + ".jpg"), type: "jpeg", quality: 80 });
+    // "내 조합 저장하기"는 로그인한 계정에만 연결되므로 먼저 체험용 로그인을 해둔다.
+    await page.goto(base + "/login");
+    await page.getByLabel("이메일").fill("quality@example.com");
+    await page.getByLabel("비밀번호").fill("password");
+    await page.getByRole("button", { name: "로그인", exact: true }).click();
+    await page.waitForURL("**/mypage");
     console.log("Match state across unrelated catalog updates");
     let snapshot = await (await page.request.get(base + "/api/catalog")).json();
     await page.route("**/api/catalog", (route) => route.fulfill({ json: publicSnapshot(snapshot) }));
@@ -53,7 +59,7 @@ fs.mkdirSync(shots, { recursive: true });
       snapshot.catalog.products.some((product) => product.id === selectedDressing && product.type === "dressing"),
     );
     assert.equal(
-      await page.evaluate(() => JSON.parse(localStorage.getItem("bm-recipe")).dressingKey),
+      await page.evaluate(() => JSON.parse(localStorage.getItem("bm-recipe")).at(-1).dressingKey),
       selectedDressing,
     );
     await shot("match-result");

@@ -1,11 +1,17 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { ordersStore } from "@/infrastructure/browser/legacy-orders";
+import { useCustomerCatalog } from "@/components/CustomerCatalogProvider";
+import { useReviewableOrderItems } from "@/features/reviews/reviewable-orders";
+import { useReviewWrite } from "@/components/ReviewWrite";
 import { loadServerOrders, type ServerOrder } from "@/features/orders/client";
 import { money } from "@/modules/shared/format";
 import { deliveryWindowKST } from "@/modules/delivery/time";
+
+const FALLBACK_IMAGE = "/images/hero-cutout.png";
 const statusLabels: Record<string, string> = {
   received: "접수",
   confirmed: "확인",
@@ -21,6 +27,12 @@ function formatDay(day: string) {
 }
 
 export default function OrdersTab() {
+  const { openWrite } = useReviewWrite();
+  const { catalog } = useCustomerCatalog();
+  const { items: reviewable } = useReviewableOrderItems();
+  const reviewablePids = useMemo(() => new Map(reviewable.map((it) => [it.orderItemId, it.pid])), [reviewable]);
+  const imageFor = (productId?: string | null) =>
+    (productId && catalog.products.find((p) => p.id === productId)?.image) || FALLBACK_IMAGE;
   const legacy = useSyncExternalStore(ordersStore.subscribe, ordersStore.getSnapshot, ordersStore.getServerSnapshot);
   const [serverOrders, setServerOrders] = useState<ServerOrder[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -105,13 +117,28 @@ export default function OrdersTab() {
                   {"status" in o ? (statusLabels[String(o.status)] ?? String(o.status)) : "이전 브라우저의 체험 주문"}
                 </p>
                 <ul className="order-item-lines">
-                  {o.items.map((it, i) => (
-                    <li key={i}>
-                      {it.name}
-                      {it.options && <span> · {it.options}</span>}
-                      <span> × {it.qty}</span>
-                    </li>
-                  ))}
+                  {o.items.map((it, i) => {
+                    const pid = it.id ? reviewablePids.get(it.id) : undefined;
+                    return (
+                      <li key={i} className="order-line">
+                        <div className="order-line-image">
+                          <Image src={imageFor(it.productId)} alt="" width={96} height={96} unoptimized />
+                        </div>
+                        <div className="order-line-info">
+                          <div>
+                            {it.name}
+                            {it.options && <span> · {it.options}</span>}
+                            <span> × {it.qty}</span>
+                          </div>
+                          {pid !== undefined && (
+                            <button type="button" className="ghost-btn" onClick={() => openWrite(pid)}>
+                              리뷰 쓰기
+                            </button>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               </li>
             );

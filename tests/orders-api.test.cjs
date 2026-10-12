@@ -81,7 +81,7 @@ function orderBody(catalog, overrides = {}) {
   const dressing = catalog.products.find((p) => p.type === "dressing" && p.name === "발사믹").id;
   const orange = catalog.products.find((p) => p.type === "drink" && p.name === "오렌지 주스").id;
   return {
-    items: [{ productId: 0, dressingKey: dressing, drinkKeys: [orange], quantity: 2 }],
+    items: [{ productId: 0, dressingKeys: [dressing], drinkKeys: [orange], quantity: 2 }],
     ordererName: "홍길동",
     phone: "010-1234-5678",
     address: "서울 중구 세종대로 110",

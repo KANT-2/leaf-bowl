@@ -3,7 +3,13 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useCustomerCatalog } from "./CustomerCatalogProvider";
 import { createLocalStore } from "@/infrastructure/browser/local-store";
-import { addCartItem, changeCartChoice, addCartVariant, updateCartQuantity } from "@/modules/cart/operations";
+import {
+  addCartItem,
+  changeCartChoice,
+  addCartVariant,
+  toggleCartDressing,
+  updateCartQuantity,
+} from "@/modules/cart/operations";
 import { CART_KEY, loadCart, saveCart } from "@/infrastructure/browser/cart-storage";
 import { type CartItem, type CustomItem, type MenuItem } from "@/modules/cart/types";
 
@@ -26,6 +32,8 @@ interface CartContextValue {
   changeChoice: (index: number, groupId: string | null, value: string) => boolean;
   /** 같은 샐러드를 다른 선택(드레싱 등)으로 1개 더 담는다. 새 줄(또는 합쳐진 줄)의 위치를 돌려준다. */
   addVariant: (index: number, groupId: string | null, value: string) => number;
+  /** 한 줄에 담긴 드레싱을 켜고 끈다 (여러 개 동시에 담을 수 있다). 같은 구성이 이미 있으면 합친다. */
+  toggleDressing: (index: number, groupId: string | null, value: string) => boolean;
   remove: (index: number) => void;
   clear: () => void;
   isOpen: boolean;
@@ -110,6 +118,12 @@ export default function CartProvider({ children }: { children: React.ReactNode }
     return result.index;
   }, []);
 
+  const toggleDressing = useCallback((index: number, groupId: string | null, value: string) => {
+    const result = toggleCartDressing(store.getSnapshot(), index, groupId, value);
+    store.set(result.items);
+    return result.merged;
+  }, []);
+
   const update = useCallback((index: number, qty: number) => {
     store.set(updateCartQuantity(store.getSnapshot(), index, qty));
   }, []);
@@ -147,6 +161,7 @@ export default function CartProvider({ children }: { children: React.ReactNode }
       update,
       changeChoice,
       addVariant,
+      toggleDressing,
       remove,
       clear,
       isOpen,
@@ -163,6 +178,7 @@ export default function CartProvider({ children }: { children: React.ReactNode }
       update,
       changeChoice,
       addVariant,
+      toggleDressing,
       remove,
       clear,
       isOpen,

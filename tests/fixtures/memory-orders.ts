@@ -71,6 +71,7 @@ export function createMemoryOrdersRepository({
       const at = now();
       const order: OrderRecord = {
         ...structuredClone(input),
+        items: structuredClone(input.items).map((item, i) => ({ ...item, id: `${input.requestKey}-${i}` })),
         id: randomUUID(),
         status: "received",
         version: 1,

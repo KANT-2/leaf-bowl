@@ -5,7 +5,7 @@ import { notifyCatalogSaved } from "@/components/CustomerCatalogProvider";
 import { type Catalog, type Snapshot } from "@/modules/catalog/schema";
 import { request } from "@/features/admin/request";
 
-export function useAdminCatalog(pollReviews: boolean) {
+export function useAdminCatalog() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [loadError, setLoadError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -37,35 +37,6 @@ export function useAdminCatalog(pollReviews: boolean) {
       });
     return () => controller.abort();
   }, [accept]);
-  useEffect(() => {
-    if (!pollReviews || busy) {
-      return;
-    }
-    const controller = new AbortController();
-    let pending = false;
-    const timer = setInterval(async () => {
-      if (pending) {
-        return;
-      }
-      pending = true;
-      try {
-        const next = await request("/api/admin/catalog", {
-          signal: controller.signal,
-        });
-        if (!controller.signal.aborted) {
-          accept(next);
-        }
-      } catch {
-        /* 다음 주기에 재확인한다. */
-      } finally {
-        pending = false;
-      }
-    }, 3000);
-    return () => {
-      controller.abort();
-      clearInterval(timer);
-    };
-  }, [pollReviews, busy, accept]);
   const save = async (catalog: Catalog, successMessage = "변경 내용을 저장했습니다.") => {
     if (!snapshot || saving.current) {
       throw Error("다른 저장이 끝난 뒤 다시 시도해주세요.");

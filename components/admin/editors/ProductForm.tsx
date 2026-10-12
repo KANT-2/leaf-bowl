@@ -15,6 +15,7 @@ export default function ProductForm({
   groups,
   categories,
   ingredients,
+  originCountries,
   busy,
   onCancel,
   onSave,
@@ -26,6 +27,7 @@ export default function ProductForm({
   ingredients: NonNullable<Catalog["ingredients"]>;
   categories: string[];
   groups: OptionGroup[];
+  originCountries: string[];
   busy: boolean;
   onRefresh: () => Promise<void>;
   onCancel: () => void;
@@ -145,6 +147,23 @@ export default function ProductForm({
                 options={["", "BEST", "NEW", "PLANT", "PICK"].map((v) => [v, v || "배지 없음"])}
               />
             </label>
+            {p.type === "drink" && (
+              <label className="field">
+                원산지
+                <Input
+                  maxLength={200}
+                  list="product-origin-countries"
+                  value={p.origin ?? ""}
+                  onChange={(e) => set("origin", e.target.value)}
+                  placeholder="예: 원두: 콜롬비아산"
+                />
+                <datalist id="product-origin-countries">
+                  {originCountries.map((x) => (
+                    <option key={x} value={x} />
+                  ))}
+                </datalist>
+              </label>
+            )}
             {p.type === "salad" && (
               <div className="field">
                 연결할 옵션 그룹

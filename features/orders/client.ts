@@ -1,6 +1,6 @@
 import { type CartItem } from "@/modules/cart/types";
 import { hasCustomIngredientIds, isCustom, isDrink } from "@/modules/cart/identity";
-import { dressingKey, drinkKey, drinkKeys } from "@/modules/cart/identifiers";
+import { dressingKeys, drinkKey, drinkKeys } from "@/modules/cart/identifiers";
 import { deliveryWindowKST } from "@/modules/delivery/time";
 import type { OrderRecord } from "@/modules/orders/customer-record";
 
@@ -15,7 +15,7 @@ export function orderItems(items: CartItem[]) {
       }
       return {
         ingredientKeys: item.ingredientIds,
-        dressingKey: dressingKey(item),
+        dressingKeys: dressingKeys(item),
         quantity: item.qty,
       };
     }
@@ -24,7 +24,7 @@ export function orderItems(items: CartItem[]) {
       quantity: item.qty,
       ...(item.optionSelections
         ? { optionSelections: item.optionSelections }
-        : { dressingKey: dressingKey(item), drinkKeys: drinkKeys(item) }),
+        : { dressingKeys: dressingKeys(item), drinkKeys: drinkKeys(item) }),
     };
   });
 }
@@ -70,7 +70,7 @@ export function clearOrderRequestKey() {
   }
 }
 
-async function jsonRequest(url: string, init: RequestInit = {}) {
+export async function jsonRequest(url: string, init: RequestInit = {}) {
   let response;
   try {
     response = await fetch(url, {
@@ -134,6 +134,9 @@ export async function loadServerOrders(cursor?: string): Promise<{ items: Server
         desiredStartAt: string;
         desiredEndAt: string;
         items: {
+          id: string;
+          productId: string | null;
+          productType?: "salad" | "drink" | "custom";
           name: string;
           options: string;
           quantity: number;
@@ -156,6 +159,9 @@ export async function loadServerOrders(cursor?: string): Promise<{ items: Server
           desiredStartAt: order.desiredStartAt,
           desiredEndAt: order.desiredEndAt,
           items: order.items.map((item) => ({
+            id: item.id,
+            productId: item.productId,
+            productType: item.productType,
             name: item.name,
             options: item.options,
             qty: item.quantity,

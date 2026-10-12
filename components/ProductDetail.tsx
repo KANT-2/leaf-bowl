@@ -1,16 +1,43 @@
 "use client";
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useCustomerCatalog } from "./CustomerCatalogProvider";
 import { useCart } from "./CartProvider";
+import { useToast } from "./ToastProvider";
 import { money } from "@/modules/shared/format";
 import { type Product } from "@/modules/catalog/customer-product";
 
 export default function ProductDetail({ product: p }: { product: Product }) {
   const { catalog, groupsFor, DRESSINGS, DRINKS, kcalOf } = useCustomerCatalog();
   const { add, open } = useCart();
+  const toast = useToast();
   const [selected, setSelected] = useState<Record<string, string[]>>({});
   const [qty, setQty] = useState(1);
+  const [openGroupId, setOpenGroupId] = useState<string | null>(null);
+
+  // 모바일 드롭다운 바깥을 누르거나 Esc를 누르면 닫는다. (데스크톱에서는 CSS 로 항상 펼쳐 보여서 영향 없다.)
+  useEffect(() => {
+    if (openGroupId === null) {
+      return;
+    }
+    const onPointer = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest(".option-picker")) {
+        setOpenGroupId(null);
+      }
+    };
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpenGroupId(null);
+      }
+    };
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [openGroupId]);
   const groups = groupsFor(p.id).map((g) => ({
     ...g,
     choices:
@@ -42,7 +69,14 @@ export default function ProductDetail({ product: p }: { product: Product }) {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (!complete || p.status !== "active") {
+          if (p.status !== "active") {
+            return;
+          }
+          if (!complete) {
+            const missing = groups.find(
+              (g) => g.required && !g.choices.some((c) => (selected[g.id] ?? []).includes(c.id)),
+            );
+            toast(missing ? `${missing.name} 옵션을 선택해주세요.` : "필수 옵션을 선택해주세요.");
             return;
           }
           add({
@@ -57,53 +91,94 @@ export default function ProductDetail({ product: p }: { product: Product }) {
           open(e.currentTarget.querySelector<HTMLButtonElement>('button[type="submit"]'));
         }}
       >
-        {groups.map((g) => (
-          <fieldset key={g.id} className="option-list">
-            <legend>
-              {g.name}
-              {g.required ? " (필수)" : ""}
-            </legend>
-            {g.choices.length ? (
-              g.choices.map((c) => (
-                <label key={c.id} className={c.soldout ? "is-soldout" : undefined}>
-                  <input
-                    type={g.multiple ? "checkbox" : "radio"}
-                    name={g.id}
-                    disabled={c.soldout}
-                    checked={(selected[g.id] ?? []).includes(c.id)}
-                    onChange={(e) =>
-                      setSelected((current) => ({
-                        ...current,
-                        [g.id]: g.multiple
-                          ? e.target.checked
-                            ? [...(current[g.id] ?? []), c.id]
-                            : (current[g.id] ?? []).filter((id) => id !== c.id)
-                          : e.target.checked
-                            ? [c.id]
-                            : [],
-                      }))
-                    }
-                  />
-                  {c.name}
-                  {c.soldout && <span className="opt-soldout">품절</span>}
-                  {c.price > 0 && <span> +{money(c.price)}</span>}
-                  {"image" in c && typeof c.image === "string" && c.image && (
-                    <span className="opt-preview" aria-hidden="true">
-                      <Image src={c.image} alt="" width={1024} height={1024} sizes="150px" />
+        {groups.map((g) => {
+          const chosenHere = g.choices.filter((c) => (selected[g.id] ?? []).includes(c.id));
+          const thumb = chosenHere.find((c) => "image" in c && typeof c.image === "string" && c.image) as
+            | { image?: string }
+            | undefined;
+          const summaryText = chosenHere.length
+            ? chosenHere.map((c) => c.name).join(", ")
+            : g.required
+              ? "선택해주세요"
+              : "선택 안 함";
+          return (
+            <fieldset key={g.id} className="option-list">
+              <legend>
+                {g.name}
+                {g.required ? " (필수)" : ""}
+              </legend>
+              {/* 모바일에서는 접힌 드롭다운으로, 데스크톱에서는 기존처럼 항상 펼쳐 보여준다(CSS 로만 제어). */}
+              <div className={`option-picker${openGroupId === g.id ? " open" : ""}`}>
+                <button
+                  type="button"
+                  className="option-picker-trigger"
+                  aria-expanded={openGroupId === g.id}
+                  onClick={() => setOpenGroupId((current) => (current === g.id ? null : g.id))}
+                >
+                  {thumb?.image && (
+                    <span className="opt-thumb" aria-hidden="true">
+                      <Image src={thumb.image} alt="" width={64} height={64} sizes="32px" />
                     </span>
                   )}
-                </label>
-              ))
-            ) : (
-              <p>현재 선택 가능한 옵션이 없습니다.</p>
-            )}
-            {!g.required && !g.multiple && (
-              <button type="button" onClick={() => setSelected((s) => ({ ...s, [g.id]: [] }))}>
-                선택 안 함
-              </button>
-            )}
-          </fieldset>
-        ))}
+                  <span className="opt-summary-text">{summaryText}</span>
+                  <span className="opt-caret" aria-hidden="true">
+                    ⌄
+                  </span>
+                </button>
+                <div className="option-choices">
+                  {g.choices.length ? (
+                    g.choices.map((c) => (
+                      <label key={c.id} className={c.soldout ? "is-soldout" : undefined}>
+                        <input
+                          type={g.multiple ? "checkbox" : "radio"}
+                          name={g.id}
+                          disabled={c.soldout}
+                          checked={(selected[g.id] ?? []).includes(c.id)}
+                          onChange={(e) => {
+                            setSelected((current) => ({
+                              ...current,
+                              [g.id]: g.multiple
+                                ? e.target.checked
+                                  ? [...(current[g.id] ?? []), c.id]
+                                  : (current[g.id] ?? []).filter((id) => id !== c.id)
+                                : e.target.checked
+                                  ? [c.id]
+                                  : [],
+                            }));
+                            // 골랐으면(체크 해제가 아니라 선택했으면) 드롭다운을 접는다.
+                            if (e.target.checked) {
+                              setOpenGroupId(null);
+                            }
+                          }}
+                        />
+                        {"image" in c && typeof c.image === "string" && c.image && (
+                          <span className="opt-thumb" aria-hidden="true">
+                            <Image src={c.image} alt="" width={64} height={64} sizes="32px" />
+                          </span>
+                        )}
+                        {c.name}
+                        {c.soldout && <span className="opt-soldout">품절</span>}
+                        {c.price > 0 && <span> +{money(c.price)}</span>}
+                        {"image" in c && typeof c.image === "string" && c.image && (
+                          <span className="opt-preview" aria-hidden="true">
+                            <Image src={c.image} alt="" width={1024} height={1024} sizes="150px" />
+                          </span>
+                        )}
+                      </label>
+                    ))
+                  ) : (
+                    <p>현재 선택 가능한 옵션이 없습니다.</p>
+                  )}
+                </div>
+              </div>
+              {!g.required && !g.multiple && (
+                <button type="button" onClick={() => setSelected((s) => ({ ...s, [g.id]: [] }))}>
+                  선택 안 함
+                </button>
+              )}
+            </fieldset>
+          );
+        })}
         {kcalOf(p.id, dressing, drinks) !== undefined && (
           <p className="pv-kcal" aria-live="polite">
             선택한 구성 약{" "}
@@ -133,7 +208,7 @@ export default function ProductDetail({ product: p }: { product: Product }) {
               +
             </button>
           </div>
-          <button className="primary" type="submit" disabled={p.status !== "active" || !complete}>
+          <button className="primary" type="submit" disabled={p.status !== "active"}>
             {p.status === "soldout" ? "품절 · 주문할 수 없어요" : money((p.price + optionPrice) * qty) + " · 담기"}
           </button>
         </div>

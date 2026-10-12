@@ -192,12 +192,33 @@ model Order {
   updatedAt         DateTime             @default(now()) @map("updated_at") @db.Timestamptz(6)
   items             OrderItem[]
   history           OrderStatusHistory[]
+  payment           PaymentCheckout?
 
   @@unique([customerSessionId, requestKey], map: "uq_order_request")
   @@index([updatedAt(sort: Desc)], map: "idx_orders_completed", where: raw("((status)::text = 'completed'::text)"))
   @@index([status, createdAt(sort: Desc), id(sort: Desc)], map: "idx_orders_list")
   @@index([customerSessionId, createdAt(sort: Desc)], map: "idx_orders_session")
   @@map("orders")
+}
+
+model PaymentCheckout {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customerSessionId String    @map("customer_session_id") @db.Uuid
+  requestKey        String    @map("request_key") @db.VarChar(80)
+  requestHash       String    @map("request_hash") @db.VarChar(64)
+  amount            BigInt
+  orderSnapshot     Json      @map("order_snapshot")
+  expiresAt         DateTime  @map("expires_at") @db.Timestamptz(6)
+  paymentKey        String?   @unique @map("payment_key") @db.VarChar(200)
+  orderId           String?   @unique @map("order_id") @db.Uuid
+  method            String?   @db.VarChar(30)
+  approvedAt        DateTime? @map("approved_at") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  order             Order?    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@unique([customerSessionId, requestKey], map: "uq_payment_request")
+  @@index([expiresAt], map: "idx_payment_checkouts_expires", where: raw("(order_id IS NULL)"))
+  @@map("payment_checkouts")
 }
 
 model ProductAllergen {
@@ -260,6 +281,7 @@ model Product {
   price                                                            Int
   description                                                      String               @default("") @db.VarChar(600)
   ingredients                                                      String?              @db.VarChar(600)
+  origin                                                            String?              @db.VarChar(200)
   category                                                         String               @db.VarChar(80)
   status                                                           String               @default("active") @db.VarChar(10)
   badge                                                            String               @default("") @db.VarChar(5)

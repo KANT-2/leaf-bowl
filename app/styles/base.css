@@ -305,6 +305,7 @@
     min-width: 0;
   }
   .product-photo {
+    container-type: inline-size;
     position: relative;
     border-radius: 8px;
     overflow: hidden;
@@ -767,7 +768,31 @@
       grid-template-columns: 1fr;
     }
     .review-card {
-      padding: 22px;
+      padding: 16px;
+    }
+    .review-card h3 {
+      font-size: 14px;
+      margin: 14px 0 6px;
+    }
+    .review-card p {
+      font-size: 12.5px;
+      line-height: 1.7;
+      margin: 0 0 12px;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+      overflow: hidden;
+    }
+    .review-stars {
+      font-size: 15px;
+    }
+    .review-author {
+      margin-top: 12px;
+      padding-top: 10px;
+    }
+    .review-avatar {
+      width: 26px;
+      height: 26px;
     }
   }
   @media (max-width: 600px) {
@@ -792,9 +817,9 @@
     .header nav {
       order: 3;
       width: 100%;
-      gap: 16px;
+      gap: 20px;
       font-size: 14px;
-      justify-content: space-between;
+      justify-content: flex-start;
       padding-top: 6px;
       padding-bottom: 15px;
     }
@@ -918,18 +943,17 @@
     filter: grayscale(0.55);
     opacity: 0.75;
   }
-  .soldout-chip {
-    position: absolute;
-    right: 12px;
-    bottom: 12px;
-    z-index: 2;
-    background: var(--color-cream);
-    border: 1px solid #b8c9ae;
-    border-radius: 20px;
-    padding: 5px 10px;
-    font-size: 11px;
-    font-weight: 600;
-    color: #637561;
+  /* 카드형 사진(.product-photo)은 화면 폭이 아니라 사진 자체의 실제 크기에 맞춰 배지가 줄어들게 한다 */
+  .product-photo .soldout-cover {
+    gap: clamp(6px, 2.5cqw, 10px);
+  }
+  .product-photo .soldout-cover strong {
+    font-size: clamp(12px, 8cqw, 18px);
+    padding: clamp(6px, 2.4cqw, 9px) clamp(14px, 6cqw, 26px);
+  }
+  .product-photo .soldout-cover span {
+    font-size: clamp(10px, 5cqw, 12px);
+    padding: clamp(4px, 1.6cqw, 6px) clamp(8px, 3.5cqw, 12px);
   }
   .card-soldout {
     display: block;

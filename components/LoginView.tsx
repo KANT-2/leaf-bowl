@@ -1,24 +1,30 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import PageHeading from "./PageHeading";
 import { useAuth } from "./AuthProvider";
 import { useToast } from "./ToastProvider";
 import { GoogleIcon } from "./icons/BrandMarks";
 
+/** 로그인 후 돌아갈 주소. 외부 주소로 보내지 않도록 "/"로 시작하는 상대 경로만 받는다. */
+function safeNext(value: string | null): string {
+  return value && value.startsWith("/") && !value.startsWith("//") ? value : "/mypage";
+}
+
 export default function LoginView() {
   const { isLoggedIn, login } = useAuth();
   const router = useRouter();
   const toast = useToast();
+  const next = safeNext(useSearchParams().get("next"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   useEffect(() => {
     if (isLoggedIn) {
-      router.replace("/mypage");
+      router.replace(next);
     }
-  }, [isLoggedIn, router]);
+  }, [isLoggedIn, router, next]);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,13 +33,13 @@ export default function LoginView() {
     }
     login({ name: email.split("@")[0] || "손님", email: email.trim(), provider: "email" });
     toast("체험용 임시 로그인입니다");
-    router.push("/mypage");
+    router.push(next);
   };
 
   const googleLogin = () => {
     login({ name: "구글 사용자", email: "google@example.com", provider: "google" });
     toast("구글 로그인은 체험용 임시 로그인입니다");
-    router.push("/mypage");
+    router.push(next);
   };
 
   if (isLoggedIn) {

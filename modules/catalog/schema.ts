@@ -46,6 +46,8 @@ export const productSchema = z.object({
   customerId: z.number().int().min(0).max(10000).optional(),
   en: z.string().max(100).optional(),
   ingredients: z.string().max(600).optional(),
+  /** 음료 등 단일 상품의 원산지 안내 (예: "원두: 콜롬비아산") */
+  origin: z.string().max(200).optional(),
   type: z.enum(["salad", "drink", "dressing"]),
   name: z.string().trim().min(1).max(80),
   price: z.number().int().min(0).max(1000000),

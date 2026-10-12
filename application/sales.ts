@@ -8,7 +8,9 @@ type Item = OrderItemRecord & { originalProductId?: string | null };
 export function salesItems(items: Item[]): SalesData["orders"][number]["items"] {
   return items.flatMap((item, index) => {
     const productType = item.productType ?? (item.productId ? "salad" : "custom");
-    const dressing = item.options.dressing;
+    // 예전 주문은 options.dressing(단일)으로 저장되어 있다. 하나짜리 배열로 맞춰 읽는다.
+    const legacy = (item.options as { dressing?: { key: string; name: string } }).dressing;
+    const dressings = (item.options.dressings ?? (legacy ? [legacy] : [])).filter((d) => d.name !== "드레싱 없이");
     const line = {
       productId: item.originalProductId ?? item.productId ?? `custom-${index}`,
       productType,
@@ -17,10 +19,8 @@ export function salesItems(items: Item[]): SalesData["orders"][number]["items"] 
       refundedQuantity: 0,
       ...(productType === "salad"
         ? {
-            dressing:
-              dressing && dressing.name !== "드레싱 없이"
-                ? { productId: dressing.key, productName: dressing.name }
-                : null,
+            // 드레싱별 조합 통계는 한 줄당 하나의 드레싱만 센다. 여러 개를 담은 주문은 첫 번째로 대표한다.
+            dressing: dressings[0] ? { productId: dressings[0].key, productName: dressings[0].name } : null,
           }
         : {}),
     };
@@ -35,19 +35,14 @@ export function salesItems(items: Item[]): SalesData["orders"][number]["items"] 
             quantity: item.quantity,
             refundedQuantity: 0,
           }));
-    const dressings =
-      dressing && dressing.name !== "드레싱 없이"
-        ? [
-            {
-              productId: dressing.key,
-              productType: "dressing" as const,
-              productName: dressing.name,
-              quantity: item.quantity,
-              refundedQuantity: 0,
-            },
-          ]
-        : [];
-    return [line, ...drinks, ...dressings];
+    const dressingLines = dressings.map((dressing) => ({
+      productId: dressing.key,
+      productType: "dressing" as const,
+      productName: dressing.name,
+      quantity: item.quantity,
+      refundedQuantity: 0,
+    }));
+    return [line, ...drinks, ...dressingLines];
   });
 }
 
