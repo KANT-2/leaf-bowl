@@ -3,22 +3,17 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/admin/button";
 import { Input } from "@/components/admin/input";
-import { STATUS_LABEL, type OrderStatus } from "@/modules/orders/status";
-import { kstDate } from "@/modules/shared/time";
+import { Tabs, TabsList, TabsTrigger } from "@/components/admin/tabs";
+import {
+  deliveryDateOptions,
+  deliveryGroupLabel,
+  filterDeliveryOrders,
+  groupDeliveryOrders,
+  type DeliveryGroupBy,
+  type DeliveryOrder,
+} from "@/features/admin/delivery-filters";
+import { ORDER_STATUSES, STATUS_LABEL, type OrderStatus } from "@/modules/orders/status";
 
-interface DeliveryOrder {
-  id: string;
-  status: OrderStatus;
-  ordererName: string;
-  phone: string;
-  address: string;
-  addressDetail: string;
-  desiredDate: string;
-  desiredSlot: string;
-  createdAt: string;
-  total: string;
-  items: { name: string; options: string; quantity: number }[];
-}
 const receivedTime = (value: string) =>
   new Intl.DateTimeFormat("ko-KR", {
     timeZone: "Asia/Seoul",
@@ -31,7 +26,6 @@ const receivedTime = (value: string) =>
   }).format(new Date(value));
 
 export default function DeliveryOrders() {
-  const [date, setDate] = useState("");
   return (
     <section className="surface">
       <div className="section-heading">
@@ -41,51 +35,12 @@ export default function DeliveryOrders() {
       <p className="muted">
         배달 날짜별로 묶고, 각 날짜 안에서는 최근 접수한 주문부터 표시합니다. 시간은 한국 시간 기준입니다.
       </p>
-      <div className="delivery-filters">
-        <Button type="button" variant={date ? "outline" : "default"} onClick={() => setDate("")}>
-          전체 날짜
-        </Button>
-        <Button type="button" variant="outline" onClick={() => setDate(kstDate(Date.now()))}>
-          오늘 배달
-        </Button>
-        <label className="field">
-          배달 날짜
-          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </label>
-      </div>
-      <OrderList key={date} date={date} />
+      <Results />
     </section>
   );
 }
 
-function OrderList({ date }: { date: string }) {
-  const [hour, setHour] = useState("");
-  return (
-    <>
-      {date && (
-        <div className="delivery-hours" role="group" aria-label="배달 시간대 선택">
-          <Button type="button" variant={hour === "" ? "default" : "outline"} onClick={() => setHour("")}>
-            전체 시간
-          </Button>
-          {Array.from({ length: 24 }, (_, h) => (
-            <Button
-              key={h}
-              type="button"
-              variant={hour === String(h) ? "default" : "outline"}
-              aria-pressed={hour === String(h)}
-              onClick={() => setHour(String(h))}
-            >
-              {String(h).padStart(2, "0")}:00–{String(h + 1).padStart(2, "0")}:00
-            </Button>
-          ))}
-        </div>
-      )}
-      <Results key={hour} date={date} hour={hour} />
-    </>
-  );
-}
-
-function Results({ date, hour }: { date: string; hour: string }) {
+function Results() {
   const [orders, setOrders] = useState<DeliveryOrder[]>([]);
   const [more, setMore] = useState(false);
   const [pages, setPages] = useState(1);
@@ -93,6 +48,12 @@ function Results({ date, hour }: { date: string; hour: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [updated, setUpdated] = useState("");
+  const [status, setStatus] = useState<OrderStatus | "all">("all");
+  const [query, setQuery] = useState("");
+  const [groupBy, setGroupBy] = useState<DeliveryGroupBy>("day");
+  const [month, setMonth] = useState("");
+  const [day, setDay] = useState("");
+  const [hour, setHour] = useState("");
   useEffect(() => {
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
@@ -102,12 +63,6 @@ function Results({ date, hour }: { date: string; hour: string }) {
         let cursor: string | null = null;
         for (let p = 0; p < pages; p++) {
           const params = new URLSearchParams({ limit: "50" });
-          if (date) {
-            params.set("deliveryDate", date);
-          }
-          if (hour !== "") {
-            params.set("deliveryHour", hour);
-          }
           if (cursor) {
             params.set("cursor", cursor);
           }
@@ -152,16 +107,118 @@ function Results({ date, hour }: { date: string; hour: string }) {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [date, hour, pages, refresh]);
-  const groups = new Map<string, DeliveryOrder[]>();
-  for (const order of orders) {
-    groups.set(order.desiredDate, [...(groups.get(order.desiredDate) ?? []), order]);
-  }
+  }, [pages, refresh]);
+  const { months, days } = deliveryDateOptions(orders, month);
+  const filtered = filterDeliveryOrders(orders, { status, query, month, day, hour });
+  const groups = groupDeliveryOrders(filtered, groupBy);
+  const countOf = (value: OrderStatus) => orders.filter((order) => order.status === value).length;
   return (
     <>
+      <div className="toolbar">
+        <div className="review-filter-controls">
+          <Tabs value={status} onValueChange={(value) => setStatus(value as OrderStatus | "all")}>
+            <TabsList aria-label="주문 상태">
+              <TabsTrigger value="all">전체 주문 {orders.length}</TabsTrigger>
+              {ORDER_STATUSES.map((value) => (
+                <TabsTrigger key={value} value={value}>
+                  {STATUS_LABEL[value]} {countOf(value)}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        </div>
+        <Input
+          aria-label="주문 검색"
+          placeholder="주문자, 전화, 주소, 메뉴, 주문번호 검색"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          style={{ maxWidth: 320 }}
+        />
+      </div>
+      <div className="review-calendar-controls">
+        <div role="group" aria-label="주문 묶음 보기">
+          {(["month", "day"] as const).map((value) => (
+            <Button
+              type="button"
+              key={value}
+              variant={groupBy === value ? "default" : "outline"}
+              aria-pressed={groupBy === value}
+              onClick={() => {
+                setGroupBy(value);
+                if (value === "month") {
+                  setDay("");
+                  setHour("");
+                }
+              }}
+            >
+              {value === "month" ? "월별 모아보기" : "일별 모아보기"}
+            </Button>
+          ))}
+        </div>
+        <label>
+          월 선택
+          <select
+            aria-label="배달 월 선택"
+            value={month}
+            onChange={(e) => {
+              setMonth(e.target.value);
+              setDay("");
+              setHour("");
+            }}
+          >
+            <option value="">전체 월</option>
+            {months.map((value) => (
+              <option key={value} value={value}>
+                {deliveryGroupLabel(value)}
+              </option>
+            ))}
+          </select>
+        </label>
+        {groupBy === "day" && (
+          <label>
+            날짜 선택
+            <select
+              aria-label="배달 날짜 선택"
+              value={day}
+              onChange={(e) => {
+                setDay(e.target.value);
+                setHour("");
+              }}
+            >
+              <option value="">전체 날짜</option>
+              {days.map((value) => (
+                <option key={value} value={value}>
+                  {deliveryGroupLabel(value)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <span className="meta" role="status">
+          조회 {filtered.length}건 · 배달 날짜순 · 한국 시간 기준
+        </span>
+      </div>
+      {day && (
+        <div className="delivery-hours" role="group" aria-label="배달 시간대 선택">
+          <Button type="button" variant={hour === "" ? "default" : "outline"} onClick={() => setHour("")}>
+            전체 시간
+          </Button>
+          {Array.from({ length: 24 }, (_, h) => (
+            <Button
+              key={h}
+              type="button"
+              variant={hour === String(h) ? "default" : "outline"}
+              aria-pressed={hour === String(h)}
+              onClick={() => setHour(String(h))}
+            >
+              {String(h).padStart(2, "0")}:00–{String(h + 1).padStart(2, "0")}:00
+            </Button>
+          ))}
+        </div>
+      )}
       <div className="section-heading">
         <p className="meta" aria-live="polite">
-          {loading ? "주문 불러오는 중…" : `${orders.length}건 표시 · 30초마다 자동 갱신`}
+          {loading ? "주문 불러오는 중…" : `불러온 주문 ${orders.length}건 · 30초마다 자동 갱신`}
           {updated && ` · 갱신 ${updated}`}
         </p>
         <Button
@@ -181,13 +238,12 @@ function Results({ date, hour }: { date: string; hour: string }) {
           {error}
         </p>
       )}
-      {!loading && !error && !orders.length && <p className="muted">선택한 조건에 해당하는 배달 주문이 없습니다.</p>}
-      {[...groups].map(([day, rows]) => (
-        <section key={day} className="delivery-day" aria-label={`${day} 배달 주문`}>
-          <div className="section-heading">
-            <h3>{day.replaceAll("-", ".")} 배달</h3>
-            <span className="pill">{rows.length}건</span>
-          </div>
+      {!loading && !error && !filtered.length && <p className="muted">선택한 조건에 해당하는 배달 주문이 없습니다.</p>}
+      {groups.map(([key, rows]) => (
+        <section key={key} className="delivery-day" aria-label={`${deliveryGroupLabel(key)} 배달 주문`}>
+          <h3 className="review-calendar-heading">
+            {deliveryGroupLabel(key)} 배달<span>{rows.length}건</span>
+          </h3>
           {rows.map((order) => (
             <article key={order.id} className="delivery-order">
               <div className="section-heading">
