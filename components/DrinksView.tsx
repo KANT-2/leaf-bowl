@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useCart } from "./CartProvider";
 import { useCustomerCatalog } from "./CustomerCatalogProvider";
 import PageHeading from "./PageHeading";
@@ -56,7 +57,11 @@ export default function DrinksView() {
                 </button>
               )}
             </div>
-            <h3>{d.name}</h3>
+            <h3>
+              <Link className="product-link" href={`/drinks/${d.id}`}>
+                {d.name}
+              </Link>
+            </h3>
             {(DRINK_KCAL[d.n] ?? 0) > 0 && <span className="card-nutri">약 {DRINK_KCAL[d.n]}kcal</span>}
             <strong>{money(d.price)}</strong>
             {!d.available && <span className="card-soldout">현재 주문할 수 없어요</span>}

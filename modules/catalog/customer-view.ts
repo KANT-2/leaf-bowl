@@ -59,6 +59,10 @@ export function customerCatalog(snapshot: PublicSnapshot) {
   const DRINKS = drinks.map((p) => ({
     id: p.id,
     name: p.name,
+    description: p.description,
+    ingredients: p.ingredients ?? p.description,
+    origin: p.origin ?? "",
+    allergens: split(p.allergens),
     price: p.price,
     available: !p.deleted && p.status === "active",
     image: p.image,
