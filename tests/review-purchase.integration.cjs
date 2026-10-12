@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
-const { test } = require("node:test");
+const { test, after } = require("node:test");
 const assert = require("node:assert/strict");
 const { randomUUID } = require("node:crypto");
 const { prisma } = require("../infrastructure/database/prisma.ts");
@@ -9,26 +9,36 @@ const { createOrdersService } = require("../modules/orders/service.ts");
 const { createPostgresOrdersRepository } = require("../infrastructure/orders/postgres.ts");
 const { publicSnapshot } = require("../modules/catalog/public-snapshot.ts");
 const { applyDefaultSql } = require("../seed/sql.ts");
+const { createOrderSchema } = require("../modules/orders/schema.ts");
+const { hashPassword } = require("../modules/identity/crypto.ts");
 
 const db = prisma();
 assert.match(decodeURIComponent(new URL(process.env.DATABASE_URL).pathname.slice(1)), /(?:^|[_-])test$/);
+after(() => db.$disconnect());
 test("review authorization enforces ownership, completion, product, uniqueness and durable deletion claims", async () => {
   await applyDefaultSql(process.env.DATABASE_URL);
   const session = randomUUID();
+  const admin = await db.adminUser.create({
+    data: { loginId: "review-test-" + randomUUID(), passwordHash: await hashPassword("test-only-password") },
+  });
   const catalog = await readCatalog();
   const product = catalog.catalog.products.find((p) => p.type === "salad" && !p.deleted && p.status === "active");
   const future = new Date(Date.now() + 3 * 86400_000);
   future.setUTCHours(3, 0, 0, 0);
   const orders = createOrdersService({ repository: createPostgresOrdersRepository(db) });
-  const { order } = await orders.createOrder(session, randomUUID(), {
-    ordererName: "리뷰 권한 테스트",
-    phone: "010-1234-5678",
-    address: "서울 중구",
-    addressDetail: "",
-    desiredStartAt: future.toISOString(),
-    desiredEndAt: new Date(future.getTime() + 3600_000).toISOString(),
-    items: [{ productId: product.customerId, dressingKey: "dressing-0", drinkKeys: ["drink-1"], quantity: 1 }],
-  });
+  const { order } = await orders.createOrder(
+    session,
+    randomUUID(),
+    createOrderSchema.parse({
+      ordererName: "리뷰 권한 테스트",
+      phone: "010-1234-5678",
+      address: "서울 중구",
+      addressDetail: "",
+      desiredStartAt: future.toISOString(),
+      desiredEndAt: new Date(future.getTime() + 3600_000).toISOString(),
+      items: [{ productId: product.customerId, dressingKey: "dressing-0", drinkKeys: ["drink-1"], quantity: 2 }],
+    }),
+  );
   const review = {
     id: "auth-" + randomUUID(),
     pid: product.customerId,
@@ -46,7 +56,10 @@ test("review authorization enforces ownership, completion, product, uniqueness a
       (e) => e.status === 404,
     );
     await assert.rejects(verifyReviewPurchase(session, review), (e) => e.status === 400);
-    await db.order.update({ where: { id: order.id }, data: { status: "completed" } });
+    let currentOrder = order;
+    for (const status of ["confirmed", "preparing", "delivering", "completed"]) {
+      currentOrder = await orders.changeStatus(admin.id, order.id, { status, version: currentOrder.version });
+    }
     await assert.rejects(verifyReviewPurchase(session, { ...review, pid: 9999 }), (e) => e.status === 400);
     const outcomes = await Promise.allSettled([
       appendPurchasedReview(session, review),
@@ -72,6 +85,6 @@ test("review authorization enforces ownership, completion, product, uniqueness a
   } finally {
     await db.reviewSubmission.deleteMany({ where: { customerSessionId: session } });
     await db.order.delete({ where: { id: order.id } });
-    await db.$disconnect();
+    await db.adminUser.delete({ where: { id: admin.id } });
   }
 });
