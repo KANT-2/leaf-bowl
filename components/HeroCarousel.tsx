@@ -1,6 +1,7 @@
 "use client";
 
 import HeroBanner from "./HeroBanner";
+import EventPicture from "./EventPicture";
 import { visibleBannerPages } from "@/modules/catalog/banner-pages";
 import type { Content } from "@/modules/catalog/schema";
 import Image from "next/image";
@@ -199,10 +200,12 @@ export default function HeroCarousel({
                   </Link>
                 </div>
                 <div className="hero-photo">
-                  <picture className="hero-event-photo">
-                    {e.mobileImage && <source media="(max-width: 600px)" srcSet={e.mobileImage} />}
-                    <img src={e.image} alt={e.alt || e.title} loading="lazy" />
-                  </picture>
+                  <EventPicture
+                    event={e}
+                    className="hero-event-photo"
+                    sizes="(max-width: 600px) 90vw, 620px"
+                    mobileUpTo={600}
+                  />
                 </div>
               </div>
             );

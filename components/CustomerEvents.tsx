@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
+import EventPicture from "./EventPicture";
 import { eventStatusLabel, type CustomerEvent, type EventStatus } from "@/modules/events/schema";
 
 type Filter = "all" | EventStatus;
@@ -15,13 +16,7 @@ function Banner({ event }: { event: CustomerEvent }) {
       </div>
     );
   }
-  return (
-    <picture className="ev-photo">
-      {event.mobileImage && <source media="(max-width: 700px)" srcSet={event.mobileImage} />}
-      {/* 관리자가 올린 배너(/api/admin/images/…)도 그대로 보여주기 위해 next/image 최적화를 거치지 않는다. */}
-      <img src={event.image} alt={event.alt || event.title} loading="lazy" />
-    </picture>
-  );
+  return <EventPicture event={event} className="ev-photo" sizes="(max-width: 700px) 100vw, 560px" mobileUpTo={700} />;
 }
 
 function Row({ event }: { event: CustomerEvent }) {
