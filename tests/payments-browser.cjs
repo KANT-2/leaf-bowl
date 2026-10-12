@@ -18,9 +18,16 @@ fs.mkdirSync(shots, { recursive: true });
     page.on("pageerror", (error) => errors.push(error.message));
     if (process.env.FRONT5_APP_ORIGIN) {
       // An internal runner address still uses the configured external origin for CSRF.
-      await page.route("**/api/v1/**", (route) =>
-        route.continue({ headers: { ...route.request().headers(), origin: process.env.FRONT5_APP_ORIGIN } }),
-      );
+      await page.route("**/api/v1/**", async (route) => {
+        const response = await route.fetch({
+          headers: {
+            ...(await route.request().allHeaders()),
+            origin: process.env.FRONT5_APP_ORIGIN,
+            "sec-fetch-site": "same-origin",
+          },
+        });
+        await route.fulfill({ response });
+      });
     }
     await page.goto(base + "/menu");
     await page.evaluate(() => {
