@@ -7,20 +7,26 @@
 .auth-card {
   width: 100%;
   max-width: 420px;
-  background: var(--color-cream);
+  background: var(--color-surface);
   border: 1px solid var(--color-line);
-  border-radius: 12px;
-  padding: 36px 32px;
+  border-radius: 16px;
+  padding: 40px 36px;
+  box-shadow: 0 10px 35px #194b3814;
 }
 .auth-card h1 {
   font-size: 26px;
-  margin: 10px 0 14px;
+  margin: 10px 0 26px;
 }
-.auth-note {
-  font-size: 13px;
-  color: var(--color-muted);
-  margin: 0 0 20px;
-  line-height: 1.6;
+.auth-card .field input {
+  border-radius: 10px;
+  border-color: var(--color-input-border);
+  transition: border-color 0.15s ease;
+}
+.auth-card .field input:focus-visible {
+  border-color: var(--color-focus);
+}
+.auth-card form .form-btn {
+  margin-top: 28px;
 }
 .auth-divider {
   display: flex;
@@ -304,6 +310,22 @@
 }
 .pref-group .allergy-chips {
   margin-top: 10px;
+}
+.pref-group .allergy-chips button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+.pref-group .allergy-chips .chip-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+.pref-group .allergy-chips button[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 1px var(--color-brand);
 }
 
 /* 주문 내역 */
