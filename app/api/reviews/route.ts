@@ -20,7 +20,7 @@ const schema = z.object({
   orderItemId: z
     .string()
     .regex(/^[1-9][0-9]{0,18}$/)
-    .refine((id) => BigInt(id) <= BigInt("9223372036854775807")),
+    .refine((id) => /^[1-9][0-9]{0,18}$/.test(id) && BigInt(id) <= BigInt("9223372036854775807")),
   author: z.string().trim().min(1).max(80),
   stars: z.number().int().min(1).max(5),
   title: z.string().trim().min(2).max(200),

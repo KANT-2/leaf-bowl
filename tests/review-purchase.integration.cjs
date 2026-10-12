@@ -24,6 +24,7 @@ test("review authorization enforces ownership, completion, product, uniqueness a
     ordererName: "리뷰 권한 테스트",
     phone: "010-1234-5678",
     address: "서울 중구",
+    addressDetail: "",
     desiredStartAt: future.toISOString(),
     desiredEndAt: new Date(future.getTime() + 3600_000).toISOString(),
     items: [{ productId: product.customerId, dressingKey: "dressing-0", drinkKeys: ["drink-1"], quantity: 1 }],
