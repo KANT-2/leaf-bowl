@@ -16,7 +16,8 @@ function Banner({ event }: { event: CustomerEvent }) {
       </div>
     );
   }
-  return <EventPicture event={event} className="ev-photo" sizes="(max-width: 700px) 100vw, 560px" mobileUpTo={700} />;
+  // 목록 칸은 가로로 긴 비율이라, 세로로 긴 모바일 배너를 쓰면 위아래가 잘린다. 모바일에서도 PC 이미지를 쓴다.
+  return <EventPicture event={event} className="ev-photo" sizes="(max-width: 700px) 100vw, 560px" />;
 }
 
 function Row({ event }: { event: CustomerEvent }) {

@@ -91,7 +91,10 @@ export default function EventManager() {
         <div>
           <div className="eyebrow">THIS MONTH’S EVENT</div>
           <h1>이달의 이벤트 관리</h1>
-          <p className="muted">이벤트 이미지와 기간을 관리하세요. 현재 고객 화면에는 연결되지 않습니다.</p>
+          <p className="muted">
+            이벤트 이미지와 기간을 관리하세요. 노출 중인 이벤트는 고객 이달의 이벤트 화면에, 진행 중인 이벤트는 메인
+            배너에도 표시됩니다.
+          </p>
         </div>
         <Button
           disabled={!snapshot || busy || uploading || !!draft}
