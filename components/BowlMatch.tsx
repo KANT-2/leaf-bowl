@@ -1,5 +1,7 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { useAuth } from "./AuthProvider";
 import { useCustomerCatalog } from "./CustomerCatalogProvider";
 import BowlResultDialog from "./bowl-match/BowlResultDialog";
 import { CardFace, DoneCard } from "./bowl-match/MatchCards";
@@ -14,6 +16,9 @@ import { type Decision } from "@/modules/bowl/model";
 import { money } from "@/modules/shared/format";
 
 const two = (n: number) => String(n).padStart(2, "0");
+
+/** 계정당 저장할 수 있는 조합 수. 넘으면 오래된 것부터 지운다. */
+const MAX_SAVED_RECIPES = 20;
 
 const unique = (list: string[]) => [...new Set(list)];
 
@@ -33,6 +38,8 @@ export default function BowlMatch() {
 function BowlMatchBody({ ingredients }: { ingredients: Ingredient[] }) {
   const { DRESSINGS, PRODUCTS, photoSrc, bowlPrice, pricingPolicy, catalogConfig } = useCustomerCatalog();
   const { addCustom, open } = useCart();
+  const { user, isLoggedIn } = useAuth();
+  const router = useRouter();
   const toast = useToast();
   const total = ingredients.length;
 
@@ -41,7 +48,7 @@ function BowlMatchBody({ ingredients }: { ingredients: Ingredient[] }) {
     decisionsStore.getSnapshot,
     decisionsStore.getServerSnapshot,
   );
-  const recipe = useSyncExternalStore(recipeStore.subscribe, recipeStore.getSnapshot, recipeStore.getServerSnapshot);
+  const recipes = useSyncExternalStore(recipeStore.subscribe, recipeStore.getSnapshot, recipeStore.getServerSnapshot);
   // 재료 목록이 줄어든 경우를 위해 지금 목록 길이까지만 쓴다.
   const invalid = saved.findIndex((d) => d.ingredientId && d.ingredientId !== ingredients[d.index]?.id);
   const decisions = saved.slice(0, invalid < 0 ? total : invalid);
@@ -54,12 +61,17 @@ function BowlMatchBody({ ingredients }: { ingredients: Ingredient[] }) {
     .filter(Boolean);
   const ids = selected.map((i) => i.id);
   const price = bowlPrice(selected);
-  const savedRecipe =
-    recipe &&
-    DRESSINGS.some((d) => d.id === recipe.dressingKey && d.available) &&
-    recipe.ingredients.every((id) => ingredients.some((i) => i.id === id))
-      ? recipe
-      : null;
+  // 가장 최근에 저장한, 지금도 주문 가능한 "내" 조합을 불러오기 버튼에 쓴다. 전체 목록은 마이페이지에서 본다.
+  const savedRecipe = !isLoggedIn
+    ? null
+    : ([...recipes]
+        .filter(
+          (r) =>
+            r.ownerEmail === user?.email &&
+            DRESSINGS.some((d) => d.id === r.dressingKey && d.available) &&
+            r.ingredients.every((id) => ingredients.some((i) => i.id === id)),
+        )
+        .sort((a, b) => b.savedAt.localeCompare(a.savedAt))[0] ?? null);
 
   const {
     busy,
@@ -170,17 +182,30 @@ function BowlMatchBody({ ingredients }: { ingredients: Ingredient[] }) {
   const recipeName = () => (name.trim() || "나의 샐러드").slice(0, 30);
 
   const saveRecipe = () => {
+    if (!isLoggedIn || !user) {
+      toast("내 조합을 저장하려면 로그인해주세요");
+      router.push("/login?next=/match");
+      return;
+    }
     const n = recipeName();
-    recipeStore.set({
-      name: n,
-      ingredients: ids,
-      dressing,
-      dressingKey: dressingId,
-      price,
-      savedAt: new Date().toISOString(),
-    });
-    setSavedNote(`${n} · 다시 방문하면 저장한 조합을 불러올 수 있어요.`);
-    toast("내 조합을 이 브라우저에 저장했어요");
+    const mine = recipes.filter((r) => r.ownerEmail === user.email);
+    const others = recipes.filter((r) => r.ownerEmail !== user.email);
+    recipeStore.set([
+      ...others,
+      ...mine.slice(-(MAX_SAVED_RECIPES - 1)),
+      {
+        id: crypto.randomUUID(),
+        name: n,
+        ingredients: ids,
+        dressing,
+        dressingKey: dressingId,
+        price,
+        savedAt: new Date().toISOString(),
+        ownerEmail: user.email,
+      },
+    ]);
+    setSavedNote(`${n} · 마이페이지 > 내 조합에서 다시 불러올 수 있어요.`);
+    toast("내 조합을 저장했어요");
   };
 
   const addToCart = () => {

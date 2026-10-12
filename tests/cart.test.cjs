@@ -117,16 +117,19 @@ test("browser JSON failures fall back and recipes retain newly added dressing ID
     assert.deepEqual(readBrowserJSON("broken", []), []);
     assert.doesNotThrow(() => writeBrowserJSON("blocked", []));
     global.localStorage.getItem = () =>
-      JSON.stringify({
-        name: "신규 조합",
-        ingredients: ["romaine"],
-        dressing: 8,
-        dressingKey: "new-dressing",
-        price: 8000,
-        savedAt: "2026-10-10",
-      });
+      JSON.stringify([
+        {
+          id: "recipe-1",
+          name: "신규 조합",
+          ingredients: ["romaine"],
+          dressing: 8,
+          dressingKey: "new-dressing",
+          price: 8000,
+          savedAt: "2026-10-10",
+        },
+      ]);
     const { recipeStore } = require("../infrastructure/browser/bowl-store.ts");
-    assert.equal(recipeStore.getSnapshot().dressingKey, "new-dressing");
+    assert.equal(recipeStore.getSnapshot()[0].dressingKey, "new-dressing");
   } finally {
     if (previous === undefined) {
       delete global.localStorage;
