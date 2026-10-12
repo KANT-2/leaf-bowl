@@ -5,10 +5,12 @@ import { Button } from "@/components/admin/button";
 import { Input } from "@/components/admin/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/admin/tabs";
 import {
+  DELIVERY_PAGE_SIZE,
   deliveryDateOptions,
   deliveryGroupLabel,
   filterDeliveryOrders,
   groupDeliveryOrders,
+  paginateDeliveryOrders,
   type DeliveryGroupBy,
   type DeliveryOrder,
 } from "@/features/admin/delivery-filters";
@@ -110,7 +112,11 @@ function Results() {
   }, [pages, refresh]);
   const { months, days } = deliveryDateOptions(orders, month);
   const filtered = filterDeliveryOrders(orders, { status, query, month, day, hour });
-  const groups = groupDeliveryOrders(filtered, groupBy);
+  const filterKey = [status, query, groupBy, month, day, hour].join("|");
+  const [pageState, setPageState] = useState({ key: "", page: 1 });
+  const paged = paginateDeliveryOrders(filtered, pageState.key === filterKey ? pageState.page : 1);
+  const goToPage = (page: number) => setPageState({ key: filterKey, page });
+  const groups = groupDeliveryOrders(paged.items, groupBy);
   const countOf = (value: OrderStatus) => orders.filter((order) => order.status === value).length;
   return (
     <>
@@ -208,7 +214,7 @@ function Results() {
           </label>
         )}
         <span className="meta" role="status">
-          조회 {filtered.length}건 · 배달 날짜순 · 한국 시간 기준
+          조회 {filtered.length}건 · {paged.page}/{paged.pageCount}쪽 · 배달 날짜순 · 한국 시간 기준
         </span>
       </div>
       <div className="section-heading">
@@ -271,6 +277,43 @@ function Results() {
           ))}
         </section>
       ))}
+      {filtered.length > DELIVERY_PAGE_SIZE && (
+        <div className="menu-pagination">
+          <nav aria-label="배달 이력 페이지">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={paged.page === 1}
+              onClick={() => goToPage(paged.page - 1)}
+            >
+              이전
+            </Button>
+            {Array.from({ length: paged.pageCount }, (_, i) => (
+              <Button
+                key={i}
+                type="button"
+                variant={paged.page === i + 1 ? "default" : "outline"}
+                size="sm"
+                aria-label={i + 1 + "페이지"}
+                aria-current={paged.page === i + 1 ? "page" : undefined}
+                onClick={() => goToPage(i + 1)}
+              >
+                {i + 1}
+              </Button>
+            ))}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={paged.page === paged.pageCount}
+              onClick={() => goToPage(paged.page + 1)}
+            >
+              다음
+            </Button>
+          </nav>
+        </div>
+      )}
       {more && (
         <Button
           type="button"

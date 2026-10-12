@@ -67,3 +67,13 @@ test("delivery date options follow the selected month and labels are Korean", ()
   assert.equal(deliveryGroupLabel("2026-10-03"), "2026년 10월 3일");
   assert.equal(deliveryGroupLabel("2026-10"), "2026년 10월");
 });
+
+test("delivery orders paginate eight per page and clamp the page number", () => {
+  const { paginateDeliveryOrders } = require("../features/admin/delivery-filters.ts");
+  const list = Array.from({ length: 19 }, (_, i) => i);
+  assert.deepEqual(paginateDeliveryOrders(list, 1), { items: list.slice(0, 8), page: 1, pageCount: 3 });
+  assert.deepEqual(paginateDeliveryOrders(list, 3).items, [16, 17, 18]);
+  assert.equal(paginateDeliveryOrders(list, 9).page, 3);
+  assert.equal(paginateDeliveryOrders(list, 0).page, 1);
+  assert.deepEqual(paginateDeliveryOrders([], 1), { items: [], page: 1, pageCount: 1 });
+});

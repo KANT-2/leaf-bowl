@@ -85,3 +85,12 @@ export function groupDeliveryOrders(orders: DeliveryOrder[], groupBy: DeliveryGr
   }
   return [...groups].sort(([a], [b]) => (a < b ? 1 : a > b ? -1 : 0));
 }
+
+export const DELIVERY_PAGE_SIZE = 8;
+
+/** 목록을 페이지로 나눈다. 범위를 벗어난 쪽 번호는 마지막·첫 쪽으로 맞춘다 */
+export function paginateDeliveryOrders<T>(items: T[], page: number, size = DELIVERY_PAGE_SIZE) {
+  const pageCount = Math.max(1, Math.ceil(items.length / size));
+  const current = Math.min(Math.max(1, page), pageCount);
+  return { items: items.slice((current - 1) * size, current * size), page: current, pageCount };
+}
