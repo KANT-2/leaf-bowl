@@ -16,6 +16,12 @@ fs.mkdirSync(shots, { recursive: true });
     page.setDefaultTimeout(20_000);
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
+    if (process.env.FRONT5_APP_ORIGIN) {
+      // An internal runner address still uses the configured external origin for CSRF.
+      await page.route("**/api/v1/**", (route) =>
+        route.continue({ headers: { ...route.request().headers(), origin: process.env.FRONT5_APP_ORIGIN } }),
+      );
+    }
     await page.goto(base + "/menu");
     await page.evaluate(() => {
       localStorage.setItem(
@@ -31,7 +37,10 @@ fs.mkdirSync(shots, { recursive: true });
     await page.goto(base + "/checkout?" + query);
     await page.getByLabel("받는 분", { exact: true }).fill("결제 테스트");
     await page.getByLabel("연락처", { exact: true }).fill("010-1234-5678");
-    await page.getByRole("radio", { name: "신용·체크카드" }).click();
+    const standard = (await page.getByRole("radio", { name: "신용·체크카드" }).count()) === 0;
+    if (!standard) {
+      await page.getByRole("radio", { name: "신용·체크카드" }).click();
+    }
     assert.equal(await page.getByPlaceholder("0000 0000 0000 0000").count(), 0);
     await page.screenshot({ path: path.join(shots, "checkout.png") });
     const response = page.waitForResponse(
@@ -51,14 +60,37 @@ fs.mkdirSync(shots, { recursive: true });
       "phone",
     ]);
     const key = preparedResponse.request().headers()["idempotency-key"];
-    const provider = page.frameLocator("iframe");
-    await provider.getByText("결제 방법을 선택해주세요", { exact: true }).waitFor();
+    const provider = page.frameLocator(
+      standard
+        ? 'iframe[src*="payment-widget.tosspayments.com"]'
+        : 'iframe[src*="payment-gateway-sandbox.tosspayments.com"]',
+    );
+    if (standard) {
+      await provider.getByText("테스트 환경이에요. 실제로 결제되지 않아요.", { exact: true }).waitFor();
+      await page.screenshot({ path: path.join(shots, "toss-payment-window.png") });
+      await provider.getByText("신용·체크카드", { exact: true }).click();
+      await provider.getByText("국민", { exact: true }).click();
+      await provider.getByRole("button", { name: "결제하기", exact: true }).click();
+      await page
+        .frameLocator('iframe[src*="payment-gateway-sandbox.tosspayments.com"]')
+        .getByRole("button", { name: "인증 취소", exact: true })
+        .waitFor();
+    } else {
+      await provider.getByText("결제 방법을 선택해주세요", { exact: true }).waitFor();
+    }
     const providerFrame = page
       .frames()
       .find((f) => new URL(f.url()).hostname === "payment-gateway-sandbox.tosspayments.com");
     assert.ok(providerFrame, "Must open the actual sandbox, never a live payment gateway");
     await page.screenshot({ path: path.join(shots, "toss-card-window.png") });
-    await provider.getByRole("button", { name: "결제 취소", exact: true }).click();
+    if (standard) {
+      await page
+        .frameLocator('iframe[src*="payment-gateway-sandbox.tosspayments.com"]')
+        .getByRole("button", { name: "인증 취소", exact: true })
+        .click();
+    } else {
+      await provider.getByRole("button", { name: "결제 취소", exact: true }).click();
+    }
     await page
       .getByRole("alert")
       .getByText(/결제를 중단했어요/)
@@ -74,11 +106,35 @@ fs.mkdirSync(shots, { recursive: true });
     const retry = await retryResponse;
     assert.equal(retry.request().headers()["idempotency-key"], key);
     assert.equal((await retry.json()).orderId, draft.orderId);
-    await provider.getByRole("button", { name: "결제 취소", exact: true }).click();
+    if (standard) {
+      await provider.getByRole("button", { name: "닫기", exact: true }).first().click();
+    } else {
+      await provider.getByRole("button", { name: "결제 취소", exact: true }).click();
+    }
     await page
       .getByRole("alert")
       .getByText(/결제를 중단했어요/)
       .waitFor();
+
+    if (standard) {
+      // Merchant UI may show other methods; they must stop before authentication.
+      const thirdResponse = page.waitForResponse(
+        (r) => r.url().endsWith("/api/v1/payments/checkout") && r.request().method() === "POST",
+      );
+      await page.locator(".checkout-pay-btn").click();
+      assert.equal((await (await thirdResponse).json()).orderId, draft.orderId);
+      await provider.getByRole("button", { name: /^퀵계좌이체 결제 수단/ }).click();
+      await provider.getByRole("button", { name: "결제하기", exact: true }).click();
+      await page
+        .getByRole("alert")
+        .getByText(/카드·토스페이·카카오페이를 선택/)
+        .waitFor();
+      assert.equal(
+        page.frames().some((f) => new URL(f.url()).hostname === "payment-gateway-sandbox.tosspayments.com"),
+        false,
+      );
+      assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("bb-cart")).length), 1);
+    }
 
     // Full authentication requires the tester's own card. This part tests only
     // callback UI with an explicitly mocked approval API. Server approval/recovery

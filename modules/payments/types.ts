@@ -62,7 +62,7 @@ export interface ApprovedPayment {
 export interface PaymentGateway {
   assertConfigured(): void;
   /** Lookup before approval also recovers an earlier success whose response was lost. */
-  lookup(orderId: string): Promise<ApprovedPayment | null>;
+  lookup(orderId: string, paymentKey: string): Promise<ApprovedPayment | null>;
   confirm(paymentKey: string, orderId: string, amount: number): Promise<ApprovedPayment>;
 }
 

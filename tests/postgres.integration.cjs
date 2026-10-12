@@ -743,8 +743,9 @@ function testPayments(database = db, overrides = {}) {
   let approvals = 0;
   const gateway = {
     assertConfigured() {},
-    async lookup(id) {
-      return approved.get(id) ?? null;
+    async lookup(id, paymentKey) {
+      const payment = approved.get(id) ?? null;
+      return payment?.paymentKey === paymentKey ? payment : null;
     },
     async confirm(paymentKey, orderId, amount) {
       if (!approved.has(orderId)) {

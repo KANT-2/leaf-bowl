@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Breadcrumb from "./Breadcrumb";
 import PageHeading from "./PageHeading";
 import { useCart } from "./CartProvider";
@@ -13,11 +13,10 @@ import { customerCatalog } from "@/modules/catalog/customer-view";
 import { publicSnapshotSchema } from "@/modules/catalog/public-schema";
 import { orderRequestKey } from "@/features/orders/client";
 import { preparePayment, paymentResultUrl, rememberPaymentCart } from "@/features/checkout/payment";
+import { openTossPayment, type PayMethod } from "@/features/checkout/toss";
 import { deliveryWindowKST, deliveryWindowUTC } from "@/modules/delivery/time";
 import { money } from "@/modules/shared/format";
 import { CardIcon, KakaoPayMark, TossMark } from "./icons/BrandMarks";
-
-type PayMethod = "toss" | "kakaopay" | "card";
 
 const PAY_METHODS: { key: PayMethod; label: string; className: string; icon: React.ReactNode }[] = [
   { key: "toss", label: "토스페이", className: "pay-toss", icon: <TossMark /> },
@@ -46,7 +45,11 @@ export default function CheckoutView({ hours, clientKey }: { hours: DeliveryHour
   const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
   const pending = useRef(false);
+  const paymentController = useRef<AbortController | null>(null);
   const submission = useRef<{ body: string; key: string } | null>(null);
+  const standard = clientKey?.startsWith("test_gck_") ?? false;
+
+  useEffect(() => () => paymentController.current?.abort(), []);
 
   const subtotal = items.reduce((n, i) => n + itemUnitPrice(i) * i.qty, 0);
   const fee = items.length ? deliveryFee(subtotal) : 0;
@@ -61,6 +64,8 @@ export default function CheckoutView({ hours, clientKey }: { hours: DeliveryHour
     if (!canPay || pending.current) {
       return;
     }
+    const controller = new AbortController();
+    paymentController.current = controller;
     pending.current = true;
     setPaying(true);
     setError("");
@@ -104,24 +109,22 @@ export default function CheckoutView({ hours, clientKey }: { hours: DeliveryHour
         throw new Error("메뉴 금액이 변경되었어요. 장바구니에서 금액을 확인해주세요.");
       }
       await rememberPaymentCart(checkout.orderId, items);
-      const { loadTossPayments } = await import("@tosspayments/tosspayments-sdk");
+      const { loadTossPayments, ANONYMOUS } = await import("@tosspayments/tosspayments-sdk");
       const toss = await loadTossPayments(clientKey!);
-      const payment = toss.payment({ customerKey: checkout.orderId });
-      await payment.requestPayment({
-        method: "CARD",
-        amount: { currency: "KRW", value: checkout.amount },
-        orderId: checkout.orderId,
-        orderName: checkout.orderName,
-        successUrl: window.location.origin + "/checkout/success",
-        failUrl: window.location.origin + "/checkout/fail",
-        customerName: ordererName.trim(),
-        card:
-          method === "card"
-            ? { flowMode: "DEFAULT" }
-            : {
-                flowMode: "DIRECT",
-                easyPay: method === "toss" ? "토스페이" : "카카오페이",
-              },
+      await openTossPayment({
+        toss,
+        standard,
+        anonymous: ANONYMOUS,
+        method,
+        signal: controller.signal,
+        request: {
+          amount: checkout.amount,
+          orderId: checkout.orderId,
+          orderName: checkout.orderName,
+          successUrl: window.location.origin + "/checkout/success",
+          failUrl: window.location.origin + "/checkout/fail",
+          customerName: ordererName.trim(),
+        },
       });
     } catch (cause) {
       const canceled = typeof cause === "object" && cause !== null && "code" in cause && cause.code === "USER_CANCEL";
@@ -224,22 +227,26 @@ export default function CheckoutView({ hours, clientKey }: { hours: DeliveryHour
 
       <section className="surface mypage-section">
         <h2>결제 수단</h2>
-        <div className="pay-methods" role="radiogroup" aria-label="결제 수단">
-          {PAY_METHODS.map((m) => (
-            <button
-              key={m.key}
-              type="button"
-              role="radio"
-              aria-checked={method === m.key}
-              aria-label={m.label}
-              className={`${m.className}${method === m.key ? " active" : ""}`}
-              onClick={() => setMethod(m.key)}
-            >
-              {m.icon}
-              {m.key === "card" && m.label}
-            </button>
-          ))}
-        </div>
+        {standard ? (
+          <p>카드·토스페이·카카오페이는 결제 창에서 선택해주세요.</p>
+        ) : (
+          <div className="pay-methods" role="radiogroup" aria-label="결제 수단">
+            {PAY_METHODS.map((m) => (
+              <button
+                key={m.key}
+                type="button"
+                role="radio"
+                aria-checked={method === m.key}
+                aria-label={m.label}
+                className={`${m.className}${method === m.key ? " active" : ""}`}
+                onClick={() => setMethod(m.key)}
+              >
+                {m.icon}
+                {m.key === "card" && m.label}
+              </button>
+            ))}
+          </div>
+        )}
         <p className="pay-redirect-note">결제하기를 누르면 토스페이먼츠 결제 창에서 안전하게 결제할 수 있어요.</p>
       </section>
 

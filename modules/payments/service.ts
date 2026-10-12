@@ -45,7 +45,7 @@ export function createPaymentsService({
         throw new AppError(409, "같은 요청 번호로 다른 결제 내용이 이미 있습니다.");
       }
       if (checkout.paymentKey && !checkout.orderId) {
-        const payment = await gateway.lookup(checkout.id);
+        const payment = await gateway.lookup(checkout.id, checkout.paymentKey);
         // Only a provider-confirmed terminal result allows a fresh payment attempt.
         // Unknown results and timeouts must keep the original approval recoverable.
         if (
@@ -93,13 +93,13 @@ export function createPaymentsService({
       }
       // Bind once before any external mutation. Retries can only approve this same payment.
       const checkout = await repository.bindPaymentKey(original.id, input.paymentKey, now());
-      let payment = await gateway.lookup(checkout.id);
+      let payment = await gateway.lookup(checkout.id, input.paymentKey);
       if (!payment || payment.status === "IN_PROGRESS" || payment.status === "READY") {
         try {
           payment = await gateway.confirm(input.paymentKey, checkout.id, Number(checkout.amount));
         } catch (error) {
           // A timeout or simultaneous request can hide a successful approval.
-          const recovered = await gateway.lookup(checkout.id);
+          const recovered = await gateway.lookup(checkout.id, input.paymentKey);
           if (recovered?.status !== "DONE") {
             throw error;
           }

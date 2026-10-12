@@ -12,6 +12,9 @@ test("missing, mixed and live keys never enable payments", () => {
     { TOSS_CLIENT_KEY: "test_ck_client" },
     { TOSS_CLIENT_KEY: "live_ck_client", TOSS_SECRET_KEY: "live_sk_secret" },
     { TOSS_CLIENT_KEY: "test_ck_client", TOSS_SECRET_KEY: "live_sk_secret" },
+    { TOSS_CLIENT_KEY: "test_gck_client", TOSS_SECRET_KEY: "test_sk_secret" },
+    { TOSS_CLIENT_KEY: "test_ck_client", TOSS_SECRET_KEY: "test_gsk_secret" },
+    { TOSS_CLIENT_KEY: "live_gck_client", TOSS_SECRET_KEY: "live_gsk_secret" },
   ]) {
     assert.throws(
       () => tossTestConfig(env),
@@ -21,6 +24,13 @@ test("missing, mixed and live keys never enable payments", () => {
   assert.deepEqual(tossTestConfig({ TOSS_CLIENT_KEY: "test_ck_client", TOSS_SECRET_KEY: "test_sk_secret" }), {
     clientKey: "test_ck_client",
     secretKey: "test_sk_secret",
+  });
+});
+
+test("standard test gck/gsk keys are accepted as a matched family", () => {
+  assert.deepEqual(tossTestConfig({ TOSS_CLIENT_KEY: "test_gck_client", TOSS_SECRET_KEY: "test_gsk_secret" }), {
+    clientKey: "test_gck_client",
+    secretKey: "test_gsk_secret",
   });
 });
 
@@ -100,8 +110,17 @@ test("Toss gateway sends server-only Basic authentication and a stable approval 
     assert.equal(calls[0].options.headers["Idempotency-Key"], calls[1].options.headers["Idempotency-Key"]);
     assert.deepEqual(JSON.parse(calls[0].options.body), { orderId, paymentKey: "test_payment", amount: 24800 });
     assert.equal(response.secret, undefined);
+    await gateway.lookup(orderId, "test_payment");
+    assert.equal(calls[2].url, "https://api.tosspayments.com/v1/payments/test_payment");
+    process.env.TOSS_CLIENT_KEY = "test_gck_client";
+    process.env.TOSS_SECRET_KEY = "test_gsk_secret";
+    await gateway.lookup(orderId, "standard_payment");
+    await gateway.confirm("standard_payment", orderId, 24800);
+    assert.equal(calls[3].url, "https://api.tosspayments.com/v1/payments/standard_payment");
+    assert.equal(calls[3].options.headers.Authorization, "Basic " + Buffer.from("test_gsk_secret:").toString("base64"));
+    assert.equal(calls[4].options.headers["Idempotency-Key"], calls[0].options.headers["Idempotency-Key"]);
     const missing = createTossGateway(async () => Response.json({ code: "NOT_FOUND_PAYMENT" }, { status: 404 }));
-    assert.equal(await missing.lookup(orderId), null);
+    assert.equal(await missing.lookup(orderId, "test_payment"), null);
     const failed = createTossGateway(async () =>
       Response.json({ message: "secret merchant information" }, { status: 500 }),
     );
@@ -113,7 +132,7 @@ test("Toss gateway sends server-only Basic authentication and a stable approval 
       throw Error("Authorization: secret");
     });
     await assert.rejects(
-      unavailable.lookup(orderId),
+      unavailable.lookup(orderId, "test_payment"),
       (error) => error.status === 502 && !error.message.includes("secret"),
     );
   } finally {

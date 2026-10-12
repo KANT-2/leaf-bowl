@@ -6,10 +6,12 @@ import type { PaymentGateway } from "@/modules/payments/types";
 export function tossTestConfig(env: NodeJS.ProcessEnv = process.env) {
   const clientKey = env.TOSS_CLIENT_KEY;
   const secretKey = env.TOSS_SECRET_KEY;
-  if (!clientKey?.startsWith("test_ck_") || !secretKey?.startsWith("test_sk_")) {
+  const individual = clientKey?.startsWith("test_ck_") && secretKey?.startsWith("test_sk_");
+  const standard = clientKey?.startsWith("test_gck_") && secretKey?.startsWith("test_gsk_");
+  if (!individual && !standard) {
     throw new AppError(503, "테스트 결제를 준비 중입니다. 잠시 후 다시 이용해주세요.");
   }
-  return { clientKey, secretKey };
+  return { clientKey: clientKey!, secretKey: secretKey! };
 }
 
 export function tossClientKey(): string | null {
@@ -72,7 +74,8 @@ export function createTossGateway(fetcher: typeof fetch = fetch): PaymentGateway
     assertConfigured: () => {
       tossTestConfig();
     },
-    lookup: (orderId) => request("/orders/" + encodeURIComponent(orderId)),
+    // The standard gsk keys support paymentKey lookup, but not orderId lookup.
+    lookup: (_orderId, paymentKey) => request("/" + encodeURIComponent(paymentKey)),
     async confirm(paymentKey, orderId, amount) {
       const payment = await request("/confirm", { paymentKey, orderId, amount }, "confirm-" + orderId);
       if (!payment) {
