@@ -381,6 +381,16 @@ model Session {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model SiteContent {
+  bannerIncludesOriginals Boolean @default(false) @map("banner_includes_originals")
+  bannerPages Json @default("[]") @map("banner_pages")
+  hasBannerPages Boolean @default(false) @map("has_banner_pages")
+  bannerVisible Boolean @default(true) @map("banner_visible")
+  mainImage String @default("") @map("main_image") @db.VarChar(200)
+  mainMobileImage String @default("") @map("main_mobile_image") @db.VarChar(200)
+  heroImage         String   @default("") @map("hero_image") @db.VarChar(200)
+  heroMobileImage   String   @default("") @map("hero_mobile_image") @db.VarChar(200)
+  heroAlt           String   @default("") @map("hero_alt") @db.VarChar(300)
+  heroHref          String   @default("") @map("hero_href") @db.VarChar(300)
   id                Int      @id @default(1) @db.SmallInt
   heroTitle         String   @map("hero_title") @db.VarChar(200)
   heroDescription   String   @default("") @map("hero_description") @db.VarChar(600)
@@ -402,4 +412,11 @@ model StoreLocation {
   detailAddress String @default("") @map("detail_address") @db.VarChar(200)
 
   @@map("store_location")
+}
+
+model AdminEventSettings {
+  id Int @id @default(1) @db.SmallInt
+  revision Int @default(1)
+  events Json @default("[]")
+  @@map("admin_event_settings")
 }

@@ -111,6 +111,16 @@ const pageRows = (catalog: Catalog) =>
   }));
 
 const contentRow = ({ content: c }: Catalog) => ({
+  bannerIncludesOriginals: c.bannerIncludesOriginals,
+  bannerPages: c.bannerPages ?? [],
+  hasBannerPages: c.bannerPages !== undefined,
+  bannerVisible: c.bannerVisible,
+  mainImage: c.mainImage ?? "",
+  mainMobileImage: c.mainMobileImage ?? "",
+  heroImage: c.heroImage ?? "",
+  heroMobileImage: c.heroMobileImage ?? "",
+  heroAlt: c.heroAlt ?? "",
+  heroHref: c.heroHref ?? "",
   heroTitle: c.heroTitle,
   heroDescription: c.heroDescription,
   seasonTitle: c.seasonTitle,

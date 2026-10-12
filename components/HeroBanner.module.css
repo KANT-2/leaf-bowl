@@ -1,0 +1,21 @@
+.banner {
+  width: 100%;
+  overflow: hidden;
+  background: var(--cream, #f7f6ef);
+}
+
+.banner picture,
+.banner a {
+  display: block;
+}
+
+.banner img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.banner a:focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: -3px;
+}

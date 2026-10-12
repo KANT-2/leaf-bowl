@@ -13,7 +13,9 @@ export async function GET(request: Request) {
     const query = parseOrThrow(
       adminOrderListQuerySchema,
       Object.fromEntries(
-        ["status", "from", "to", "limit", "cursor"].flatMap((k) => (params.has(k) ? [[k, params.get(k)]] : [])),
+        ["status", "from", "to", "limit", "cursor", "deliveryDate", "deliveryHour"].flatMap((k) =>
+          params.has(k) ? [[k, params.get(k)]] : [],
+        ),
       ),
       "조회 조건을 확인해주세요.",
     );
