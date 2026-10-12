@@ -18,6 +18,7 @@ import ProductForm from "./editors/ProductForm";
 import type { CatalogEditors } from "./use-catalog-editors";
 export default function CatalogDialogs({
   catalog,
+  originCountries,
   busy,
   editors,
   load,
@@ -25,6 +26,7 @@ export default function CatalogDialogs({
   action,
 }: {
   catalog: Catalog;
+  originCountries: string[];
   busy: boolean;
   editors: CatalogEditors;
   load: () => Promise<void>;
@@ -57,6 +59,7 @@ export default function CatalogDialogs({
               ingredients={catalog.ingredients ?? []}
               categories={saladCategories(catalog)}
               groups={catalog.groups.filter((g) => !g.deleted)}
+              originCountries={originCountries}
               busy={busy}
               onRefresh={load}
               onCancel={() => setProduct(null)}

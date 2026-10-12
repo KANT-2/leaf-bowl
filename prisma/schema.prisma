@@ -281,6 +281,7 @@ model Product {
   price                                                            Int
   description                                                      String               @default("") @db.VarChar(600)
   ingredients                                                      String?              @db.VarChar(600)
+  origin                                                            String?              @db.VarChar(200)
   category                                                         String               @db.VarChar(80)
   status                                                           String               @default("active") @db.VarChar(10)
   badge                                                            String               @default("") @db.VarChar(5)
