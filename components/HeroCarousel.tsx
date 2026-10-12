@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { type HeroSlide } from "@/modules/settings/hero";
 import { useReducedMotion } from "@/features/shared/hooks";
+import type { CustomerEvent } from "@/modules/events/schema";
 
 /** 다음 배너로 넘어가기까지의 시간 (밀리초) */
 export const HERO_MS = 6000;
@@ -34,10 +35,21 @@ function arcPath([cx, cy, rx, ry]: HeroSlide["bowl"]) {
  * 홈 상단 히어로 배너. 여러 장을 겹쳐 두고 HERO_MS 마다 페이드로 넘긴다.
  * 마우스를 올리거나 키보드 포커스가 있거나, 화면 밖·탭 숨김·정지 버튼·동작 줄이기 설정이면 멈춘다.
  */
-export default function HeroCarousel({ slides, advertisement }: { slides: HeroSlide[]; advertisement?: Content }) {
-  const entries: ({ kind: "standard"; slide: HeroSlide } | { kind: "advertisement"; content: Content })[] = slides.map(
-    (slide) => ({ kind: "standard", slide }),
-  );
+export default function HeroCarousel({
+  slides,
+  advertisement,
+  events = [],
+}: {
+  slides: HeroSlide[];
+  advertisement?: Content;
+  /** 진행 중인 이달의 이벤트. 기존 배너 뒤에 이어서 보여준다. */
+  events?: CustomerEvent[];
+}) {
+  const entries: (
+    | { kind: "standard"; slide: HeroSlide }
+    | { kind: "advertisement"; content: Content }
+    | { kind: "event"; event: CustomerEvent }
+  )[] = slides.map((slide) => ({ kind: "standard", slide }));
   if (advertisement?.bannerPages === undefined && advertisement?.bannerVisible && advertisement.mainImage) {
     entries.splice(0, entries.length ? 1 : 0, {
       kind: "advertisement",
@@ -78,6 +90,7 @@ export default function HeroCarousel({ slides, advertisement }: { slides: HeroSl
       entries.splice(Math.min(1, entries.length), 0, ...managed);
     }
   }
+  entries.push(...events.map((event) => ({ kind: "event" as const, event })));
   const total = entries.length;
   const reduced = useReducedMotion();
   // 첫 렌더는 서버와 같게 항상 첫 번째 배너
@@ -160,8 +173,41 @@ export default function HeroCarousel({ slides, advertisement }: { slides: HeroSl
               </div>
             );
           }
-          const s = entry.slide;
           const Title = active ? "h1" : "p";
+          if (entry.kind === "event") {
+            const e = entry.event;
+            return (
+              <div
+                key={`event-${e.id}`}
+                className={`hero-inner hero-event wrap${active ? " is-active" : ""}`}
+                role="group"
+                aria-roledescription="slide"
+                aria-label={`${total}개 중 ${i + 1}번째: 이벤트`}
+                aria-hidden={!active}
+                inert={!active}
+              >
+                <div className="hero-copy">
+                  <div className="eyebrow">THIS MONTH’S EVENT</div>
+                  <Title className="hero-title">{e.title}</Title>
+                  {e.description && <p>{e.description}</p>}
+                  <p className="hero-event-date">
+                    <time dateTime={e.startDate}>{e.startDate.replaceAll("-", ".")}</time> –{" "}
+                    <time dateTime={e.endDate}>{e.endDate.replaceAll("-", ".")}</time>
+                  </p>
+                  <Link className="primary" href={e.href || "/event"}>
+                    이벤트 보러가기 <span>↗</span>
+                  </Link>
+                </div>
+                <div className="hero-photo">
+                  <picture className="hero-event-photo">
+                    {e.mobileImage && <source media="(max-width: 600px)" srcSet={e.mobileImage} />}
+                    <img src={e.image} alt={e.alt || e.title} loading="lazy" />
+                  </picture>
+                </div>
+              </div>
+            );
+          }
+          const s = entry.slide;
           return (
             <div
               key={s.src}
@@ -237,10 +283,22 @@ export default function HeroCarousel({ slides, advertisement }: { slides: HeroSl
           <div className="hero-dots" role="group" aria-label="배너 선택">
             {entries.map((entry, i) => (
               <button
-                key={entry.kind === "advertisement" ? `image-${i}` : entry.slide.src}
+                key={
+                  entry.kind === "advertisement"
+                    ? `image-${i}`
+                    : entry.kind === "event"
+                      ? `event-${entry.event.id}`
+                      : entry.slide.src
+                }
                 type="button"
                 className={i === index ? "is-active" : ""}
-                aria-label={`${i + 1}번째 배너: ${entry.kind === "advertisement" ? "광고" : entry.slide.noteKo}`}
+                aria-label={`${i + 1}번째 배너: ${
+                  entry.kind === "advertisement"
+                    ? "광고"
+                    : entry.kind === "event"
+                      ? entry.event.title
+                      : entry.slide.noteKo
+                }`}
                 aria-current={i === index}
                 onClick={() => go(i)}
               >

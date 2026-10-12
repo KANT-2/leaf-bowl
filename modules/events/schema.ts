@@ -48,3 +48,39 @@ export function eventStatus(event: Pick<ManagedEvent, "startDate" | "endDate">, 
   const today = kstDate(now);
   return today < event.startDate ? "scheduled" : today > event.endDate ? "ended" : "ongoing";
 }
+
+/** 고객 화면에 보내는 이벤트 (관리자 전용 정보 없이, 상태를 계산해 둔 모양) */
+export interface CustomerEvent {
+  id: string;
+  title: string;
+  description: string;
+  startDate: string;
+  endDate: string;
+  image: string;
+  mobileImage: string;
+  alt: string;
+  href: string;
+  status: EventStatus;
+}
+
+/** 진행 중 → 예정 → 종료 순서로 보여주고, 같은 상태끼리는 관리자가 정한 순서를 따른다. */
+const statusOrder: Record<EventStatus, number> = { ongoing: 0, scheduled: 1, ended: 2 };
+
+/** 노출 중인 이벤트만 고객용 모양으로 바꾼다. */
+export function customerEvents(events: readonly ManagedEvent[], now = Date.now()): CustomerEvent[] {
+  return events
+    .filter((event) => event.visible)
+    .map((event) => ({
+      id: event.id,
+      title: event.title,
+      description: event.description,
+      startDate: event.startDate,
+      endDate: event.endDate,
+      image: event.image,
+      mobileImage: event.mobileImage,
+      alt: event.alt,
+      href: event.href,
+      status: eventStatus(event, now),
+    }))
+    .sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
+}

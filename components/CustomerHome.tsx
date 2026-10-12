@@ -7,12 +7,13 @@ import ProductCard from "@/components/ProductCard";
 import ReviewRotator from "@/components/ReviewRotator";
 import { useCustomerCatalog } from "./CustomerCatalogProvider";
 import { MATCH_URL } from "@/features/customer/routes";
+import type { CustomerEvent } from "@/modules/events/schema";
 
-export default function CustomerHome() {
+export default function CustomerHome({ events = [] }: { events?: CustomerEvent[] }) {
   const { catalog, revision, heroSlides: slides, visibleProducts: PRODUCTS } = useCustomerCatalog();
   return (
     <main>
-      <HeroCarousel key={revision} slides={slides} advertisement={catalog.content} />
+      <HeroCarousel key={revision} slides={slides} advertisement={catalog.content} events={events} />
 
       <section className="section wrap" id="best">
         <div className="section-title">
