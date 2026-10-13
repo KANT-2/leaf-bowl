@@ -24,6 +24,30 @@ export default function CustomerProductPage({ id, hours }: { id: number; hours: 
     );
   }
   const others = PRODUCTS.filter((o) => o.id !== p.id).slice(0, 4);
+  const originCard = !!p.ingredientOrigins?.length && (
+    <details className="origin-box" open>
+      <summary>원산지·알레르기 정보</summary>
+      <table>
+        <thead>
+          <tr>
+            <th>재료</th>
+            <th>원산지</th>
+            <th>알레르기</th>
+          </tr>
+        </thead>
+        <tbody>
+          {p.ingredientOrigins!.map((row, i) => (
+            <tr key={i}>
+              <td>{row.name}</td>
+              <td>{row.origin || "–"}</td>
+              <td>{row.allergens || "–"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="origin-note">원재료 수급 상황에 따라 원산지가 바뀔 수 있으며, 바뀌면 바로 반영합니다.</p>
+    </details>
+  );
   return (
     <main className="wrap pv-wrap">
       <Breadcrumb items={[["홈", "/"], ["메뉴", "/menu"], [p.name]]} />
@@ -59,31 +83,8 @@ export default function CustomerProductPage({ id, hours }: { id: number; hours: 
           </dl>
           <ProductDetail product={p} />
         </div>
-        {!!p.ingredientOrigins?.length && (
-          <details className="origin-box" open>
-            <summary>원산지·알레르기 정보</summary>
-            <table>
-              <thead>
-                <tr>
-                  <th>재료</th>
-                  <th>원산지</th>
-                  <th>알레르기</th>
-                </tr>
-              </thead>
-              <tbody>
-                {p.ingredientOrigins.map((row, i) => (
-                  <tr key={i}>
-                    <td>{row.name}</td>
-                    <td>{row.origin || "–"}</td>
-                    <td>{row.allergens || "–"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <p className="origin-note">원재료 수급 상황에 따라 원산지가 바뀔 수 있으며, 바뀌면 바로 반영합니다.</p>
-          </details>
-        )}
       </div>
+      {originCard}
       <ProductReviewsPreview id={p.id} />
       <section className="pvsec" aria-labelledby="pvMoreTitle">
         <div className="section-title">
