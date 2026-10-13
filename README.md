@@ -78,7 +78,7 @@ Next.js App Router 기반으로 고객 화면과 관리자 화면을 구성하�
 | 과제 요구 | 위치 |
 | --- | --- |
 | 상품 타입 `interface Product` | [types/product.ts](types/product.ts) (정의: [modules/catalog/customer-product.ts](modules/catalog/customer-product.ts)) |
-| Mock 데이터 6개 이상 | [data/products.ts](data/products.ts) — 샐러드 13종 정적 배열 (처음엔 화면이 직접 읽었고, 지금은 같은 메뉴가 DB 초기 데이터 [db/seed.sql](db/seed.sql)에 있어 화면은 DB 에서 읽음) |
+| Mock 데이터 6개 이상 | [data/products.ts](data/products.ts) — 샐러드 12종 정적 배열 (처음엔 화면이 직접 읽었고, 지금은 같은 메뉴가 DB 초기 데이터 [db/seed.sql](db/seed.sql)에 있어 화면은 DB 에서 읽음) |
 | 공통 컴포넌트 | [Header](components/Header.tsx) · [Footer](components/Footer.tsx) · [ProductCard](components/ProductCard.tsx) (Props 로 상품 전달) |
 | 메인 `app/page.tsx` | [`app/(customer)/page.tsx`](app/%28customer%29/page.tsx) — 배너와 추천 상품 |
 | 목록 `app/products/page.tsx` | [`app/(customer)/products/page.tsx`](app/%28customer%29/products/page.tsx) — `.map()` 으로 카드 출력 (`/menu` 와 같은 화면) |
