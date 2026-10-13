@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/admin/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/admin/dialog";
 import { Input } from "@/components/admin/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/admin/tabs";
 import {
@@ -43,6 +44,7 @@ export default function DeliveryOrders() {
 }
 
 function Results() {
+  const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const [orders, setOrders] = useState<DeliveryOrder[]>([]);
   const [more, setMore] = useState(false);
   const [pages, setPages] = useState(1);
@@ -249,6 +251,8 @@ function Results() {
             <span>배달 예정</span>
             <span>주문 정보</span>
             <span>배달 주소</span>
+            <span>상태·금액</span>
+            <span>관리</span>
           </div>
           {rows.map((order) => (
             <article key={order.id} className="delivery-order delivery-order-compact">
@@ -257,7 +261,6 @@ function Results() {
                 <p className="meta">
                   접수 <time dateTime={order.createdAt}>{receivedTime(order.createdAt)}</time>
                 </p>
-                <span className="pill">{STATUS_LABEL[order.status]}</span>
               </div>
               <div>
                 <strong>{order.ordererName}</strong>
@@ -272,13 +275,25 @@ function Results() {
                     </li>
                   ))}
                 </ul>
-                <p className="meta">
-                  주문번호 {order.id} · {Number(order.total).toLocaleString("ko-KR")}원
-                </p>
               </div>
               <div>
                 <p>{order.address}</p>
                 <p>{order.addressDetail}</p>
+              </div>
+              <div>
+                <span className={"delivery-status delivery-status-" + order.status}>{STATUS_LABEL[order.status]}</span>
+                <p>{Number(order.total).toLocaleString("ko-KR")}원</p>
+              </div>
+              <div className="delivery-manage">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label={order.ordererName + " 주문 상세 보기"}
+                  onClick={() => setSelectedOrder(order.id)}
+                >
+                  상세 보기
+                </Button>
               </div>
             </article>
           ))}
@@ -326,6 +341,22 @@ function Results() {
           </nav>
         </div>
       )}
+      <Dialog
+        open={!!selectedOrder}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedOrder(null);
+          }
+        }}
+      >
+        <DialogContent className="editor-dialog">
+          <DialogHeader>
+            <DialogTitle>배달 주문 상세</DialogTitle>
+            <DialogDescription>주문 정보와 처리 이력을 확인하세요.</DialogDescription>
+          </DialogHeader>
+          {selectedOrder && <OrderDetails key={selectedOrder} id={selectedOrder} />}
+        </DialogContent>
+      </Dialog>
       {more && (
         <Button
           type="button"
@@ -340,5 +371,99 @@ function Results() {
         </Button>
       )}
     </>
+  );
+}
+
+type OrderDetail = DeliveryOrder & {
+  cancelReason: string | null;
+  history: { toStatus: OrderStatus; reason: string | null; createdAt: string }[];
+};
+function OrderDetails({ id }: { id: string }) {
+  const [data, setData] = useState<OrderDetail | null>(null);
+  const [error, setError] = useState("");
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    async function load() {
+      setError("");
+      setData(null);
+      try {
+        const response = await fetch(`/api/v1/admin/orders/${encodeURIComponent(id)}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          throw new Error(
+            response.status === 401 || response.status === 403
+              ? "관리자 로그인이 필요합니다."
+              : "주문 상세를 불러오지 못했습니다.",
+          );
+        }
+        const result = await response.json();
+        if (!controller.signal.aborted) {
+          setData(result);
+        }
+      } catch (cause) {
+        if (!controller.signal.aborted) {
+          setError(cause instanceof Error ? cause.message : "조회에 실패했습니다.");
+        }
+      }
+    }
+    void load();
+    return () => controller.abort();
+  }, [id, retry]);
+  if (error) {
+    return (
+      <div role="alert">
+        <p className="error">{error}</p>
+        <Button variant="outline" onClick={() => setRetry((value) => value + 1)}>
+          다시 시도
+        </Button>
+      </div>
+    );
+  }
+  if (!data) {
+    return <p role="status">주문 상세 불러오는 중…</p>;
+  }
+  return (
+    <div className="delivery-detail">
+      <p className="meta">주문번호 {data.id}</p>
+      <p>
+        <strong>{data.ordererName}</strong> · {data.phone}
+      </p>
+      <p>
+        배달 예정 {data.desiredDate} {data.desiredSlot}
+      </p>
+      <p>접수 {receivedTime(data.createdAt)}</p>
+      <p>
+        배달 주소: {data.address} {data.addressDetail}
+      </p>
+      <p>
+        <span className={"delivery-status delivery-status-" + data.status}>{STATUS_LABEL[data.status]}</span> · 결제
+        금액 {Number(data.total).toLocaleString("ko-KR")}원
+      </p>
+      <h3>주문 메뉴</h3>
+      <ul>
+        {data.items.map((item, index) => (
+          <li key={index}>
+            <strong>
+              {item.name} × {item.quantity}
+            </strong>
+            {item.options && <p className="meta">{item.options}</p>}
+          </li>
+        ))}
+      </ul>
+      {data.cancelReason && <p>취소 사유: {data.cancelReason}</p>}
+      <h3>처리 이력</h3>
+      <ul>
+        {data.history.map((entry, index) => (
+          <li key={index}>
+            {receivedTime(entry.createdAt)} · {STATUS_LABEL[entry.toStatus]}
+            {entry.reason && ` · ${entry.reason}`}
+          </li>
+        ))}
+      </ul>
+      {!data.history.length && <p className="meta">등록된 처리 이력이 없습니다.</p>}
+    </div>
   );
 }

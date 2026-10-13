@@ -120,12 +120,17 @@ export default function BannerPagesEditor({
             </div>
           )}
           <div className="field" role="group" aria-label="PC 광고 이미지">
-            PC 광고 이미지
-            <Upload value={current.image} onChange={(image) => update({ image })} onBusy={onBusy} />
+            <span style={{ fontWeight: 700 }}>PC 광고 이미지</span>
+            <Upload outlinedRemove value={current.image} onChange={(image) => update({ image })} onBusy={onBusy} />
           </div>
           <div className="field" role="group" aria-label="모바일 광고 이미지">
-            모바일 광고 이미지
-            <Upload value={current.mobileImage} onChange={(mobileImage) => update({ mobileImage })} onBusy={onBusy} />
+            <span style={{ fontWeight: 700 }}>모바일 광고 이미지</span>
+            <Upload
+              outlinedRemove
+              value={current.mobileImage}
+              onChange={(mobileImage) => update({ mobileImage })}
+              onBusy={onBusy}
+            />
           </div>
           <p className="meta">
             PC는 가로형, 모바일은 세로형을 권장합니다. 모바일 이미지가 없으면 PC 이미지를 사용합니다. PC 이미지가 없는

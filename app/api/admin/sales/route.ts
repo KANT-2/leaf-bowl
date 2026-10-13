@@ -4,6 +4,7 @@ import { readSalesData } from "@/application/sales";
 import {
   buildSalesReport,
   salesPeriods,
+  salesDateRangeSchema,
   salesProductTypes,
   type SalesProductType,
   type SalesPeriod,
@@ -26,10 +27,21 @@ export async function GET(request: Request) {
   if (!salesPeriods.includes(period as SalesPeriod)) {
     return jsonError("올바른 조회 기간을 선택해주세요.");
   }
+  const range = salesDateRangeSchema.safeParse({ startDate: params.get("startDate"), endDate: params.get("endDate") });
+  if (period === "custom" && !range.success) {
+    return jsonError("시작일과 종료일을 올바르게 선택해주세요. 종료일은 시작일 이후여야 합니다.");
+  }
   try {
     const [snapshot, data] = await Promise.all([readCatalog(), readSalesData()]);
     return Response.json(
-      buildSalesReport(snapshot.catalog, data, period as SalesPeriod, new Date(), productType as SalesProductType),
+      buildSalesReport(
+        snapshot.catalog,
+        data,
+        period as SalesPeriod,
+        new Date(),
+        productType as SalesProductType,
+        period === "custom" && range.success ? range.data : undefined,
+      ),
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {

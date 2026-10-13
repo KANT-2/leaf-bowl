@@ -103,7 +103,16 @@ export default function ContentEditor({
             visible={c.bannerVisible}
             index={bannerIndex}
             onIndex={setBannerIndex}
-            onChange={(bannerPages) => setC((value) => ({ ...value, bannerPages }))}
+            onChange={(bannerPages) =>
+              setC((value) => ({
+                ...value,
+                bannerPages,
+                deletedBannerPages: [
+                  ...(value.deletedBannerPages ?? []),
+                  ...(value.bannerPages ?? []).filter((page) => !bannerPages.some((next) => next.id === page.id)),
+                ],
+              }))
+            }
             onVisible={(bannerVisible) => setC((value) => ({ ...value, bannerVisible }))}
             onBusy={setUploading}
           />
@@ -177,6 +186,7 @@ export default function ContentEditor({
                         setC({
                           ...c,
                           seasonPages: pages.filter((_, i) => i !== index),
+                          deletedSeasonPages: [...(c.deletedSeasonPages ?? []), current],
                         });
                         setIndex(Math.max(0, index - 1));
                       }}
@@ -227,7 +237,12 @@ export default function ContentEditor({
                 </label>
                 <div className="field">
                   시즌 이미지
-                  <Upload value={current.image} onChange={(v) => update({ image: v })} onBusy={setUploading} />
+                  <Upload
+                    outlinedRemove
+                    value={current.image}
+                    onChange={(v) => update({ image: v })}
+                    onBusy={setUploading}
+                  />
                 </div>
               </div>
             ) : (
@@ -235,10 +250,10 @@ export default function ContentEditor({
             )}
           </section>
         </fieldset>
-        <div className="live-preview">
+        <div className="live-preview" style={{ height: "auto", maxHeight: "none", overflow: "visible" }}>
           <div className="eyebrow">LIVE PREVIEW · 저장 전 미리보기</div>
           <section className="surface" aria-label="메인 광고 미리보기">
-            <div className="section-heading">
+            <div className="section-heading" style={{ marginBottom: 12 }}>
               <h2>메인 광고 · {bannerIndex + 1}페이지</h2>
               <div className="row-actions">
                 <Button
@@ -293,29 +308,6 @@ export default function ContentEditor({
             ) : (
               <p className="muted">PC 광고 이미지를 등록하면 여기에 표시됩니다.</p>
             )}
-            {bannerPages.length > 0 && (
-              <nav className="season-preview-arrows" aria-label="메인 광고 미리보기 페이지">
-                <button
-                  type="button"
-                  aria-label="이전 광고 페이지"
-                  disabled={bannerIndex === 0}
-                  onClick={() => setBannerIndex(bannerIndex - 1)}
-                >
-                  ←
-                </button>
-                <span>
-                  {bannerIndex + 1} / {bannerPages.length}
-                </span>
-                <button
-                  type="button"
-                  aria-label="다음 광고 페이지"
-                  disabled={bannerIndex === bannerPages.length - 1}
-                  onClick={() => setBannerIndex(bannerIndex + 1)}
-                >
-                  →
-                </button>
-              </nav>
-            )}
           </section>
           {c.seasonVisible && current?.visible ? (
             <section className="season-preview season-layout-preview" aria-label="시즌 스페셜 고객 화면 미리보기">
@@ -337,27 +329,6 @@ export default function ContentEditor({
                 <strong>{featured?.name || current.title}</strong>
                 <p>{current.description}</p>
               </div>
-              <nav className="season-preview-arrows" aria-label="시즌 미리보기 페이지">
-                <button
-                  type="button"
-                  aria-label="이전 시즌 페이지"
-                  disabled={index === 0}
-                  onClick={() => setIndex(index - 1)}
-                >
-                  ←
-                </button>
-                <span>
-                  {index + 1} / {pages.length}
-                </span>
-                <button
-                  type="button"
-                  aria-label="다음 시즌 페이지"
-                  disabled={index === pages.length - 1}
-                  onClick={() => setIndex(index + 1)}
-                >
-                  →
-                </button>
-              </nav>
             </section>
           ) : (
             <section className="surface muted">시즌 스페셜 또는 선택한 페이지가 숨겨져 있습니다.</section>

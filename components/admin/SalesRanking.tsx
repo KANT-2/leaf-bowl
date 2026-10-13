@@ -49,6 +49,16 @@ export default function SalesRanking() {
   const productLabel = { salad: "샐러드", drink: "음료", dressing: "드레싱" }[productType];
   const metric = productType === "dressing" ? "선택" : "판매";
   const [period, setPeriod] = useState<SalesPeriod>("all");
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState(today);
+  const [appliedRange, setAppliedRange] = useState({ startDate: today, endDate: today });
+  const [rangeError, setRangeError] = useState("");
   const [report, setReport] = useState<SalesReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -60,7 +70,12 @@ export default function SalesRanking() {
       setError("");
       setReport(null);
       try {
-        const response = await fetch(`/api/admin/sales?period=${period}&type=${productType}`, {
+        const params = new URLSearchParams({ period, type: productType });
+        if (period === "custom") {
+          params.set("startDate", appliedRange.startDate);
+          params.set("endDate", appliedRange.endDate);
+        }
+        const response = await fetch(`/api/admin/sales?${params}`, {
           cache: "no-store",
           signal: controller.signal,
         });
@@ -95,7 +110,7 @@ export default function SalesRanking() {
       controller.abort();
       window.clearInterval(timer);
     };
-  }, [period, productType, refresh]);
+  }, [period, productType, refresh, appliedRange]);
   const selectedSalad = report?.combinations.some((row) => row.saladId === combinationSalad) ? combinationSalad : "";
   const combinations = report?.combinations.filter((row) => !selectedSalad || row.saladId === selectedSalad) ?? [];
   const leaders = report?.rows.filter((row) => row.rank !== null && row.rank <= 3) ?? [];
@@ -119,25 +134,22 @@ export default function SalesRanking() {
           새로고침
         </Button>
       </div>
-      <div
-        className={styles.periods}
-        role="group"
-        aria-label="제품 분류"
-        style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}
-      >
-        {(["salad", "drink", "dressing"] as const).map((type) => (
-          <Button
-            key={type}
-            variant={productType === type ? "default" : "outline"}
-            aria-pressed={productType === type}
-            onClick={() => setProductType(type)}
-          >
-            {{ salad: "샐러드", drink: "음료", dressing: "드레싱" }[type]}
-          </Button>
-        ))}
+      <div className={styles.filterRow}>
+        <div className={styles.segmented} role="group" aria-label="제품 분류">
+          {(["salad", "drink", "dressing"] as const).map((type) => (
+            <Button
+              key={type}
+              variant={productType === type ? "default" : "outline"}
+              aria-pressed={productType === type}
+              onClick={() => setProductType(type)}
+            >
+              {{ salad: "샐러드", drink: "음료", dressing: "드레싱" }[type]}
+            </Button>
+          ))}
+        </div>
       </div>
-      <div className={styles.toolbar}>
-        <div className={styles.periods} role="group" aria-label="제품 판매 현황 조회 기간">
+      <div className={styles.periodRow}>
+        <div className={styles.segmented} role="group" aria-label="제품 판매 현황 조회 기간">
           {periods.map((item) => (
             <Button
               key={item.value}
@@ -149,14 +161,55 @@ export default function SalesRanking() {
             </Button>
           ))}
         </div>
-        <span className="meta">한국 시간 기준 · 1분마다 자동 갱신</span>
+        <form
+          className={styles.dateRange}
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!startDate || !endDate || startDate > endDate) {
+              setRangeError("종료일은 시작일 이후로 선택해주세요.");
+              return;
+            }
+            setRangeError("");
+            setAppliedRange({ startDate, endDate });
+            setPeriod("custom");
+          }}
+        >
+          <label>
+            시작일
+            <input
+              type="date"
+              required
+              max={endDate || today}
+              value={startDate}
+              onChange={(event) => setStartDate(event.target.value)}
+            />
+          </label>
+          <span aria-hidden="true">~</span>
+          <label>
+            종료일
+            <input
+              type="date"
+              required
+              min={startDate}
+              max={today}
+              value={endDate}
+              onChange={(event) => setEndDate(event.target.value)}
+            />
+          </label>
+          <Button type="submit">기간 조회</Button>
+          {period === "custom" && (
+            <span className="meta">
+              조회 기간: {appliedRange.startDate} ~ {appliedRange.endDate}
+            </span>
+          )}
+          {rangeError && (
+            <p role="alert" className="error">
+              {rangeError}
+            </p>
+          )}
+        </form>
       </div>
-      <p className={styles.note}>
-        {productType === "dressing"
-          ? "결제 확정 주문에서 무료·유료 드레싱의 선택 수량을 집계합니다."
-          : "결제 확정 주문의 제품 판매 수량을 집계합니다. 음료는 단품과 옵션 선택을 포함합니다."}{" "}
-        취소·환불 수량은 제외하며, 같은 수량은 공동 순위로 표시합니다.
-      </p>
+      <p className="meta">한국 시간 기준 · 1분마다 자동 갱신</p>
       <div aria-live="polite" aria-busy={loading}>
         {loading || (report !== null && report.productType !== productType) ? (
           <section className="surface empty">제품 판매 현황을 불러오는 중입니다…</section>
@@ -181,8 +234,8 @@ export default function SalesRanking() {
                   </div>
                 </section>
               )}
-              <div className={styles.summary}>
-                <section className="surface">
+              <div className={`surface ${styles.summaryPanel}`}>
+                <section>
                   <span className="meta">
                     {productLabel} {metric} 수량
                   </span>
@@ -191,14 +244,14 @@ export default function SalesRanking() {
                     <small>개</small>
                   </strong>
                 </section>
-                <section className="surface">
+                <section>
                   <span className="meta">{productLabel} 포함 주문</span>
                   <strong>
                     {report.connected ? number(report.orderCount) : "—"}
                     <small>건</small>
                   </strong>
                 </section>
-                <section className="surface">
+                <section>
                   <span className="meta">
                     {metric}된 {productLabel} 종류
                   </span>
@@ -207,6 +260,7 @@ export default function SalesRanking() {
                     <small>종</small>
                   </strong>
                 </section>
+                <p className={styles.summaryNote}>결제 확정 주문 기준 · 취소·환불 수량 제외</p>
               </div>
               <section aria-labelledby="sales-top-title">
                 <div className={styles.sectionTitle}>

@@ -266,14 +266,19 @@ export default function BowlMatchManager({
             .map((i) => (
               <div className="trash-row" key={i.id}>
                 <span>{i.name}</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={busy}
-                  onClick={() => persist(items.map((x) => (x.id === i.id ? { ...x, deleted: false } : x)))}
-                >
-                  복원
-                </Button>
+                <div className="row-actions">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => persist(items.map((x) => (x.id === i.id ? { ...x, deleted: false } : x)))}
+                  >
+                    복원
+                  </Button>
+                  <Button variant="destructive" size="sm" disabled={busy} onClick={() => setRemoving(i)}>
+                    영구 삭제
+                  </Button>
+                </div>
               </div>
             ))}
         </details>
@@ -574,10 +579,11 @@ export default function BowlMatchManager({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>재료를 삭제할까요?</AlertDialogTitle>
+            <AlertDialogTitle>{removing?.deleted ? "재료를 영구 삭제할까요?" : "재료를 삭제할까요?"}</AlertDialogTitle>
             <AlertDialogDescription>
-              {removing?.name}을 삭제합니다. bowl match와 원산지 및 알레르기 관리 목록에서 제외되며, 휴지통에서 복원할
-              수 있습니다.
+              {removing?.deleted
+                ? `${removing.name}을 저장된 재료 목록에서 완전히 삭제합니다. 영구 삭제하면 복원할 수 없습니다.`
+                : `${removing?.name}을 삭제합니다. bowl match와 원산지 및 알레르기 관리 목록에서 제외되며, 휴지통에서 복원할 수 있습니다.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -588,13 +594,17 @@ export default function BowlMatchManager({
                 e.preventDefault();
                 if (
                   removing &&
-                  (await persist(items.map((i) => (i.id === removing.id ? { ...i, deleted: true } : i))))
+                  (await persist(
+                    removing.deleted
+                      ? items.filter((i) => i.id !== removing.id)
+                      : items.map((i) => (i.id === removing.id ? { ...i, deleted: true } : i)),
+                  ))
                 ) {
                   setRemoving(null);
                 }
               }}
             >
-              삭제
+              {removing?.deleted ? "영구 삭제" : "삭제"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

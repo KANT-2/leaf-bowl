@@ -20,21 +20,37 @@ export default function TrashPanel({
     <>
       <div className="eyebrow">RESTORE COLLECTION</div>
       <h1>휴지통</h1>
-      <p className="muted">삭제한 메뉴와 옵션 그룹을 복원할 수 있습니다.</p>
+      <p className="muted">삭제한 메뉴, 옵션 그룹, 메인 광고와 시즌 페이지를 복원할 수 있습니다.</p>
       <section className="surface">
         {[
           ...catalog.products.filter((p) => p.deleted).map((p) => ({ ...p, kind: "product" })),
           ...catalog.groups.filter((g) => g.deleted).map((g) => ({ ...g, kind: "group" })),
+          ...(catalog.content.deletedBannerPages ?? []).map((p) => ({
+            ...p,
+            name: p.alt || "메인 광고 페이지",
+            kind: "banner",
+          })),
+          ...(catalog.content.deletedSeasonPages ?? []).map((p) => ({ ...p, name: p.title, kind: "season" })),
         ].map((i) => (
           <div className="trash-row" key={i.kind + i.id}>
             <div>
               <strong>{i.name}</strong>
-              <div className="meta">{i.kind === "product" ? "메뉴" : "옵션 그룹"}</div>
+              <div className="meta">
+                {
+                  { product: "메뉴", group: "옵션 그룹", banner: "메인 광고 페이지", season: "시즌 스페셜 페이지" }[
+                    i.kind
+                  ]
+                }
+              </div>
             </div>
             <div className="row-actions">
               <Button
                 variant="outline"
-                disabled={busy}
+                disabled={
+                  busy ||
+                  (i.kind === "banner" && (catalog.content.bannerPages?.length ?? 0) >= 40) ||
+                  (i.kind === "season" && (catalog.content.seasonPages?.length ?? 0) >= 20)
+                }
                 onClick={() =>
                   action(async () => {
                     const next = structuredClone(catalog);
@@ -42,6 +58,28 @@ export default function TrashPanel({
                       const p = next.products.find((p) => p.id === i.id)!;
                       p.deleted = false;
                       p.optionIds = p.optionIds.filter((id) => next.groups.some((g) => g.id === id && !g.deleted));
+                    } else if (i.kind === "banner") {
+                      const page = next.content.deletedBannerPages?.find((p) => p.id === i.id);
+                      if (!page || (next.content.bannerPages?.length ?? 0) >= 40) {
+                        return;
+                      }
+                      next.content.bannerPages = [...(next.content.bannerPages ?? []), page];
+                      next.content.deletedBannerPages = next.content.deletedBannerPages?.filter((p) => p.id !== i.id);
+                    } else if (i.kind === "season") {
+                      const page = next.content.deletedSeasonPages?.find((p) => p.id === i.id);
+                      if (!page || (next.content.seasonPages?.length ?? 0) >= 20) {
+                        return;
+                      }
+                      next.content.seasonPages = [
+                        ...(next.content.seasonPages ?? []),
+                        {
+                          ...page,
+                          productId: next.products.some((p) => p.id === page.productId && p.type === "salad")
+                            ? page.productId
+                            : "",
+                        },
+                      ];
+                      next.content.deletedSeasonPages = next.content.deletedSeasonPages?.filter((p) => p.id !== i.id);
                     } else {
                       next.groups.find((g) => g.id === i.id)!.deleted = false;
                     }
@@ -49,7 +87,7 @@ export default function TrashPanel({
                       next,
                       i.kind === "product"
                         ? `“${i.name}”을 ${statusNames[next.products.find((p) => p.id === i.id)!.status]} 상태로 복원했습니다.`
-                        : "옵션 그룹을 복원했습니다.",
+                        : "복원했습니다.",
                     );
                   })
                 }
@@ -74,9 +112,10 @@ export default function TrashPanel({
             </div>
           </div>
         ))}
-        {!catalog.products.some((p) => p.deleted) && !catalog.groups.some((g) => g.deleted) && (
-          <div className="empty">휴지통이 비어 있습니다.</div>
-        )}
+        {!catalog.products.some((p) => p.deleted) &&
+          !catalog.groups.some((g) => g.deleted) &&
+          !catalog.content.deletedBannerPages?.length &&
+          !catalog.content.deletedSeasonPages?.length && <div className="empty">휴지통이 비어 있습니다.</div>}
       </section>
     </>
   );

@@ -49,10 +49,12 @@ export function Upload({
   value,
   onChange,
   onBusy,
+  outlinedRemove = false,
 }: {
   value: string;
   onChange: (v: string) => void;
   onBusy?: (v: boolean) => void;
+  outlinedRemove?: boolean;
 }) {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -151,7 +153,14 @@ export function Upload({
         </Button>
       )}
       {value && (
-        <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => onChange("")}>
+        <Button
+          type="button"
+          variant={outlinedRemove ? "outline" : "ghost"}
+          style={outlinedRemove ? { display: "flex", marginLeft: "auto", marginTop: 8 } : undefined}
+          size="sm"
+          disabled={busy}
+          onClick={() => onChange("")}
+        >
           이미지 제거
         </Button>
       )}

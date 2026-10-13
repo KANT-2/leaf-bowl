@@ -110,6 +110,8 @@ export const contentSchema = z.object({
     .max(40)
     .refine((pages) => new Set(pages.map((p) => p.id)).size === pages.length, "배너 페이지 ID가 중복되었습니다.")
     .optional(),
+  deletedBannerPages: z.array(bannerPageSchema).optional(),
+  deletedSeasonPages: z.array(seasonPageSchema).optional(),
   bannerVisible: z.boolean().default(true),
   mainImage: image.default(""),
   mainMobileImage: image.default(""),

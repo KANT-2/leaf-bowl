@@ -6,7 +6,7 @@ import { type Catalog } from "@/modules/catalog/schema";
 export const salesProductTypes = ["salad", "drink", "dressing"] as const;
 export type SalesProductType = (typeof salesProductTypes)[number];
 
-export const salesPeriods = ["all", "today", "7d", "30d"] as const;
+export const salesPeriods = ["all", "today", "7d", "30d", "custom"] as const;
 export type SalesPeriod = (typeof salesPeriods)[number];
 export const salesDataSchema = z
   .object({
@@ -82,6 +82,16 @@ export type SalesReport = {
   combinations: DressingCombination[];
 };
 
+export const salesDateRangeSchema = z
+  .object({
+    startDate: z.string().date(),
+    endDate: z.string().date(),
+  })
+  .refine((range) => range.startDate <= range.endDate, {
+    message: "종료일은 시작일 이후로 선택해주세요.",
+  });
+export type SalesDateRange = z.infer<typeof salesDateRangeSchema>;
+
 // Periods use Korean calendar days, including today, and never include future sales.
 export function salesPeriodStart(period: SalesPeriod, now: Date): number {
   if (period === "all") {
@@ -98,6 +108,7 @@ export function buildSalesReport(
   period: SalesPeriod,
   now = new Date(),
   productType: SalesProductType = "salad",
+  dateRange?: SalesDateRange,
 ): SalesReport {
   const products = new Map(catalog.products.filter((p) => p.type === productType).map((p) => [p.id, p]));
   const quantities = new Map<string, { name: string; quantity: number }>();
@@ -109,14 +120,18 @@ export function buildSalesReport(
   const combinationCounts = new Map<string, Omit<DressingCombination, "saladQuantity" | "share">>();
   const dressings = new Map(catalog.products.filter((p) => p.type === "dressing").map((p) => [p.id, p]));
   let orderCount = 0;
-  const start = salesPeriodStart(period, now);
+  const range = period === "custom" ? salesDateRangeSchema.parse(dateRange) : null;
+  const start = range ? Date.parse(`${range.startDate}T00:00:00+09:00`) : salesPeriodStart(period, now);
+  const end = range
+    ? Math.min(Date.parse(`${range.endDate}T00:00:00+09:00`) + 86400000, now.getTime() + 1)
+    : now.getTime() + 1;
   for (const order of data?.orders ?? []) {
     const soldAt = order.completedAt ?? order.paidAt;
     if (!["paid", "completed"].includes(order.status) || !soldAt) {
       continue;
     }
     const paidAt = Date.parse(soldAt);
-    if (paidAt < start || paidAt > now.getTime()) {
+    if (paidAt < start || paidAt >= end) {
       continue;
     }
     let counted = false;

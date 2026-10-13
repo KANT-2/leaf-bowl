@@ -31,6 +31,8 @@ export function catalogImageKeys(catalog: Catalog): Set<string> {
     catalog.content.heroMobileImage,
     ...(catalog.content.bannerPages ?? []).flatMap((p) => [p.image, p.mobileImage]),
     ...(catalog.content.seasonPages ?? []).map((p) => p.image),
+    ...(catalog.content.deletedBannerPages ?? []).flatMap((p) => [p.image, p.mobileImage]),
+    ...(catalog.content.deletedSeasonPages ?? []).map((p) => p.image),
   ];
   return new Set(urls.map(uploadedImageKey).filter((key): key is string => key !== null));
 }
