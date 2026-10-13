@@ -384,6 +384,12 @@
   min-width: 0;
   flex: 1;
 }
+.checkout-summary .order-line-info {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
 .order-line .ghost-btn {
   margin-top: 6px;
   padding: 4px 10px;
@@ -503,10 +509,24 @@
   font-size: 24px;
   margin: 4px 0 10px;
 }
+.checkout-alert {
+  margin: 16px 0 20px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: #fbeceb;
+  color: var(--color-danger);
+}
+.checkout-alert .ghost-btn {
+  margin-top: 10px;
+}
 .checkout-pay-btn {
   height: 56px;
   font-size: 16px;
   margin-top: 4px;
+}
+.checkout-pay-btn[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 @media (max-width: 600px) {
