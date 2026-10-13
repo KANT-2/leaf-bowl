@@ -25,7 +25,7 @@ export default function CustomerProductPage({ id, hours }: { id: number; hours: 
   }
   const others = PRODUCTS.filter((o) => o.id !== p.id).slice(0, 4);
   const originCard = !!p.ingredientOrigins?.length && (
-    <details className="origin-box" open>
+    <details className="origin-box">
       <summary>원산지·알레르기 정보</summary>
       <table>
         <thead>
@@ -58,6 +58,7 @@ export default function CustomerProductPage({ id, hours }: { id: number; hours: 
             {p.tag && <span className="product-tag">{p.tag}</span>}
             {p.status === "soldout" && <SoldOutCover />}
           </div>
+          {originCard}
         </div>
         <div className="pv-info">
           <span className="eyebrow">YOUR DAILY BOWL · {p.en}</span>

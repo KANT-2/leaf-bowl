@@ -22,10 +22,14 @@
   border-radius: 12px;
   overflow: hidden;
 }
-/* 원산지 카드를 사진과 같은 왼쪽 컬럼에 두면 그 컬럼이 오른쪽(가격·옵션)보다
-   길어지거나 비슷해져서 사진이 스크롤 중 고정될 여유 공간이 사라진다. 사진은
-   계속 고정되도록 두고, 원산지 카드는 .pv 그리드 바깥(두 컬럼 모두 끝난 뒤)에
-   전체 폭으로 보여준다 — 그리드 안에 두면 고정된 사진이 스크롤 중 겹칠 수 있다. */
+/* 원산지 카드는 기본적으로 접혀 있어(요약 한 줄) 사진이 있는 왼쪽 컬럼이
+   오른쪽(가격·옵션)보다 충분히 짧게 유지되고, 사진이 스크롤 중 정상적으로
+   고정(sticky)된다. 데스크톱·모바일 위치가 달라 두 벌을 렌더링하고 CSS로
+   하나만 보여준다 (데스크톱: 사진 아래 — 고정되는 왼쪽 컬럼 안.
+   모바일: 담기 버튼 다음). */
+.pv-wrap > .origin-box {
+  display: none;
+}
 .origin-box {
   margin-top: 20px;
   border: 1px solid var(--color-line);
@@ -278,6 +282,12 @@
   }
   .pv-left {
     position: static;
+  }
+  .pv-left .origin-box {
+    display: none;
+  }
+  .pv-wrap > .origin-box {
+    display: block;
   }
   .pv-photo {
     position: relative;
