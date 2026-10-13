@@ -105,3 +105,26 @@ test("existing built-in banners are first-class admin pages and remain stable af
     [2, 0, "advertisement"],
   );
 });
+
+test("deleted page settings survive storage without rejoining active pages", () => {
+  const banner = {
+    id: "trash-banner",
+    image: "/api/admin/images/banner.png",
+    mobileImage: "/api/admin/images/mobile.webp",
+    alt: "광고",
+    href: "/menu",
+    visible: true,
+  };
+  const season = { id: "trash-season", title: "시즌", description: "설명", image: "", productId: "", visible: false };
+  const parsed = contentSchema.parse({
+    ...existing,
+    bannerPages: [],
+    seasonPages: [],
+    deletedBannerPages: [banner],
+    deletedSeasonPages: [season],
+  });
+  assert.deepEqual(parsed.deletedBannerPages, [banner]);
+  assert.deepEqual(parsed.deletedSeasonPages, [season]);
+  assert.deepEqual(parsed.bannerPages, []);
+  assert.deepEqual(parsed.seasonPages, []);
+});
