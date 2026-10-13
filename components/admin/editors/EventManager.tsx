@@ -111,6 +111,7 @@ export default function EventManager() {
               alt: "",
               href: "",
               visible: true,
+              heroVisible: true,
             });
           }}
         >
@@ -177,6 +178,16 @@ export default function EventManager() {
                 <select value={String(draft.visible)} onChange={(e) => update({ visible: e.target.value === "true" })}>
                   <option value="true">노출</option>
                   <option value="false">숨김</option>
+                </select>
+              </label>
+              <label>
+                메인 배너
+                <select
+                  value={String(draft.heroVisible)}
+                  onChange={(e) => update({ heroVisible: e.target.value === "true" })}
+                >
+                  <option value="true">진행 중일 때 표시</option>
+                  <option value="false">표시 안 함</option>
                 </select>
               </label>
               <label>
@@ -263,6 +274,7 @@ export default function EventManager() {
                 <div>
                   <span className="badge">
                     {eventStatusLabel[eventStatus(event)]} · {event.visible ? "노출" : "숨김"}
+                    {!event.heroVisible && " · 메인 배너 제외"}
                   </span>
                   <h3>{event.title}</h3>
                   <p>
