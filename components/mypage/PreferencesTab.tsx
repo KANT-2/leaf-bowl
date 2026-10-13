@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { useAuth } from "../AuthProvider";
+import { useToast } from "../ToastProvider";
 import { useCustomerCatalog } from "../CustomerCatalogProvider";
 
 const CATEGORY_ICONS: Record<string, string> = {
@@ -32,26 +34,30 @@ const DEFAULT_ALLERGEN_ICON = "🌿";
 
 export default function PreferencesTab() {
   const { user, setPreferences } = useAuth();
+  const toast = useToast();
   const { catalog, catalogConfig } = useCustomerCatalog();
   const categories = catalog.categories ?? [];
+  const [preferredCategories, setPreferredCategories] = useState(user?.preferredCategories ?? []);
+  const [excludedAllergens, setExcludedAllergens] = useState(user?.excludedAllergens ?? []);
 
   if (!user) {
     return null;
   }
 
+  const dirty =
+    preferredCategories.join() !== user.preferredCategories.join() ||
+    excludedAllergens.join() !== user.excludedAllergens.join();
+
   const toggleCategory = (c: string) =>
-    setPreferences({
-      preferredCategories: user.preferredCategories.includes(c)
-        ? user.preferredCategories.filter((x) => x !== c)
-        : [...user.preferredCategories, c],
-    });
+    setPreferredCategories((cur) => (cur.includes(c) ? cur.filter((x) => x !== c) : [...cur, c]));
 
   const toggleAllergen = (a: string) =>
-    setPreferences({
-      excludedAllergens: user.excludedAllergens.includes(a)
-        ? user.excludedAllergens.filter((x) => x !== a)
-        : [...user.excludedAllergens, a],
-    });
+    setExcludedAllergens((cur) => (cur.includes(a) ? cur.filter((x) => x !== a) : [...cur, a]));
+
+  const save = () => {
+    setPreferences({ preferredCategories, excludedAllergens });
+    toast("취향·알레르기 설정을 저장했어요");
+  };
 
   return (
     <section className="surface mypage-section">
@@ -63,7 +69,7 @@ export default function PreferencesTab() {
             <button
               key={c}
               type="button"
-              aria-pressed={user.preferredCategories.includes(c)}
+              aria-pressed={preferredCategories.includes(c)}
               onClick={() => toggleCategory(c)}
             >
               <span className="chip-icon" aria-hidden="true">
@@ -82,17 +88,22 @@ export default function PreferencesTab() {
             <button
               key={a}
               type="button"
-              aria-pressed={user.excludedAllergens.includes(a)}
+              aria-pressed={excludedAllergens.includes(a)}
               onClick={() => toggleAllergen(a)}
             >
               <span className="chip-icon" aria-hidden="true">
                 {ALLERGEN_ICONS[a] ?? DEFAULT_ALLERGEN_ICON}
               </span>
-              {user.excludedAllergens.includes(a) ? "✕ " : ""}
+              {excludedAllergens.includes(a) ? "✕ " : ""}
               {a}
             </button>
           ))}
         </div>
+      </div>
+      <div className="form-actions-stack">
+        <button type="button" className="primary full form-btn" disabled={!dirty} onClick={save}>
+          취향·알레르기 저장
+        </button>
       </div>
     </section>
   );

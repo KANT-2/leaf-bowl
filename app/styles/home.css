@@ -798,6 +798,10 @@
     padding-bottom: 18px;
     font-size: 10px;
     letter-spacing: 0.7px;
+    justify-content: center;
+  }
+  .hero-bottom > span:first-child {
+    display: none;
   }
   .hero-dots button {
     width: 24px;

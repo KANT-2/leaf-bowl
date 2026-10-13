@@ -814,7 +814,7 @@
       width: 100%;
       gap: 20px;
       font-size: 14px;
-      justify-content: flex-start;
+      justify-content: space-evenly;
       padding-top: 6px;
       padding-bottom: 15px;
     }
