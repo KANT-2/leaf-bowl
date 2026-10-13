@@ -29,6 +29,8 @@ export const eventSchema = z
       .max(300)
       .refine((value) => value === "" || /^\/(?!\/)[^\s\\]*$/.test(value), "사이트 내부 경로를 입력해주세요."),
     visible: z.boolean(),
+    /** 진행 중일 때 홈 메인 배너에도 슬라이드로 보여줄지. 예전 데이터에는 없으므로 기본값은 보여준다. */
+    heroVisible: z.boolean().default(true),
   })
   .strict()
   .refine((event) => event.startDate <= event.endDate, "종료일은 시작일 이후로 설정해주세요.");

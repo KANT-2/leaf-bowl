@@ -1256,21 +1256,22 @@
   object-fit: contain;
   object-position: center;
 }
-/* PC·태블릿에서는 광고 이미지도 기존 배너 높이에 맞춰 칸을 꽉 채운다 (넘치는 위아래는 잘린다).
-   min/max-height 로 높이를 고정해 배너 컴포넌트의 height: auto 보다 우선한다. 휴대폰은 모바일 이미지를 그대로 보여준다. */
+/* PC·태블릿에서는 광고 이미지를 PC 390px·태블릿 300px 높이로 꽉 채워 위 로고·아래 버튼 부분은 잘라낸다.
+   (광고 장만 기존 배너보다 낮아 위아래에 배경색 여백이 생긴다.) min/max-height 로 높이를 고정해 배너 컴포넌트의
+   height: auto 보다 우선한다. 휴대폰은 모바일 이미지를 그대로 보여준다. */
 @media (min-width: 601px) {
   .hero-ad-slide img {
     width: 100%;
-    min-height: 510px;
-    max-height: 510px;
+    min-height: 390px;
+    max-height: 390px;
     object-fit: cover;
     object-position: center;
   }
 }
 @media (min-width: 601px) and (max-width: 900px) {
   .hero-ad-slide img {
-    min-height: 450px;
-    max-height: 450px;
+    min-height: 300px;
+    max-height: 300px;
   }
 }
 

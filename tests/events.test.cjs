@@ -31,3 +31,9 @@ test("invalid dates, reversed periods, external links and duplicate identifiers 
   assert.equal(eventsSchema.safeParse([event, event]).success, false);
   assert.equal(eventSchema.safeParse(event).success, true);
 });
+test("events saved before the main banner option still show in the banner by default", () => {
+  const { heroVisible, ...legacy } = event;
+  assert.equal(heroVisible, undefined);
+  assert.equal(eventSchema.parse(legacy).heroVisible, true);
+  assert.equal(eventSchema.parse({ ...legacy, heroVisible: false }).heroVisible, false);
+});
