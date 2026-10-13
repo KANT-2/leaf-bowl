@@ -4,13 +4,14 @@ import Image from "next/image";
 import Link from "next/link";
 import Breadcrumb from "./Breadcrumb";
 import PageHeading from "./PageHeading";
+import ProductCard from "./ProductCard";
 import SoldOutCover from "./SoldOutCover";
 import { useCart } from "./CartProvider";
 import { useCustomerCatalog } from "./CustomerCatalogProvider";
 import { money } from "@/modules/shared/format";
 
 export default function CustomerDrinkPage({ id }: { id: string }) {
-  const { DRINKS, DRINK_KCAL } = useCustomerCatalog();
+  const { DRINKS, DRINK_KCAL, visibleProducts: PRODUCTS } = useCustomerCatalog();
   const { addDrink, open } = useCart();
   const index = DRINKS.findIndex((d) => d.id === id && d.name);
   const d = index >= 0 ? DRINKS[index] : undefined;
@@ -23,6 +24,7 @@ export default function CustomerDrinkPage({ id }: { id: string }) {
     );
   }
   const kcal = DRINK_KCAL[index];
+  const recommended = PRODUCTS.slice(0, 4);
   return (
     <main className="wrap pv-wrap">
       <Breadcrumb items={[["홈", "/"], ["음료", "/drinks"], [d.name]]} />
@@ -79,6 +81,22 @@ export default function CustomerDrinkPage({ id }: { id: string }) {
           </div>
         </div>
       </div>
+      {!!recommended.length && (
+        <section className="pvsec" aria-labelledby="drinkMoreTitle">
+          <div className="section-title">
+            <div>
+              <div className="eyebrow">YOU MAY ALSO LIKE</div>
+              <h2 id="drinkMoreTitle">이 음료와 어울리는 샐러드</h2>
+            </div>
+            <Link href="/menu">전체 메뉴 보기 ↗</Link>
+          </div>
+          <div className="product-grid">
+            {recommended.map((o) => (
+              <ProductCard key={o.id} product={o} />
+            ))}
+          </div>
+        </section>
+      )}
     </main>
   );
 }
