@@ -5,11 +5,13 @@
 .pv {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas: "photo info" "origin info";
   gap: 56px;
   padding: 34px 0 20px;
   align-items: start;
 }
 .pv-left {
+  grid-area: photo;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -23,6 +25,7 @@
   overflow: hidden;
 }
 .origin-box {
+  grid-area: origin;
   margin-top: 20px;
   border: 1px solid var(--color-line);
   border-radius: 10px;
@@ -67,6 +70,7 @@
   top: 18px;
 }
 .pv-info {
+  grid-area: info;
   min-width: 0;
 }
 .pv-info h1 {
@@ -269,6 +273,7 @@
 @media (max-width: 700px) {
   .pv {
     grid-template-columns: 1fr;
+    grid-template-areas: "photo" "info" "origin";
     gap: 22px;
     padding-top: 22px;
   }
