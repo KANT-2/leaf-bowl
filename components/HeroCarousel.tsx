@@ -45,10 +45,9 @@ export default function HeroCarousel({
   /** 진행 중인 이달의 이벤트. 기존 배너 뒤에 이어서 보여준다. */
   events?: CustomerEvent[];
 }) {
-  const entries: (
-    | { kind: "standard"; slide: HeroSlide }
-    | { kind: "advertisement"; content: Content }
-  )[] = slides.map((slide) => ({ kind: "standard", slide }));
+  const entries: ({ kind: "standard"; slide: HeroSlide } | { kind: "advertisement"; content: Content })[] = slides.map(
+    (slide) => ({ kind: "standard", slide }),
+  );
   if (advertisement?.bannerPages === undefined && advertisement?.bannerVisible && advertisement.mainImage) {
     entries.splice(0, entries.length ? 1 : 0, {
       kind: "advertisement",
