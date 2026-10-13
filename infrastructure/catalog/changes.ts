@@ -58,6 +58,7 @@ const productRows = (catalog: Catalog) =>
     sortOrder,
     allergensText: p.allergens,
     isNew: p.isNew ?? null,
+    origin: p.origin ?? null,
   }));
 
 const ingredientRows = (catalog: Catalog) =>
