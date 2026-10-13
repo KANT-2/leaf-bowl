@@ -1,7 +1,6 @@
 "use client";
 
 import HeroBanner from "./HeroBanner";
-import EventPicture from "./EventPicture";
 import { visibleBannerPages } from "@/modules/catalog/banner-pages";
 import type { Content } from "@/modules/catalog/schema";
 import Image from "next/image";
@@ -49,7 +48,6 @@ export default function HeroCarousel({
   const entries: (
     | { kind: "standard"; slide: HeroSlide }
     | { kind: "advertisement"; content: Content }
-    | { kind: "event"; event: CustomerEvent }
   )[] = slides.map((slide) => ({ kind: "standard", slide }));
   if (advertisement?.bannerPages === undefined && advertisement?.bannerVisible && advertisement.mainImage) {
     entries.splice(0, entries.length ? 1 : 0, {
@@ -91,7 +89,21 @@ export default function HeroCarousel({
       entries.splice(Math.min(1, entries.length), 0, ...managed);
     }
   }
-  entries.push(...events.map((event) => ({ kind: "event" as const, event })));
+  // 진행 중 이벤트는 광고 배너와 같은 방식(배너 이미지를 칸에 꽉 차게)으로 맨 뒤에 붙인다.
+  if (advertisement) {
+    entries.push(
+      ...events.map((event) => ({
+        kind: "advertisement" as const,
+        content: {
+          ...advertisement,
+          heroImage: event.image,
+          heroMobileImage: event.mobileImage,
+          heroAlt: event.alt || event.title,
+          heroHref: event.href || "/event",
+        },
+      })),
+    );
+  }
   const total = entries.length;
   const reduced = useReducedMotion();
   // 첫 렌더는 서버와 같게 항상 첫 번째 배너
@@ -175,41 +187,6 @@ export default function HeroCarousel({
             );
           }
           const Title = active ? "h1" : "p";
-          if (entry.kind === "event") {
-            const e = entry.event;
-            return (
-              <div
-                key={`event-${e.id}`}
-                className={`hero-inner hero-event wrap${active ? " is-active" : ""}`}
-                role="group"
-                aria-roledescription="slide"
-                aria-label={`${total}개 중 ${i + 1}번째: 이벤트`}
-                aria-hidden={!active}
-                inert={!active}
-              >
-                <div className="hero-copy">
-                  <div className="eyebrow">THIS MONTH’S EVENT</div>
-                  <Title className="hero-title">{e.title}</Title>
-                  {e.description && <p>{e.description}</p>}
-                  <p className="hero-event-date">
-                    <time dateTime={e.startDate}>{e.startDate.replaceAll("-", ".")}</time> –{" "}
-                    <time dateTime={e.endDate}>{e.endDate.replaceAll("-", ".")}</time>
-                  </p>
-                  <Link className="primary" href={e.href || "/event"}>
-                    이벤트 보러가기 <span>↗</span>
-                  </Link>
-                </div>
-                <div className="hero-photo">
-                  <EventPicture
-                    event={e}
-                    className="hero-event-photo"
-                    sizes="(max-width: 600px) 90vw, 620px"
-                    mobileUpTo={600}
-                  />
-                </div>
-              </div>
-            );
-          }
           const s = entry.slide;
           return (
             <div
@@ -286,22 +263,10 @@ export default function HeroCarousel({
           <div className="hero-dots" role="group" aria-label="배너 선택">
             {entries.map((entry, i) => (
               <button
-                key={
-                  entry.kind === "advertisement"
-                    ? `image-${i}`
-                    : entry.kind === "event"
-                      ? `event-${entry.event.id}`
-                      : entry.slide.src
-                }
+                key={entry.kind === "advertisement" ? `image-${i}` : entry.slide.src}
                 type="button"
                 className={i === index ? "is-active" : ""}
-                aria-label={`${i + 1}번째 배너: ${
-                  entry.kind === "advertisement"
-                    ? "광고"
-                    : entry.kind === "event"
-                      ? entry.event.title
-                      : entry.slide.noteKo
-                }`}
+                aria-label={`${i + 1}번째 배너: ${entry.kind === "advertisement" ? entry.content.heroAlt || "광고" : entry.slide.noteKo}`}
                 aria-current={i === index}
                 onClick={() => go(i)}
               >
