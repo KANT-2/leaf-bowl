@@ -78,7 +78,7 @@ Next.js App Router 기반으로 고객 화면과 관리자 화면을 구성하�
 | 과제 요구 | 위치 |
 | --- | --- |
 | 상품 타입 `interface Product` | [types/product.ts](types/product.ts) (정의: [modules/catalog/customer-product.ts](modules/catalog/customer-product.ts)) |
-| Mock 데이터 6개 이상 | [data/products.ts](data/products.ts) — 샐러드 13종 정적 배열 (지금은 같은 데이터로 DB 초기 메뉴를 만든 뒤 DB 에서 읽음) |
+| Mock 데이터 6개 이상 | [data/products.ts](data/products.ts) — 샐러드 13종 정적 배열 (처음엔 화면이 직접 읽었고, 지금은 같은 메뉴가 DB 초기 데이터 [db/seed.sql](db/seed.sql)에 있어 화면은 DB 에서 읽음) |
 | 공통 컴포넌트 | [Header](components/Header.tsx) · [Footer](components/Footer.tsx) · [ProductCard](components/ProductCard.tsx) (Props 로 상품 전달) |
 | 메인 `app/page.tsx` | [`app/(customer)/page.tsx`](app/%28customer%29/page.tsx) — 배너와 추천 상품 |
 | 목록 `app/products/page.tsx` | [`app/(customer)/products/page.tsx`](app/%28customer%29/products/page.tsx) — `.map()` 으로 카드 출력 (`/menu` 와 같은 화면) |
@@ -221,7 +221,7 @@ leaf-bowl/
 ├── infrastructure/       # PostgreSQL·HTTP·브라우저 저장소 어댑터
 ├── features/             # 화면별 표시·입력·클라이언트 요청 로직
 ├── types/                # 과제 경로의 공통 타입 (Product)
-├── data/                 # 과제 경로의 상품 Mock 데이터 (DB 초기 메뉴 원본)
+├── data/                 # 과제 경로의 상품 Mock 데이터 (테스트·카탈로그 이관에 사용)
 ├── seed/                 # SQL 초기화·명시적 JSON 이관 전용
 ├── public/               # 상품·재료 이미지
 ├── prisma/               # DB 모델·마이그레이션·seed

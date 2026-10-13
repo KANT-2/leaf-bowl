@@ -1,6 +1,6 @@
 // 과제 규격: 가상 상품 데이터(Mock Data). 샐러드 13종을 Product 규격(types/product.ts)대로 작성한 정적 배열이다.
-// 처음에는 화면이 이 배열을 직접 읽었고, 지금은 같은 데이터로 PostgreSQL 초기 메뉴를 만든 뒤 화면은 DB 를 거쳐 읽는다
-// (seed/legacy/catalog.ts → db:seed).
+// 처음에는 화면이 이 배열을 직접 읽었다. 지금 화면은 PostgreSQL 에서 읽고(초기 메뉴는 db/seed.sql 에 같은 내용),
+// 이 배열은 테스트와 기존 카탈로그 이관(seed/legacy/catalog.ts)에서 쓴다.
 // 순서를 바꾸지 말 것: id 가 배열 위치와 같아야 한다 (NUTRITION 등이 같은 순서를 따름).
 import type { Dressing, Drink, Product } from "@/types/product";
 
