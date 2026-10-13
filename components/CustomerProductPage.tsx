@@ -34,30 +34,6 @@ export default function CustomerProductPage({ id, hours }: { id: number; hours: 
             {p.tag && <span className="product-tag">{p.tag}</span>}
             {p.status === "soldout" && <SoldOutCover />}
           </div>
-          {!!p.ingredientOrigins?.length && (
-            <details className="origin-box" open>
-              <summary>원산지·알레르기 정보</summary>
-              <table>
-                <thead>
-                  <tr>
-                    <th>재료</th>
-                    <th>원산지</th>
-                    <th>알레르기</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {p.ingredientOrigins.map((row, i) => (
-                    <tr key={i}>
-                      <td>{row.name}</td>
-                      <td>{row.origin || "–"}</td>
-                      <td>{row.allergens || "–"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className="origin-note">원재료 수급 상황에 따라 원산지가 바뀔 수 있으며, 바뀌면 바로 반영합니다.</p>
-            </details>
-          )}
         </div>
         <div className="pv-info">
           <span className="eyebrow">YOUR DAILY BOWL · {p.en}</span>
@@ -82,6 +58,30 @@ export default function CustomerProductPage({ id, hours }: { id: number; hours: 
             </dd>
           </dl>
           <ProductDetail product={p} />
+          {!!p.ingredientOrigins?.length && (
+            <details className="origin-box" open>
+              <summary>원산지·알레르기 정보</summary>
+              <table>
+                <thead>
+                  <tr>
+                    <th>재료</th>
+                    <th>원산지</th>
+                    <th>알레르기</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {p.ingredientOrigins.map((row, i) => (
+                    <tr key={i}>
+                      <td>{row.name}</td>
+                      <td>{row.origin || "–"}</td>
+                      <td>{row.allergens || "–"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="origin-note">원재료 수급 상황에 따라 원산지가 바뀔 수 있으며, 바뀌면 바로 반영합니다.</p>
+            </details>
+          )}
         </div>
       </div>
       <ProductReviewsPreview id={p.id} />
