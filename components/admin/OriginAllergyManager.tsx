@@ -2,13 +2,23 @@
 import type { CatalogConfig } from "@/modules/settings/schema";
 
 import { Fragment, useState } from "react";
-import { Plus, Pencil, Search } from "lucide-react";
+import { Plus, Pencil, Search, Trash2 } from "lucide-react";
 import { Button } from "./button";
 import { Input } from "./input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./dialog";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "./table";
 import { type Catalog, type Ingredient } from "@/modules/catalog/schema";
 import { ingredientAllergens, matchesIngredient } from "@/modules/catalog/allergens";
+
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+} from "./alert-dialog";
 
 const PAGE_SIZE = 15;
 const split = (value: string) =>
@@ -29,6 +39,9 @@ export default function OriginAllergyManager({
   onSave: (catalog: Catalog) => Promise<void>;
 }) {
   const [editing, setEditing] = useState<Ingredient | null>(null);
+  const [removing, setRemoving] = useState<Ingredient | null>(null);
+  const [restoreError, setRestoreError] = useState("");
+  const [deleteError, setDeleteError] = useState("");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
   const [allergen, setAllergen] = useState("");
@@ -243,6 +256,19 @@ export default function OriginAllergyManager({
                             <Pencil size={15} />
                             수정
                           </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={busy}
+                            aria-label={`${i.name} 삭제`}
+                            onClick={() => {
+                              setDeleteError("");
+                              setRemoving(i);
+                            }}
+                          >
+                            <Trash2 size={15} />
+                            삭제
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -292,6 +318,68 @@ export default function OriginAllergyManager({
             </Button>
           </nav>
         </div>
+      )}
+      {(catalog.ingredients ?? []).some((item) => item.deleted) && (
+        <details className="surface ingredient-trash">
+          <summary>삭제된 재료 · 복원 ({(catalog.ingredients ?? []).filter((item) => item.deleted).length}개)</summary>
+          {(catalog.ingredients ?? [])
+            .filter((item) => item.deleted)
+            .map((item) => (
+              <div className="trash-row" key={item.id}>
+                <div>
+                  <strong>{item.name}</strong>
+                  <div className="meta">
+                    {item.category} · {item.origin || "원산지 미입력"}
+                  </div>
+                </div>
+                <div className="row-actions">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={busy}
+                    aria-label={`${item.name} 복원`}
+                    onClick={async () => {
+                      if (busy) {
+                        return;
+                      }
+                      setRestoreError("");
+                      try {
+                        await onSave({
+                          ...catalog,
+                          ingredients: (catalog.ingredients ?? []).map((entry) =>
+                            entry.id === item.id ? { ...entry, deleted: false } : entry,
+                          ),
+                        });
+                      } catch (cause) {
+                        setRestoreError(
+                          cause instanceof Error ? cause.message : "재료를 복원하지 못했습니다. 다시 시도해주세요.",
+                        );
+                      }
+                    }}
+                  >
+                    복원
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={busy}
+                    aria-label={`${item.name} 영구 삭제`}
+                    onClick={() => {
+                      setDeleteError("");
+                      setRemoving(item);
+                    }}
+                  >
+                    영구 삭제
+                  </Button>
+                </div>
+              </div>
+            ))}
+          {restoreError && (
+            <p role="alert" className="error">
+              {restoreError}
+            </p>
+          )}
+        </details>
       )}
       <Dialog
         open={!!editing}
@@ -424,6 +512,60 @@ export default function OriginAllergyManager({
           )}
         </DialogContent>
       </Dialog>
+      <AlertDialog
+        open={!!removing}
+        onOpenChange={(open) => {
+          if (!open && !busy) {
+            setRemoving(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{removing?.deleted ? "재료를 영구 삭제할까요?" : "재료를 삭제할까요?"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {removing?.deleted
+                ? `${removing.name}을 저장된 재료 목록에서 완전히 삭제합니다. 영구 삭제하면 복원할 수 없습니다.`
+                : `${removing?.name}을 원산지 및 알레르기 관리와 bowl match 목록에서 삭제합니다. 이 페이지 아래의 삭제된 재료 목록에서 복원할 수 있습니다.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteError && (
+            <p role="alert" className="error">
+              {deleteError}
+            </p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>취소</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              disabled={busy}
+              onClick={async () => {
+                if (!removing || busy) {
+                  return;
+                }
+                setDeleteError("");
+                try {
+                  await onSave({
+                    ...catalog,
+                    ingredients: removing.deleted
+                      ? (catalog.ingredients ?? []).filter((item) => item.id !== removing.id)
+                      : (catalog.ingredients ?? []).map((item) =>
+                          item.id === removing.id ? { ...item, deleted: true } : item,
+                        ),
+                  });
+                  setRemoving(null);
+                } catch (cause) {
+                  setDeleteError(
+                    cause instanceof Error ? cause.message : "재료를 삭제하지 못했습니다. 다시 시도해주세요.",
+                  );
+                }
+              }}
+            >
+              {busy ? "삭제 중…" : removing?.deleted ? "영구 삭제" : "삭제"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

@@ -1915,7 +1915,7 @@
 .delivery-list-labels,
 .delivery-order-compact {
   display: grid;
-  grid-template-columns: minmax(150px, 1fr) minmax(0, 2fr) minmax(0, 2fr);
+  grid-template-columns: minmax(120px, 1fr) minmax(0, 1.6fr) minmax(0, 1.8fr) minmax(95px, 0.8fr) 82px;
   gap: 20px;
 }
 .delivery-list-labels {
@@ -1936,12 +1936,62 @@
 .delivery-order-compact p {
   margin: 3px 0;
 }
-@media (max-width: 640px) {
+@media (max-width: 900px) {
   .delivery-list-labels {
     display: none;
   }
   .delivery-order-compact {
     grid-template-columns: 1fr;
     gap: 10px;
+  }
+}
+
+.delivery-status {
+  display: inline-block;
+  border-radius: 20px;
+  padding: 5px 12px;
+  background: #edf3e6;
+  color: #24543f;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+.delivery-status-received {
+  background: #fff0d3;
+  color: #89531d;
+}
+.delivery-status-preparing {
+  background: #e7f0fa;
+  color: #245582;
+}
+.delivery-status-canceled {
+  background: #f5e4e2;
+  color: #903f36;
+}
+.delivery-manage button {
+  padding: 6px;
+  text-decoration: underline;
+  color: #24543f;
+}
+.delivery-detail {
+  display: grid;
+  gap: 12px;
+}
+.delivery-detail h3 {
+  font-weight: 700;
+  margin-top: 10px;
+}
+.delivery-detail ul {
+  display: grid;
+  gap: 10px;
+}
+
+/* Keep the entire preview column beside the fields while the page scrolls. */
+@media (min-width: 901px) {
+  .content-grid > .live-preview {
+    position: sticky;
+    top: 16px;
+    align-self: start;
+    min-width: 0;
+    padding-bottom: 10px;
   }
 }
