@@ -8,6 +8,7 @@ import Breadcrumb from "./Breadcrumb";
 import PageHeading from "./PageHeading";
 import { useAuth } from "./AuthProvider";
 import { useCart } from "./CartProvider";
+import { useToast } from "./ToastProvider";
 import { useCustomerCatalog } from "./CustomerCatalogProvider";
 import { type DeliveryHours } from "@/modules/delivery/hours";
 import { dateValue, timeOptions } from "@/modules/delivery/slots";
@@ -26,6 +27,7 @@ import { TossMark } from "./icons/BrandMarks";
 export default function CheckoutView({ hours, clientKey }: { hours: DeliveryHours; clientKey: string | null }) {
   const router = useRouter();
   const { items, open } = useCart();
+  const toast = useToast();
   const catalog = useCustomerCatalog();
   const { itemName, itemOptions, itemUnitPrice, deliveryFee, photoSrc, DRINKS, catalogConfig } = catalog;
   const { user } = useAuth();
@@ -94,10 +96,23 @@ export default function CheckoutView({ hours, clientKey }: { hours: DeliveryHour
   const delivery = { address, day, timeLabel, hours };
   // 시간은 확정 동작에서도 다시 확인한다. 초기 렌더에서는 시각 의존 검사 없이 상태만 표시한다.
   const unavailable = items.some((i) => !catalog.itemAvailable(i));
-  const canPay = items.length > 0 && !unavailable && !paying && clientKey !== null && agree;
+  // 장바구니가 비었거나 결제 모듈이 준비 안 됐으면 버튼 자체를 끈다. 나머지는 사용자가 채울 수 있는
+  // 항목이라 버튼은 눌리게 두고, 클릭 시 무엇이 비었는지 알림으로 알려준다.
+  const hardBlocked = items.length === 0 || unavailable || paying || clientKey === null;
+  const missingFields = [
+    !address.trim() && "배송 주소",
+    !ordererName.trim() && "받는 분 이름",
+    !/^0\d[\d -]{7,27}$/.test(phone.trim()) && "연락처",
+    !agree && "주문 내용 확인 동의",
+  ].filter((x): x is string => !!x);
+  const canPay = !hardBlocked && missingFields.length === 0;
 
   const pay = async () => {
-    if (!canPay || pending.current) {
+    if (hardBlocked || pending.current) {
+      return;
+    }
+    if (missingFields.length) {
+      toast(`${missingFields.join(", ")}을(를) 입력해주세요.`);
       return;
     }
     const controller = new AbortController();
@@ -197,7 +212,7 @@ export default function CheckoutView({ hours, clientKey }: { hours: DeliveryHour
       {!clientKey && <p role="alert">테스트 결제를 준비 중입니다. 잠시 후 다시 이용해주세요.</p>}
 
       {(error || unavailable) && (
-        <div role="alert">
+        <div className="checkout-alert" role="alert">
           <p>{error || "품절되거나 삭제된 메뉴·옵션이 있어요."}</p>
           <button type="button" className="ghost-btn" onClick={(e) => open(e.currentTarget)}>
             장바구니 확인
@@ -335,7 +350,7 @@ export default function CheckoutView({ hours, clientKey }: { hours: DeliveryHour
                   <Image src={itemPhoto(item)} alt="" width={96} height={96} unoptimized />
                 </div>
                 <div className="order-line-info">
-                  <div>
+                  <div title={`${itemName(item)}${itemOptions(item) ? ` · ${itemOptions(item)}` : ""}`}>
                     {itemName(item)}
                     {itemOptions(item) && <span> · {itemOptions(item)}</span>}
                     <span> × {item.qty}</span>
@@ -366,8 +381,14 @@ export default function CheckoutView({ hours, clientKey }: { hours: DeliveryHour
             주문 내용을 확인했으며 결제 진행에 동의합니다.
           </label>
 
-          <button type="button" className="primary full form-btn checkout-pay-btn" disabled={!canPay} onClick={pay}>
-            {agree ? `${money(total)} 결제하기` : "약관에 동의해주세요"}
+          <button
+            type="button"
+            className="primary full form-btn checkout-pay-btn"
+            disabled={hardBlocked}
+            aria-disabled={!canPay}
+            onClick={pay}
+          >
+            {missingFields.length ? `${missingFields[0]} 입력 필요` : `${money(total)} 결제하기`}
           </button>
         </aside>
       </div>
