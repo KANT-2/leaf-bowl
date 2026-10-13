@@ -13,7 +13,7 @@
 <img src="https://img.shields.io/badge/TypeScript-5-194B38?style=flat-square" alt="TypeScript 5" />
 <img src="https://img.shields.io/badge/Tailwind_CSS-4-194B38?style=flat-square" alt="Tailwind CSS 4" />
 
-[프로젝트 소개](#프로젝트-소개) · [주요 기능](#주요-기능) · [시작하기](#시작하기) · [개발 가이드](#개발-가이드) · [관련 문서](#관련-문서)
+[프로젝트 소개](#프로젝트-소개) · [주요 기능](#주요-기능) · [화면 미리보기](#화면-미리보기) · [과제 요구사항](#과제-요구사항-대응) · [시작하기](#시작하기) · [개발 가이드](#개발-가이드) · [관련 문서](#관련-문서)
 
 </div>
 
@@ -25,7 +25,7 @@
 
 Next.js App Router 기반으로 고객 화면과 관리자 화면을 구성하고, 공통 카탈로그를 통해 저장한 변경 사항을 고객 화면에 반영합니다.
 
-> **체험 범위** · 로그인은 실제 인증 없이 동작하는 모의 로그인입니다. 결제 수단은 실제 청구가 없는 체험 기능이며, 주문 접수·조회와 관리자 인증은 PostgreSQL에 연결됩니다. 초기 리뷰는 예시 데이터입니다.
+> **체험 범위** · 고객 로그인은 실제 인증 없이 동작하는 모의 로그인입니다. 결제는 토스페이먼츠 **테스트 결제**라 실제 청구가 없고, 주문 접수·조회·결제 기록과 관리자 인증은 PostgreSQL에 연결됩니다. 초기 리뷰는 예시 데이터입니다.
 
 ## 주요 기능
 
@@ -55,6 +55,42 @@ Next.js App Router 기반으로 고객 화면과 관리자 화면을 구성하�
 | ![메뉴 이름과 가격의 자동 갱신 검증](docs/screenshots/shared-catalog/menu-live-update.png) | ![장바구니 옵션 가격의 자동 재계산 검증](docs/screenshots/shared-catalog/cart-live-price.png) |
 
 </details>
+
+## 화면 미리보기
+
+검증 서버(https://kant2-front5-staging.dev.crasnec.com) 화면입니다. PC는 1440px, 모바일은 390px 폭입니다.
+
+| 메인 | 상품 목록 | 상품 상세 |
+| --- | --- | --- |
+| ![메인 화면](docs/screenshots/final/home-pc.jpg) | ![상품 목록 화면](docs/screenshots/final/menu-pc.jpg) | ![상품 상세 화면](docs/screenshots/final/product-pc.jpg) |
+| ![모바일 메인 화면](docs/screenshots/final/home-mobile.jpg) | ![모바일 상품 목록 화면](docs/screenshots/final/menu-mobile.jpg) | ![모바일 상품 상세 화면](docs/screenshots/final/product-mobile.jpg) |
+
+| 장바구니 | 주문·결제 | 이달의 이벤트 |
+| --- | --- | --- |
+| ![장바구니 화면](docs/screenshots/final/cart-pc.jpg) | ![주문·결제 화면](docs/screenshots/final/checkout-pc.jpg) | ![이달의 이벤트 화면](docs/screenshots/final/event-pc.jpg) |
+
+| 관리자 · 메뉴 관리 | 관리자 · 이달의 이벤트 관리 |
+| --- | --- |
+| ![관리자 메뉴 관리 화면](docs/screenshots/final/admin-products-pc.jpg) | ![관리자 이달의 이벤트 관리 화면](docs/screenshots/final/admin-events-pc.jpg) |
+
+## 과제 요구사항 대응
+
+| 과제 요구 | 위치 |
+| --- | --- |
+| 상품 타입 `interface Product` | [types/product.ts](types/product.ts) (정의: [modules/catalog/customer-product.ts](modules/catalog/customer-product.ts)) |
+| Mock 데이터 6개 이상 | [data/products.ts](data/products.ts) — 샐러드 12종 정적 배열 (처음엔 화면이 직접 읽었고, 지금은 같은 메뉴가 DB 초기 데이터 [db/seed.sql](db/seed.sql)에 있어 화면은 DB 에서 읽음) |
+| 공통 컴포넌트 | [Header](components/Header.tsx) · [Footer](components/Footer.tsx) · [ProductCard](components/ProductCard.tsx) (Props 로 상품 전달) |
+| 메인 `app/page.tsx` | [`app/(customer)/page.tsx`](app/%28customer%29/page.tsx) — 배너와 추천 상품 |
+| 목록 `app/products/page.tsx` | [`app/(customer)/products/page.tsx`](app/%28customer%29/products/page.tsx) — `.map()` 으로 카드 출력 (`/menu` 와 같은 화면) |
+| 상세 `app/products/[id]/page.tsx` | [`app/(customer)/products/[id]/page.tsx`](app/%28customer%29/products/%5Bid%5D/page.tsx) — 동적 라우트 (`/product/[id]` 와 같은 화면) |
+| 없는 상품 ID 예외 처리 | `notFound()` → "찾으시는 메뉴가 없어요." 안내 화면 |
+| `<Link>` 페이지 이동 | 헤더 메뉴·상품 카드·브레드크럼 모두 `next/link` |
+| Tailwind CSS | 테마 토큰·관리자 화면은 Tailwind 유틸리티, 고객 화면은 디자인 시안을 옮긴 화면별 CSS([app/styles](app/styles)) |
+| 도전: 반응형 | PC·태블릿·모바일 레이아웃 (위 모바일 캡처) |
+| 도전: 장바구니 뱃지 | 담으면 헤더 장바구니 숫자 증가 |
+| 도전: 배포 | GitHub Actions CI 를 통과한 커밋만 검증 서버에 자동 배포 |
+
+필수 범위를 기준선으로 먼저 두고, 과제 제외 범위였던 DB·관리자 인증·테스트 결제는 팀 합의로 확장했습니다.
 
 ## 기술 스택
 
@@ -133,20 +169,42 @@ Next.js가 생성하는 타입을 사용하므로 별도 타입 검사는 빌드
 | --- | --- |
 | `/` | 홈 · 시즌 스페셜 · 메뉴 · 리뷰 |
 | `/menu` | 샐러드 메뉴 목록 |
+| `/products` | 과제 경로의 전체 상품 목록 (`/menu` 와 같은 화면) |
 | `/drinks` | 음료 목록 |
 | `/product/[id]` | 상품 상세와 옵션 선택 |
+| `/products/[id]` | 과제 경로의 상품 상세 (`/product/[id]` 와 같은 화면) |
 | `/product/[id]/reviews` | 상품별 리뷰 |
 | `/reviews` | 기본 상품 리뷰(`/product/0/reviews`)로 이동 |
 | `/match` | bowl match · 나만의 재료 조합 |
+| `/event` | 이달의 이벤트 목록 (진행 중·종료) |
 | `/login` | 체험용 로그인 |
 | `/mypage` | 프로필·배송지·취향·주문 내역·내 리뷰 |
-| `/checkout` | 체험용 결제 |
+| `/checkout` | 주문·결제 (토스페이먼츠 테스트 결제) |
 | `/admin` | 관리자 화면 |
 | `/admin/preview` | 관리자 카탈로그 기반의 별도 고객 미리보기 |
 
 장바구니는 고객 화면에서 열리는 드로어입니다. 기존 `/bowl-match` 주소는 `/match`로 이동합니다.
 
 ## 개발 가이드
+
+### 컴포넌트 구조
+
+```text
+app/(customer)/layout.tsx
+├── Provider (카탈로그 · 장바구니 · 로그인 · 리뷰 · 알림)
+├── Header ── HeaderNav · CartButton · AccountLink
+├── page.tsx (메인) ── CustomerHome
+│   └── HeroCarousel · ProductCard × 4 · CustomerSeasons · ReviewRotator · MatchFloat
+├── menu · products ── MenuSection ── ProductCard × n
+├── product/[id] · products/[id] ── CustomerProductPage
+│   └── ProductDetail · ProductRating · ProductReviewsPreview
+├── match ── BowlMatch
+├── checkout ── CheckoutView
+├── event ── CustomerEvents
+├── CartDrawer
+└── Footer
+app/admin ── AdminWorkspace ── 메뉴 · 옵션 · bowl match · 고객 페이지 · 이벤트 · 판매 · 리뷰 · 배달 관리
+```
 
 ### 프로젝트 구조
 
@@ -162,6 +220,8 @@ leaf-bowl/
 ├── application/          # 트랜잭션 조합·서비스 생성·서버 조회
 ├── infrastructure/       # PostgreSQL·HTTP·브라우저 저장소 어댑터
 ├── features/             # 화면별 표시·입력·클라이언트 요청 로직
+├── types/                # 과제 경로의 공통 타입 (Product)
+├── data/                 # 과제 경로의 상품 Mock 데이터 (테스트·카탈로그 이관에 사용)
 ├── seed/                 # SQL 초기화·명시적 JSON 이관 전용
 ├── public/               # 상품·재료 이미지
 ├── prisma/               # DB 모델·마이그레이션·seed
