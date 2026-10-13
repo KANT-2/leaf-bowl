@@ -34,6 +34,8 @@ export function publicSnapshot(snapshot: Snapshot): PublicSnapshot {
       reviews: catalog.reviews?.filter((r) => !r.deleted),
       content: {
         ...catalog.content,
+        deletedBannerPages: undefined,
+        deletedSeasonPages: undefined,
         bannerPages: catalog.content.bannerPages === undefined ? undefined : visibleBannerPages(catalog.content),
         seasonPages: catalog.content.seasonPages?.filter((p) => p.visible),
       },

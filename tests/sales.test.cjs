@@ -254,3 +254,28 @@ test("combination history supports removed products, Korean periods and missing 
     data([order("invalid", [{ ...item("a", 1), dressing: { productId: "", productName: "드레싱" } }])]),
   );
 });
+
+test("custom calendar range includes both KST days and excludes adjacent dates", () => {
+  const source = data([
+    order("before", [item("a", 10)], "paid", "2026-10-06T14:59:59Z"),
+    order("start", [item("a", 2)], "paid", "2026-10-06T15:00:00Z"),
+    order("end", [item("b", 3)], "paid", "2026-10-08T14:59:59.999Z"),
+    order("after", [item("a", 10)], "paid", "2026-10-08T15:00:00Z"),
+  ]);
+  const range = { startDate: "2026-10-07", endDate: "2026-10-08" };
+  const report = buildSalesReport(catalog, source, "custom", now, "salad", range);
+  assert.equal(report.totalQuantity, 5);
+  assert.equal(report.orderCount, 2);
+  assert.equal(
+    buildSalesReport(catalog, source, "custom", now, "salad", { startDate: "2026-10-07", endDate: "2026-10-07" })
+      .totalQuantity,
+    2,
+  );
+  for (const invalid of [
+    undefined,
+    { startDate: "2026-02-30", endDate: "2026-03-02" },
+    { startDate: "2026-10-08", endDate: "2026-10-07" },
+  ]) {
+    assert.throws(() => buildSalesReport(catalog, source, "custom", now, "salad", invalid));
+  }
+});

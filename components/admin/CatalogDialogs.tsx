@@ -216,6 +216,14 @@ export default function CatalogDialogs({
                       p.productId === purging.id ? { ...p, productId: "" } : p,
                     );
                     next.reviews = next.reviews?.filter((r) => r.productId !== purging.id);
+                  } else if (purging.kind === "banner") {
+                    next.content.deletedBannerPages = next.content.deletedBannerPages?.filter(
+                      (p) => p.id !== purging.id,
+                    );
+                  } else if (purging.kind === "season") {
+                    next.content.deletedSeasonPages = next.content.deletedSeasonPages?.filter(
+                      (p) => p.id !== purging.id,
+                    );
                   } else {
                     next.groups = next.groups.filter((g) => g.id !== purging.id);
                     next.products = next.products.map((p) => ({
