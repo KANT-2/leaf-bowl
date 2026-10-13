@@ -3,6 +3,8 @@ import { useCustomerCatalog } from "./CustomerCatalogProvider";
 import Link from "next/link";
 import { formatDeliveryHours, type DeliveryHours } from "@/modules/delivery/hours";
 
+const STORE_PHONE = "010-1234-5678";
+
 export default function Footer({ hours }: { hours: DeliveryHours }) {
   const { catalog } = useCustomerCatalog();
   return (
@@ -13,7 +15,7 @@ export default function Footer({ hours }: { hours: DeliveryHours }) {
       <p className="footer-store">
         {catalog.location && (
           <span>
-            {catalog.location.name} · {catalog.location.address} {catalog.location.detailAddress}
+            {catalog.location.name} · {catalog.location.address} {catalog.location.detailAddress} · {STORE_PHONE}
             <br />
           </span>
         )}
