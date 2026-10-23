@@ -2,7 +2,7 @@
 
 <img src="public/images/hero-cutout.png" alt="신선한 채소와 구운 닭고기를 담은 leaf & bowl 샐러드" width="280" />
 
-# leaf & bowl
+# leaf & bowl with BE
 
 **오늘의 신선한 한 그릇**
 
