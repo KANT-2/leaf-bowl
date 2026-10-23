@@ -110,7 +110,7 @@ class StatusChange:
 
 @dataclass
 class Order:
-    customer_id: int
+    customer_id: int | None  # 회원 주문의 customers.id. Next.js 가 접수한 비회원 주문이면 None
     orderer_name: str
     phone: str
     address: str
