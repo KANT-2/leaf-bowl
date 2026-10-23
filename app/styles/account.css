@@ -28,6 +28,14 @@
 .auth-card form .form-btn {
   margin-top: 28px;
 }
+.auth-card .form-error {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #fbeceb;
+  color: var(--color-danger);
+  font-size: 14px;
+}
 .auth-divider {
   display: flex;
   align-items: center;
@@ -399,6 +407,12 @@
 /* ===== 결제(체험) ===== */
 .checkout-wrap {
   max-width: 1100px;
+}
+.checkout-placed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
 }
 .checkout-grid {
   display: flex;

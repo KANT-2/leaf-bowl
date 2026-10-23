@@ -15,7 +15,8 @@ import { dateValue, timeOptions } from "@/modules/delivery/slots";
 import { checkoutIssue } from "@/features/checkout/validation";
 import { customerCatalog } from "@/modules/catalog/customer-view";
 import { publicSnapshotSchema } from "@/modules/catalog/public-schema";
-import { orderRequestKey } from "@/features/orders/client";
+import { clearOrderRequestKey, orderRequestKey } from "@/features/orders/client";
+import { MemberAuthError, submitMemberOrder } from "@/features/member/client";
 import { preparePayment, paymentResultUrl, rememberPaymentCart } from "@/features/checkout/payment";
 import { openTossPayment } from "@/features/checkout/toss";
 import { deliveryWindowUTC } from "@/modules/delivery/time";
@@ -26,11 +27,13 @@ import { TossMark } from "./icons/BrandMarks";
 
 export default function CheckoutView({ hours, clientKey }: { hours: DeliveryHours; clientKey: string | null }) {
   const router = useRouter();
-  const { items, open } = useCart();
+  const { items, open, clear } = useCart();
   const toast = useToast();
   const catalog = useCustomerCatalog();
   const { itemName, itemOptions, itemUnitPrice, deliveryFee, photoSrc, DRINKS, catalogConfig } = catalog;
-  const { user } = useAuth();
+  // 로그인한 회원은 결제 없이 FastAPI 로 바로 접수한다. 비회원은 토스 결제를 거친다.
+  const { user, isLoggedIn: member } = useAuth();
+  const [placed, setPlaced] = useState<{ id: string; total: number } | null>(null);
 
   const savedAddresses = user?.addresses ?? [];
   const defaultAddr = user?.addresses.find((a) => a.isDefault);
@@ -98,7 +101,7 @@ export default function CheckoutView({ hours, clientKey }: { hours: DeliveryHour
   const unavailable = items.some((i) => !catalog.itemAvailable(i));
   // 장바구니가 비었거나 결제 모듈이 준비 안 됐으면 버튼 자체를 끈다. 나머지는 사용자가 채울 수 있는
   // 항목이라 버튼은 눌리게 두고, 클릭 시 무엇이 비었는지 알림으로 알려준다.
-  const hardBlocked = items.length === 0 || unavailable || paying || clientKey === null;
+  const hardBlocked = items.length === 0 || unavailable || paying || (!member && clientKey === null);
   const missingFields = [
     !address.trim() && "배송 주소",
     !ordererName.trim() && "받는 분 이름",
@@ -150,6 +153,15 @@ export default function CheckoutView({ hours, clientKey }: { hours: DeliveryHour
       if (submission.current?.body !== body) {
         submission.current = { body, key: await orderRequestKey(input) };
       }
+      if (member) {
+        // 같은 요청 번호로 다시 보내도 주문은 한 건이다 (응답을 못 받고 다시 눌러도 안전)
+        const order = await submitMemberOrder(input, submission.current.key);
+        clearOrderRequestKey();
+        submission.current = null;
+        setPlaced(order);
+        clear();
+        return;
+      }
       const checkout = await preparePayment(input, submission.current.key);
       // An existing authentication must be reconciled instead of opening a second payment.
       if (checkout.paymentKey) {
@@ -178,6 +190,12 @@ export default function CheckoutView({ hours, clientKey }: { hours: DeliveryHour
         },
       });
     } catch (cause) {
+      if (cause instanceof MemberAuthError) {
+        // 장바구니는 그대로 두고 다시 로그인한 뒤 결제 화면으로 돌아온다
+        toast(cause.message);
+        router.push("/login?next=/checkout");
+        return;
+      }
       const canceled = typeof cause === "object" && cause !== null && "code" in cause && cause.code === "USER_CANCEL";
       setError(
         canceled
@@ -191,6 +209,26 @@ export default function CheckoutView({ hours, clientKey }: { hours: DeliveryHour
       setPaying(false);
     }
   };
+
+  if (placed) {
+    return (
+      <main className="wrap pv-wrap checkout-wrap">
+        <Breadcrumb items={[["홈", "/"], ["주문 완료"]]} />
+        <PageHeading>주문이 접수되었어요</PageHeading>
+        <p className="auth-note" role="status">
+          합계 {money(placed.total)} · 주문 상태와 취소는 마이페이지 주문 내역에서 확인할 수 있어요.
+        </p>
+        <div className="checkout-placed-actions">
+          <Link className="primary form-btn" href="/mypage">
+            주문 내역 보기
+          </Link>
+          <Link className="ghost-btn" href="/menu">
+            메뉴 더 보기
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   if (!items.length) {
     return (
@@ -206,10 +244,19 @@ export default function CheckoutView({ hours, clientKey }: { hours: DeliveryHour
 
   return (
     <main className="wrap pv-wrap checkout-wrap">
-      <Breadcrumb items={[["홈", "/"], ["결제"]]} />
-      <PageHeading>결제</PageHeading>
-      <p className="auth-note">토스페이먼츠 테스트 결제입니다. 실제로 청구되지 않아요.</p>
-      {!clientKey && <p role="alert">테스트 결제를 준비 중입니다. 잠시 후 다시 이용해주세요.</p>}
+      <Breadcrumb items={[["홈", "/"], [member ? "주문하기" : "결제"]]} />
+      <PageHeading>{member ? "주문하기" : "결제"}</PageHeading>
+      {member ? (
+        <p className="auth-note">회원 주문은 결제 없이 바로 접수돼요.</p>
+      ) : (
+        <>
+          <p className="auth-note">
+            토스페이먼츠 테스트 결제입니다. 실제로 청구되지 않아요.{" "}
+            <Link href="/login?next=/checkout">로그인하면 결제 없이 주문할 수 있어요.</Link>
+          </p>
+          {!clientKey && <p role="alert">테스트 결제를 준비 중입니다. 잠시 후 다시 이용해주세요.</p>}
+        </>
+      )}
 
       {(error || unavailable) && (
         <div className="checkout-alert" role="alert">
@@ -328,17 +375,19 @@ export default function CheckoutView({ hours, clientKey }: { hours: DeliveryHour
             </div>
           </section>
 
-          <section className="surface mypage-section">
-            <h2>결제 수단</h2>
-            <div className="pay-toss-panel">
-              <TossMark />
-              <div>
-                <p className="pay-toss-title">토스페이먼츠로 결제</p>
-                <p className="pay-toss-desc">카드·계좌이체·간편결제는 결제 창에서 바로 선택할 수 있어요.</p>
+          {!member && (
+            <section className="surface mypage-section">
+              <h2>결제 수단</h2>
+              <div className="pay-toss-panel">
+                <TossMark />
+                <div>
+                  <p className="pay-toss-title">토스페이먼츠로 결제</p>
+                  <p className="pay-toss-desc">카드·계좌이체·간편결제는 결제 창에서 바로 선택할 수 있어요.</p>
+                </div>
               </div>
-            </div>
-            <p className="pay-redirect-note">결제하기를 누르면 토스페이먼츠 결제 창에서 안전하게 결제할 수 있어요.</p>
-          </section>
+              <p className="pay-redirect-note">결제하기를 누르면 토스페이먼츠 결제 창에서 안전하게 결제할 수 있어요.</p>
+            </section>
+          )}
         </div>
 
         <aside className="surface mypage-section checkout-summary">
@@ -378,7 +427,9 @@ export default function CheckoutView({ hours, clientKey }: { hours: DeliveryHour
 
           <label className="checkout-agree">
             <input type="checkbox" checked={agree} onChange={(event) => setAgree(event.target.checked)} />
-            주문 내용을 확인했으며 결제 진행에 동의합니다.
+            {member
+              ? "주문 내용을 확인했으며 주문 접수에 동의합니다."
+              : "주문 내용을 확인했으며 결제 진행에 동의합니다."}
           </label>
 
           <button
@@ -388,7 +439,9 @@ export default function CheckoutView({ hours, clientKey }: { hours: DeliveryHour
             aria-disabled={!canPay}
             onClick={pay}
           >
-            {missingFields.length ? `${missingFields[0]} 입력 필요` : `${money(total)} 결제하기`}
+            {missingFields.length
+              ? `${missingFields[0]} 입력 필요`
+              : `${money(total)} ${member ? "주문하기" : "결제하기"}`}
           </button>
         </aside>
       </div>

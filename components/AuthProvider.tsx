@@ -2,7 +2,9 @@
 
 import { createContext, useCallback, useContext, useMemo, useSyncExternalStore } from "react";
 import { userStore } from "@/infrastructure/browser/profile-store";
-import { type Address, type AuthProvider as Provider, type UserProfile } from "@/modules/profile/types";
+import { memberTokenStore } from "@/infrastructure/browser/member-token";
+import { loginMember, logoutMember, signupMember, type Member } from "@/features/member/client";
+import { type Address, type UserProfile } from "@/modules/profile/types";
 
 import {
   loginProfile,
@@ -14,9 +16,11 @@ import {
 
 interface AuthContextValue {
   user: UserProfile | null;
+  /** FastAPI 회원 토큰이 있을 때만 로그인 상태다 */
   isLoggedIn: boolean;
-  login: (input: { name: string; email: string; provider: Provider }) => void;
-  logout: () => void;
+  login: (email: string, password: string) => Promise<void>;
+  signup: (input: { email: string; password: string; name: string; phone?: string }) => Promise<void>;
+  logout: () => Promise<void>;
   updateProfile: (patch: Partial<Pick<UserProfile, "name" | "email" | "phone">>) => void;
   addAddress: (input: Omit<Address, "id">) => void;
   updateAddress: (id: string, patch: Partial<Omit<Address, "id">>) => void;
@@ -37,13 +41,31 @@ export function useAuth(): AuthContextValue {
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
   const user = useSyncExternalStore(userStore.subscribe, userStore.getSnapshot, userStore.getServerSnapshot);
+  const token = useSyncExternalStore(
+    memberTokenStore.subscribe,
+    memberTokenStore.getSnapshot,
+    memberTokenStore.getServerSnapshot,
+  );
 
-  const login = useCallback((input: { name: string; email: string; provider: Provider }) => {
+  const login = useCallback(async (email: string, password: string) => {
+    const member: Member = await loginMember(email, password);
     const current = userStore.getSnapshot();
-    userStore.set(loginProfile(current, input));
+    // 다른 회원이 같은 브라우저로 로그인하면 이전 회원의 주소·취향을 이어받지 않는다
+    const previous = current?.email === member.email ? current : null;
+    const profile = loginProfile(previous, { name: member.name, email: member.email, provider: "email" });
+    userStore.set({ ...profile, phone: profile.phone || member.phone || "" });
   }, []);
 
-  const logout = useCallback(() => {
+  const signup = useCallback(
+    async (input: { email: string; password: string; name: string; phone?: string }) => {
+      await signupMember(input);
+      await login(input.email, input.password);
+    },
+    [login],
+  );
+
+  const logout = useCallback(async () => {
+    await logoutMember();
     const current = userStore.getSnapshot();
     if (current) {
       userStore.set({ ...current, loggedIn: false });
@@ -99,8 +121,9 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const value = useMemo(
     () => ({
       user,
-      isLoggedIn: !!user?.loggedIn,
+      isLoggedIn: !!token && !!user?.loggedIn,
       login,
+      signup,
       logout,
       updateProfile,
       addAddress,
@@ -109,7 +132,19 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       setDefaultAddress,
       setPreferences,
     }),
-    [user, login, logout, updateProfile, addAddress, updateAddress, removeAddress, setDefaultAddress, setPreferences],
+    [
+      user,
+      token,
+      login,
+      signup,
+      logout,
+      updateProfile,
+      addAddress,
+      updateAddress,
+      removeAddress,
+      setDefaultAddress,
+      setPreferences,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
