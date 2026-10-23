@@ -46,6 +46,9 @@ next-env.d.ts
 /.deploy/
 __pycache__/
 *.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
 
 # Admin runtime data
 .data/
