@@ -1,0 +1,34 @@
+[project]
+name = "leaf-bowl-api"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "asyncpg==0.30.0",
+    "fastapi[standard]>=0.161.1",
+    "pwdlib[argon2]>=0.3.1",
+    "pydantic-settings>=2.16.1",
+    "pyjwt>=2.15.1",
+    "sqlalchemy[asyncio]>=2.1.6",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "ruff>=0.17.2",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.Body", "fastapi.Header"]
