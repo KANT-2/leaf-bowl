@@ -429,3 +429,9 @@ CREATE TABLE payment_checkouts (
   )
 );
 CREATE INDEX idx_payment_checkouts_expires ON payment_checkouts(expires_at) WHERE order_id IS NULL;
+-- 0011_member_orders: 주문의 주인은 비회원 세션 또는 회원(FastAPI customers.id) 중 정확히 하나
+ALTER TABLE orders ADD COLUMN customer_id BIGINT;
+ALTER TABLE orders ALTER COLUMN customer_session_id DROP NOT NULL;
+ALTER TABLE orders ADD CONSTRAINT chk_order_owner CHECK (num_nonnulls(customer_session_id, customer_id) = 1);
+CREATE UNIQUE INDEX uq_order_member_request ON orders (customer_id, request_key) WHERE customer_id IS NOT NULL;
+CREATE INDEX idx_orders_customer ON orders (customer_id, created_at DESC, id DESC) WHERE customer_id IS NOT NULL;
