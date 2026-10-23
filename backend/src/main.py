@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 
 import database
+from auth.presentation.router import router as auth_router
 from core.config import get_settings
 from core.exception_handlers import register_exception_handlers
 from core.middleware import log_requests
@@ -54,7 +55,8 @@ def create_app() -> FastAPI:
         await database.ping()
         return {"status": "ok"}
 
-    # 기능 라우터는 여기에 등록한다. 예: app.include_router(customers_router)
+    # 기능 라우터는 여기에 등록한다
+    app.include_router(auth_router)
     return app
 
 

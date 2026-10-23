@@ -45,6 +45,31 @@ src/
 
 의존 방향은 `presentation → application → domain ← infrastructure` 이고, domain 은 FastAPI·SQLAlchemy·Pydantic 을 import 하지 않습니다.
 
+## 인증 (OAuth2 · JWT · 블랙리스트)
+
+| API | 설명 |
+| --- | --- |
+| `POST /api/auth/signup` | 회원가입 (JSON: email, password, name, phone?) |
+| `POST /api/auth/token` | 로그인. form 의 `username` 에 이메일. `access_token` 발급 |
+| `POST /api/auth/logout` | 토큰의 jti 를 `token_blacklist` 에 등록. 이후 같은 토큰은 401 |
+| `GET /api/me` | 내 정보 |
+
+Swagger 오른쪽 위 **Authorize** 에 이메일·비밀번호를 넣으면 이후 요청에 토큰이 붙습니다.
+
+다른 기능에서 로그인한 사용자가 필요하면:
+
+```python
+from core.dependencies import CurrentCustomer, get_current_customer
+
+@router.get("/api/orders")
+async def list_my_orders(customer: CurrentCustomer = Depends(get_current_customer)):
+    ...  # customer.id 로 본인 데이터만
+```
+
+관리자 API 는 `Depends(require_admin)`. 관리자 토큰은 `security.create_access_token(admin_id, "admin", {"login_id": ...})` 로 발급합니다.
+
+FastAPI 가 만드는 테이블(`customers`, `token_blacklist`)은 기동할 때 없으면 생성하고 RLS 를 켭니다 (Supabase Data API 노출 차단).
+
 ## 오류 응답 규칙
 
 | 예외 (`core.exceptions`) | 상태 | 쓰는 곳 |

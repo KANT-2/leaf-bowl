@@ -67,6 +67,10 @@ async def init_db() -> None:
 
     async with get_engine().begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Supabase 는 public 테이블을 Data API(anon 키)로 노출한다. RLS 를 켜고 정책을 두지 않으면 외부 접근이 막힌다.
+        # 테이블 소유자로 접속하는 FastAPI 는 RLS 를 거치지 않으므로 영향이 없다. 일반 PostgreSQL 에서도 무해하다.
+        for table in Base.metadata.sorted_tables:
+            await conn.execute(text(f'ALTER TABLE "{table.name}" ENABLE ROW LEVEL SECURITY'))
 
 
 async def ping() -> None:
