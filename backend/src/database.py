@@ -30,6 +30,15 @@ def is_configured() -> bool:
     return bool(get_settings().database_url)
 
 
+def async_database_url(url: str) -> str:
+    """Supabase·Prisma 에서 복사한 postgresql:// 주소도 asyncpg 드라이버로 접속하게 맞춘다."""
+    url = url.strip().strip("\"'")
+    for prefix in ("postgresql://", "postgres://"):
+        if url.startswith(prefix):
+            return "postgresql+asyncpg://" + url.removeprefix(prefix)
+    return url
+
+
 def get_engine() -> AsyncEngine:
     global _engine, _session_factory
     if _engine is None:
@@ -37,7 +46,9 @@ def get_engine() -> AsyncEngine:
         if not settings.database_url:
             raise RuntimeError("DATABASE_URL 이 설정되지 않았습니다. backend/.env 를 확인하세요.")
         connect_args = {"statement_cache_size": 0} if settings.database_disable_statement_cache else {}
-        _engine = create_async_engine(settings.database_url, pool_pre_ping=True, connect_args=connect_args)
+        _engine = create_async_engine(
+            async_database_url(settings.database_url), pool_pre_ping=True, connect_args=connect_args
+        )
         _session_factory = async_sessionmaker(_engine, expire_on_commit=False)
     return _engine
 
