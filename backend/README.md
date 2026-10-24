@@ -94,6 +94,15 @@ uv run ruff check src tests
 uv run ruff format src tests
 ```
 
+PostgreSQL 통합 테스트(`tests/test_orders_postgres.py`)는 `TEST_DATABASE_URL` 이 있을 때만 실행되고, 없으면 건너뜁니다.
+이름이 `_test` 로 끝나는 **전용 DB** 만 허용하며, 시작할 때 `public` 스키마를 지우고 `prisma/migrations` 전체와 `db/seed.sql` 을 적용합니다.
+공용 DB 주소를 넣지 마세요.
+
+```bash
+# 예: 로컬 PostgreSQL 에 빈 DB leaf_bowl_test 를 만든 뒤
+TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:5432/leaf_bowl_test uv run pytest
+```
+
 ## 구조
 
 ```
@@ -143,8 +152,9 @@ FastAPI 가 만드는 테이블(`customers`, `token_blacklist`)은 기동할 때
 
 ## 주문 (UC-C)
 
-> 라우터·서비스·도메인은 구현되어 메모리 저장소로 검증했습니다. DB 저장소는 `orders.customer_id` 마이그레이션 후 연결하며,
-> 그 전까지 실제 서버의 주문 API 는 `503` 을 돌려줍니다 (`orders/presentation/dependencies.py`).
+주문은 인수한 `orders`·`order_items`·`order_status_history` 표에 저장합니다 (`orders/infrastructure`, `LegacyBase` 매핑).
+회원 주문은 `orders.customer_id`, Next.js 비회원 주문은 `customer_session_id` 로 구분합니다 (`prisma/migrations/0011_member_orders`).
+가격 계산 때 카탈로그·`app_settings` 를 커밋까지 공유 잠금으로 읽으며, 순서는 Next.js 와 같은 카탈로그 → 배달 시간 → 가격 정책입니다.
 
 모든 API 는 회원 토큰(`Depends(get_current_customer)`)이 필요하고 본인 주문만 다룹니다.
 요청·응답 키는 기존 Next.js API 와 같은 camelCase 이고, 금액은 문자열(`"22000"`), 시각은 UTC 밀리초(`...000Z`)입니다.
