@@ -94,9 +94,14 @@ class OrderService:
         if existing:
             return _same_request(existing, cmd.request_hash)
 
+        # 카탈로그 → 배달 시간 → 가격 정책 순서로 읽는다. 각 읽기가 커밋까지 공유 잠금을 잡으므로
+        # Next.js(quote.ts)·관리자 저장과 같은 순서를 지켜야 교착이 생기지 않는다.
+        catalog = await self.catalog.get_catalog()
+        hours = await self.settings.get_delivery_hours()
+        policy = await self.settings.get_pricing_policy()
         now = self.clock()
-        assert_delivery_slot(cmd.slot, await self.settings.get_delivery_hours(), now)
-        priced = price_order(await self.catalog.get_catalog(), cmd.items, await self.settings.get_pricing_policy())
+        assert_delivery_slot(cmd.slot, hours, now)
+        priced = price_order(catalog, cmd.items, policy)
         order = Order.place(
             customer_id=customer_id,
             orderer_name=cmd.orderer_name,
