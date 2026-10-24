@@ -338,6 +338,7 @@ test("catalog revisions, optional fields, stable IDs and review deletion survive
   state.catalog.ingredients[0].originDetail = "제주";
   state.catalog.content.seasonPages = [];
   state.catalog.products[0].price = 16000;
+  state.catalog.products[0].origin = "국내산";
   state.catalog.products.push({ ...state.catalog.products[0], id: "new-salad", customerId: undefined });
   const saved = await writeCatalog(state.catalog, state.revision);
   assert.equal(saved.catalog.products.at(-1).customerId, 12);
@@ -370,6 +371,7 @@ test("catalog revisions, optional fields, stable IDs and review deletion survive
       return readCatalogState(tx);
     });
     assert.equal(actual.catalog.products[0].price, 16000);
+    assert.equal(actual.catalog.products[0].origin, "국내산");
     assert.equal(actual.catalog.products.at(-1).customerId, 12);
     assert.equal(actual.nextCustomerId, 13);
     assert.equal(actual.catalog.ingredients[0].originDetail, "제주");
