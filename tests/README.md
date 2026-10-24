@@ -22,6 +22,8 @@ FRONT5_BASE_URL=http://localhost:3337 npm exec --package=playwright -- node test
 FRONT5_BASE_URL=http://localhost:3337 npm exec --package=playwright -- node tests/timezone-browser.cjs
 FRONT5_BASE_URL=http://localhost:3337 npm exec --package=playwright -- node tests/architecture-browser.cjs
 FRONT5_BASE_URL=http://localhost:3337 npm exec --package=playwright -- node tests/tailwind-browser.cjs
+# 회원 로그인·주문: FastAPI(backend/)를 같은 전용 DB 로 띄우고 BACKEND_URL 로 가리켜 빌드한 앱에서 실행한다
+FRONT5_BASE_URL=http://localhost:3337 npm exec --package=playwright -- node tests/member-order-browser.cjs
 ```
 
 관리자 편집 테스트는 테스트 카탈로그의 첫 메뉴를 수정하고, 409 응답 후 입력 보존·재조회·저장을 확인한다. 이미지 산출물은 `docs/screenshots/code-quality/`에 생성된다. 실행 전후 변경된 스크린샷을 확인한다.

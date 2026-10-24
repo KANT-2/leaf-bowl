@@ -11,7 +11,6 @@ export default function ProfileTab() {
   const router = useRouter();
   const [name, setName] = useState(user?.name ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
-  const [email, setEmail] = useState(user?.email ?? "");
 
   if (!user) {
     return null;
@@ -19,7 +18,8 @@ export default function ProfileTab() {
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    updateProfile({ name: name.trim() || user.name, phone: phone.trim(), email: email.trim() || user.email });
+    // 이메일은 로그인 계정(FastAPI)이라 여기서 바꾸지 않는다
+    updateProfile({ name: name.trim() || user.name, phone: phone.trim() });
     toast("프로필을 저장했어요");
   };
 
@@ -37,8 +37,8 @@ export default function ProfileTab() {
           <input value={phone} maxLength={20} placeholder="010-0000-0000" onChange={(e) => setPhone(e.target.value)} />
         </label>
         <label className="field">
-          <span>이메일</span>
-          <input type="email" value={email} maxLength={120} onChange={(e) => setEmail(e.target.value)} />
+          <span>로그인 이메일</span>
+          <input type="email" value={user.email} readOnly aria-readonly="true" />
         </label>
         <div className="form-actions-stack">
           <button type="submit" className="primary full form-btn">
@@ -48,8 +48,8 @@ export default function ProfileTab() {
             <button
               type="button"
               className="text-btn"
-              onClick={() => {
-                logout();
+              onClick={async () => {
+                await logout();
                 router.push("/");
               }}
             >
