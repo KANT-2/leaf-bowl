@@ -172,7 +172,10 @@ model OrderStatusHistory {
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model Order {
   id                String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  customerSessionId String               @map("customer_session_id") @db.Uuid
+  /// 비회원 주문의 세션. 회원 주문이면 NULL (chk_order_owner: customerSessionId·customerId 중 정확히 하나)
+  customerSessionId String?              @map("customer_session_id") @db.Uuid
+  /// 회원 주문의 FastAPI customers.id. Prisma 밖의 표라 외래키는 없다
+  customerId        BigInt?              @map("customer_id")
   status            String               @default("received") @db.VarChar(10)
   version           Int                  @default(1)
   ordererName       String               @map("orderer_name") @db.VarChar(50)
@@ -195,9 +198,11 @@ model Order {
   payment           PaymentCheckout?
 
   @@unique([customerSessionId, requestKey], map: "uq_order_request")
+  @@unique([customerId, requestKey], map: "uq_order_member_request", where: raw("(customer_id IS NOT NULL)"))
   @@index([updatedAt(sort: Desc)], map: "idx_orders_completed", where: raw("((status)::text = 'completed'::text)"))
   @@index([status, createdAt(sort: Desc), id(sort: Desc)], map: "idx_orders_list")
   @@index([customerSessionId, createdAt(sort: Desc)], map: "idx_orders_session")
+  @@index([customerId, createdAt(sort: Desc), id(sort: Desc)], map: "idx_orders_customer", where: raw("(customer_id IS NOT NULL)"))
   @@map("orders")
 }
 

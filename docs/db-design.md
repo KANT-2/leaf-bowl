@@ -266,7 +266,8 @@ erDiagram
 
   orders {
     uuid id PK
-    uuid customer_session_id "비회원 세션, 외래키 없음"
+    uuid customer_session_id "비회원 세션, 외래키 없음. 회원 주문이면 NULL"
+    bigint customer_id "회원(FastAPI customers.id), 외래키 없음. 비회원 주문이면 NULL"
     varchar status "received·confirmed·preparing·delivering·completed·canceled"
     int version "동시 변경 방지"
     bigint subtotal
@@ -313,6 +314,7 @@ erDiagram
 | --- | --- |
 | 주문 UUID, 상태, `version`, 주문자·연락처·주소·UTC 배송 시작/종료 시각, 상품 합계·배달비·총액 | `orders` 의 같은 이름 칸 (`total` 은 `subtotal + delivery_fee` 와 같아야 한다는 CHECK) |
 | 고객 세션 ID 와 `requestKey` 복합 유일 | `UNIQUE (customer_session_id, request_key)` |
+| 회원 주문 (0011, FastAPI UC-C) | 주인은 `customer_session_id`·`customer_id` 중 정확히 하나 (`CHECK num_nonnulls(...) = 1`). 회원은 `UNIQUE (customer_id, request_key) WHERE customer_id IS NOT NULL`, 목록은 `(customer_id, created_at DESC, id DESC)` 부분 인덱스. `customers` 는 FastAPI 가 만드는 표라 외래키를 걸지 않는다 |
 | `requestHash` | `request_hash` (같은 키로 다른 내용을 보내면 서비스가 409) |
 | 금액은 원 단위, 합계는 BigInt | `BIGINT`. JSON 응답에서는 십진 문자열로 변환 |
 | 주문 항목은 주문 당시 값의 스냅샷 | `order_items.name·options·unit_price`. `product_id` 는 참고용(상품이 지워지면 NULL) |

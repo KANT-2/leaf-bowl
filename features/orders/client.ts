@@ -111,14 +111,23 @@ export async function submitOrder(input: OrderInput, key: string): Promise<{ id:
 }
 
 export type ServerOrder = OrderRecord & { status: string };
-export async function loadServerOrders(cursor?: string): Promise<{ items: ServerOrder[]; nextCursor: string | null }> {
-  await jsonRequest("/api/v1/session", { method: "POST" });
-  const query = new URLSearchParams({
+export type ServerOrderPage = { items: ServerOrder[]; nextCursor: string | null };
+
+export function orderPageQuery(cursor?: string) {
+  return new URLSearchParams({
     limit: "20",
     ...(cursor ? { cursor } : {}),
   });
-  const page = await jsonRequest("/api/v1/orders?" + query);
-  if (!Array.isArray(page.items) || (page.nextCursor !== null && typeof page.nextCursor !== "string")) {
+}
+
+export async function loadServerOrders(cursor?: string): Promise<ServerOrderPage> {
+  await jsonRequest("/api/v1/session", { method: "POST" });
+  return parseOrderPage(await jsonRequest("/api/v1/orders?" + orderPageQuery(cursor)));
+}
+
+/** 주문 목록 응답 (Next.js 비회원 API 와 FastAPI 회원 API 가 같은 모양이다) */
+export function parseOrderPage(page: Awaited<ReturnType<typeof jsonRequest>>): ServerOrderPage {
+  if (!Array.isArray(page?.items) || (page.nextCursor !== null && typeof page.nextCursor !== "string")) {
     throw new Error("주문 내역을 확인하지 못했습니다.");
   }
   return {

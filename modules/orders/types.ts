@@ -31,7 +31,8 @@ export interface StatusHistoryRecord {
 /** db/schema.sql 의 orders + order_items + order_status_history 를 합친 모양 */
 export interface OrderRecord {
   id: string;
-  customerSessionId: string;
+  /** 비회원 주문의 세션. FastAPI 가 접수한 회원 주문은 null (주인은 orders.customer_id) */
+  customerSessionId: string | null;
   status: OrderStatus;
   version: number;
   ordererName: string;
@@ -70,8 +71,9 @@ export type NewOrder = Omit<
     | "requestHash"
     | "items"
   >,
-  "items"
-> & { items: OrderItemRecord[] };
+  "items" | "customerSessionId"
+  // Next.js 는 비회원 주문만 접수한다
+> & { customerSessionId: string; items: OrderItemRecord[] };
 
 export interface StatusUpdate {
   id: string;
