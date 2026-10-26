@@ -79,6 +79,7 @@ raise NotFound("배송지를 찾을 수 없습니다.")
 | GET | `/api/me` | 내 정보 | 고객 |
 | PATCH | `/api/me` | 이름·전화번호 수정 (보낸 항목만, phone 빈 값은 삭제) | 고객 |
 | GET | `/api/me/login-history` | 내 로그인 기록 (`result`, `from`, `to`, `page`, `size`) | 고객 |
+| GET | `/api/me/login-history.csv` | 같은 조건의 기록 전체를 CSV 파일로 (StreamingResponse) | 고객 |
 | GET · POST | `/api/me/addresses` | 내 배송지 목록 · 추가 | 고객 |
 | PATCH · DELETE | `/api/me/addresses/{id}` | 배송지 수정 · 삭제 | 고객 |
 | POST | `/api/me/addresses/{id}/default` | 기본 배송지로 지정 | 고객 |
@@ -193,3 +194,90 @@ Prisma 가 관리하는 기존 테이블(상품·주문 등)은 건드리지 않
 | `Asia/Seoul` 시간대 로드 실패 | Windows 에 tz 데이터 없음 | 고정 +09:00 사용 (orders 와 같은 방식) |
 | 로그인 실패 기록이 안 남음 | 예외로 401 을 내면 BackgroundTasks 가 실행되지 않음 | 실패 응답을 직접 만들어 반환 |
 | PR CI 실패 | 클라이언트 테스트가 날짜를 10/24 로 고정, 토큰 만료는 실제 시계로 판단 | `NOW = Date.now()` 로 수정 |
+
+---
+
+## 10. 도전 B · BackgroundTasks 증거 (로그인 기록)
+
+로그인 기록은 **응답을 먼저 보낸 뒤** `BackgroundTasks` 로 저장합니다. 기록 저장이 느리거나 실패해도 로그인 자체는 영향을 받지 않게 하려는 것입니다.
+
+| 단계 | 하는 일 | 코드 |
+| --- | --- | --- |
+| ① 로그인 처리 | 비밀번호 확인 → 토큰 발급(또는 401) | `auth/presentation/router.py` |
+| ② 작업 예약 | `background_tasks.add_task(recorder, attempt)` | 같은 파일 |
+| ③ 응답 전송 | 200 토큰 / 401 오류 | — |
+| ④ 이력 저장 | **새 DB 세션**으로 `login_history` 에 INSERT | `auth/presentation/login_history.py` `record_in_new_session` |
+
+- 요청용 세션은 응답과 함께 닫히므로 ④는 `database.new_session()` 으로 따로 연다
+- 실패한 로그인도 기록하려고 401 을 예외가 아닌 `JSONResponse` 로 반환한다 (예외로 끝나면 예약한 작업이 실행되지 않음)
+- 가입되지 않은 이메일은 회원 id 가 없으므로 기록하지 않는다
+
+### 실행 순서 증거
+
+**자동 테스트** `tests/test_background_tasks.py`
+ASGI 단계에서 "응답 본문 전송 완료" 시점과 "이력 저장" 시점을 같은 목록에 적어 비교한다.
+
+| 테스트 | 확인 내용 |
+| --- | --- |
+| `test_history_is_saved_after_response_is_sent[200]` | 성공 로그인: `["응답 전송 완료", "이력 저장(success)"]` |
+| `test_history_is_saved_after_response_is_sent[401]` | 실패 로그인: `["응답 전송 완료", "이력 저장(failure)"]` |
+| `test_unknown_email_schedules_no_background_task` | 없는 이메일: 응답만 있고 저장 작업 없음 |
+
+**실제 서버 로그** (Supabase 연결, 2026-10-26, 테스트 계정은 확인 후 삭제)
+
+```text
+16:10:08,475 INFO app.request          POST /api/auth/token 200 62.2ms      ← 응답 완료
+16:10:08,623 INFO app.login_history    로그인 이력 기록 완료(BackgroundTasks): result=success 로그인 시도 후 148.9ms
+16:10:08,816 INFO app.request          POST /api/auth/token 401 75.1ms      ← 응답 완료
+16:10:08,847 INFO app.login_history    로그인 이력 기록 완료(BackgroundTasks): result=failure 로그인 시도 후 31.5ms
+```
+
+요청 로그(응답 처리 시간 62ms)가 먼저 찍히고, 그 뒤에 이력 저장 완료 로그가 찍힌다. DB 에도 `success`, `failure(wrong_password)` 두 행이 저장된 것을 확인했다.
+
+### 실패 처리 증거
+
+| 테스트 | 상황 | 결과 |
+| --- | --- | --- |
+| `test_login_still_succeeds_when_history_saving_fails` | DB 가 없어 이력 저장이 반드시 실패 | 로그인은 **200 + 토큰**, `로그인 이력 기록 실패` 로그 1건(원인 예외 포함), 완료 로그 없음, 로그에 비밀번호 없음 |
+
+`record_in_new_session` 은 예외를 잡아 `logger.exception` 으로만 남기고 다시 던지지 않는다. 응답은 이미 나간 뒤라 사용자는 영향이 없고, 운영자는 로그로 원인을 확인한다.
+
+### 직접 확인하기
+
+1. 서버 실행 후 Swagger 에서 로그인 한 번, 틀린 비밀번호로 한 번
+2. 서버 로그에서 `app.request POST /api/auth/token` 다음 줄에 `로그인 이력 기록 완료(BackgroundTasks)` 가 찍히는지 확인
+3. `GET /api/me/login-history` 로 두 건(성공·실패) 확인
+4. 자동 테스트: `uv run pytest tests/test_background_tasks.py -v`
+
+### CSV 다운로드 (StreamingResponse)
+
+마이페이지 **로그인 기록** 탭의 **[파일로 받기 (CSV)]** → `GET /api/me/login-history.csv`.
+지금 조회한 조건(성공·실패, 기간) 그대로, 페이지 구분 없이 전체를 한 파일로 받습니다.
+
+| 단계 | 하는 일 | 코드 |
+| --- | --- | --- |
+| ① 조건 검사 | `LoginHistoryQuery` 로 기간 규칙 확인 (위반이면 **응답을 시작하기 전에** 400) | `presentation/login_history.py` |
+| ② 나눠 읽기 | 50건씩 DB 에서 읽어 한 건씩 넘김. 내보내는 중 새 로그인이 기록돼도 같은 행이 두 번 나오지 않음 | `application/login_history.py` `export_mine` |
+| ③ 한 줄씩 전송 | 머리글 → 행 하나씩 `StreamingResponse` 로 흘려보냄 (`transfer-encoding: chunked`) | `_csv_chunks` |
+| ④ 완료 로그 | `로그인 이력 CSV 내보내기 완료(StreamingResponse): rows=N` | 같은 함수 |
+
+- 엑셀에서 한글이 깨지지 않게 UTF-8 BOM 을 붙이고, 시간은 한국 시간, 결과·실패 이유는 한국어로 쓴다
+- 기기 정보는 사용자가 보낸 값이라 `=`·`+`·`-`·`@` 로 시작하면 앞에 `'` 를 붙여 엑셀 수식으로 실행되지 않게 한다 (CSV 수식 주입 방지)
+- `Cache-Control: no-store`, 회원 id 는 토큰에서만 가져와 남의 기록은 받을 수 없다
+
+| 테스트 (`tests/test_login_history_csv.py`) | 확인 내용 |
+| --- | --- |
+| `test_body_is_sent_in_many_chunks` | 기록 31건 → 본문이 **32조각**(머리글 1 + 행 31)으로 나뉘어 전송 |
+| `test_export_reads_every_page_newest_first` | 50건 단위 3쪽을 모두 읽고 최신순, 다른 회원 기록 제외 |
+| `test_export_skips_rows_repeated_by_new_login_during_export` | 내보내는 중 새 로그인이 생겨도 중복 없음 |
+| `test_download_returns_only_my_history_as_csv_file` | 파일 이름·형식·BOM·머리글, 내 기록만, 비밀번호 없음 |
+| `test_download_applies_same_filters_as_list` · `test_invalid_period_is_rejected_before_streaming` | 목록과 같은 조건, 잘못된 기간은 400 |
+| `test_csv_row_blocks_formula_injection` | `=HYPERLINK(...)` → `'=HYPERLINK(...)` |
+
+실제 서버 확인 (2026-10-26, 테스트 계정은 확인 후 삭제): 응답 헤더 `transfer-encoding: chunked`, 파일 `leafbowl-login-history-20261026.csv`
+
+```text
+일시(한국 시간),결과,실패 이유,기기 정보
+2026-10-26 17:25:32,성공,,curl/8.21.0
+2026-10-26 17:25:31,실패,비밀번호 불일치,'=HYPERLINK(evil)
+```

@@ -217,3 +217,24 @@ test("the receipt image is fetched with the token and saved under the server fil
   await assert.rejects(client.loadMemberReceipt(ORDER.id), client.MemberAuthError);
   assert.equal(memberTokenStore.getSnapshot(), null);
 });
+
+test("the login history CSV uses the list filters and the server file name", async () => {
+  signedIn();
+  const calls = stubFetch(
+    new Response("﻿일시(한국 시간),결과,실패 이유,기기 정보\r\n", {
+      headers: {
+        "content-type": "text/csv; charset=utf-8",
+        "content-disposition": 'attachment; filename="leafbowl-login-history-20261026.csv"',
+      },
+    }),
+    new Response("", { headers: { "content-type": "text/csv" } }),
+    json({ error: { code: "unauthorized", message: "로그아웃된 토큰입니다." } }, 401),
+  );
+  const csv = await client.loadLoginHistoryCsv({ result: "failure", from: "2026-10-01", to: "2026-10-26" });
+  assert.equal(calls[0].url, "/backend/api/me/login-history.csv?result=failure&from=2026-10-01&to=2026-10-26");
+  assert.equal(calls[0].headers.authorization, "Bearer jwt-1");
+  assert.equal(csv.filename, "leafbowl-login-history-20261026.csv");
+  assert.equal((await client.loadLoginHistoryCsv({})).filename, "leafbowl-login-history.csv"); // 헤더가 없을 때
+  assert.equal(calls[1].url, "/backend/api/me/login-history.csv", "조건이 없으면 쿼리를 붙이지 않는다");
+  await assert.rejects(client.loadLoginHistoryCsv({}), client.MemberAuthError);
+});

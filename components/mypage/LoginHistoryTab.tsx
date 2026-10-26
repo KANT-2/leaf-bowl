@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   loadLoginHistory,
+  loadLoginHistoryCsv,
   MemberAuthError,
   type LoginHistoryFilter,
   type LoginHistoryPage,
@@ -46,6 +47,18 @@ function deviceLabel(userAgent: string | null): string {
   return os ? `${browser} · ${os}` : browser;
 }
 
+/** 받은 파일을 브라우저 다운로드로 저장한다 */
+function saveFile(file: Blob, filename: string) {
+  const url = URL.createObjectURL(file);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 export default function LoginHistoryTab() {
   const router = useRouter();
   const [form, setForm] = useState<Omit<LoginHistoryFilter, "page">>({});
@@ -53,10 +66,12 @@ export default function LoginHistoryTab() {
   // 응답이 어떤 조건(key)에 대한 것인지 함께 둔다. 조건과 응답의 key 가 다르면 불러오는 중이다.
   const [result, setResult] = useState<{ key: string; data?: LoginHistoryPage; error?: string }>({ key: "" });
   const [formError, setFormError] = useState("");
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState("");
   const key = JSON.stringify(filter);
   const loading = result.key !== key;
   const data = result.data ?? null;
-  const error = formError || (loading ? "" : (result.error ?? ""));
+  const error = formError || downloadError || (loading ? "" : (result.error ?? ""));
 
   useEffect(() => {
     let alive = true;
@@ -87,6 +102,27 @@ export default function LoginHistoryTab() {
     setFormError("");
     setFilter({ ...form, page: 1 });
   };
+
+  // 지금 화면에 조회된 조건(filter) 그대로, 모든 페이지를 한 파일로 받는다
+  async function download() {
+    if (downloading) {
+      return;
+    }
+    setDownloading(true);
+    setDownloadError("");
+    try {
+      const { file, filename } = await loadLoginHistoryCsv({ result: filter.result, from: filter.from, to: filter.to });
+      saveFile(file, filename);
+    } catch (cause) {
+      if (cause instanceof MemberAuthError) {
+        router.replace("/login?next=/mypage");
+        return;
+      }
+      setDownloadError(cause instanceof Error ? cause.message : "로그인 기록 파일을 받지 못했습니다.");
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   return (
     <section className="surface mypage-section">
@@ -132,7 +168,12 @@ export default function LoginHistoryTab() {
 
       {data && data.items.length > 0 && (
         <>
-          <p className="meta">총 {data.total}건</p>
+          <div className="login-history-summary">
+            <p className="meta">총 {data.total}건</p>
+            <button type="button" className="ghost-btn" disabled={loading || downloading} onClick={download}>
+              {downloading ? "파일 받는 중…" : "파일로 받기 (CSV)"}
+            </button>
+          </div>
           <ul className="login-history-list">
             {data.items.map((item) => (
               <li key={item.id} className={item.result}>
