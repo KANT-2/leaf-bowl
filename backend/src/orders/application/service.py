@@ -22,6 +22,7 @@ from orders.domain.order import (
     resolve_cancel,
 )
 from orders.domain.pricing import price_order
+from orders.domain.receipt import Receipt
 from orders.domain.repository import (
     CatalogReader,
     DuplicateRequest,
@@ -133,6 +134,10 @@ class OrderService:
         if order is None or not order.is_owned_by(customer_id):
             raise NotFound(NOT_FOUND)
         return order
+
+    async def receipt(self, customer_id: int, order_id: UUID) -> Receipt:
+        """본인 주문의 영수증. 소유권을 확인한 뒤에 만들므로 404 는 내려보내기 전에 정해진다."""
+        return Receipt(await self.get_mine(customer_id, order_id), issued_at=self.clock())
 
     async def list_mine(
         self,
