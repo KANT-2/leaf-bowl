@@ -72,7 +72,8 @@ def test_unexpected_error_hides_details():
 def test_protected_route_without_token_is_401():
     res = make_client().get("/_test/me")
     assert res.status_code == 401
-    assert res.json()["error"]["code"] == "http_401"
+    assert res.json()["error"] == {"code": "unauthorized", "message": "로그인이 필요합니다."}
+    assert res.headers["www-authenticate"] == "Bearer"
 
 
 def test_cors_allows_frontend_origin():
