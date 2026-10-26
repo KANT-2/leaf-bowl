@@ -10,7 +10,7 @@ from PIL import Image
 
 from orders.domain.order import OrderStatus
 from orders.domain.receipt import Receipt
-from orders.infrastructure.receipt_image import SCALE, WIDTH, PillowReceiptRenderer, _font, wrap
+from orders.infrastructure.receipt_image import OUTPUT_WIDTH, SCALE, PillowReceiptRenderer, _font, wrap
 from test_order_receipt import ISSUED, placed
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -24,10 +24,10 @@ def render(order) -> Image.Image:
     return image
 
 
-def test_renders_a_png_at_double_scale():
+def test_renders_a_720px_wide_png():
     image = render(placed())
     assert image.format == "PNG"
-    assert image.width == WIDTH * SCALE
+    assert image.width == OUTPUT_WIDTH == 720
     assert image.height > image.width  # 세로로 긴 영수증
     assert PillowReceiptRenderer.media_type == "image/png"
 

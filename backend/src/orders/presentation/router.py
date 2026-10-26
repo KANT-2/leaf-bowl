@@ -114,7 +114,7 @@ async def get_my_order(
     response_class=StreamingResponse,
     summary="주문 영수증 내려받기 (PNG)",
     description=(
-        "본인 주문의 영수증을 PNG 이미지로 만들어 조각(64KB)으로 나누어 내려준다 (StreamingResponse). "
+        "본인 주문의 영수증을 PNG 이미지(가로 720px)로 만들어 16KB 조각으로 나누어 내려준다 (StreamingResponse). "
         "주문 확인·권한 검사는 보내기 전에 끝나므로 401·404 는 JSON 오류로 답한다."
     ),
     responses={
@@ -142,7 +142,7 @@ async def download_my_receipt(
     )
 
 
-RECEIPT_CHUNK = 64 * 1024
+RECEIPT_CHUNK = 16 * 1024  # 720px 영수증(약 60KB)이 여러 조각으로 나뉘는 크기
 
 
 async def _chunks(content: bytes) -> AsyncIterator[bytes]:

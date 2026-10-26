@@ -1,7 +1,7 @@
 """영수증 행(도메인 ReceiptRow)을 PNG 이미지로 그린다 (Pillow).
 
 서버 OS 에 한글 폰트가 없어도 같은 결과가 나오도록 나눔고딕(SIL OFL, backend/assets/fonts)을 함께 배포한다.
-좌표는 논리 단위로 계산하고 SCALE 배로 그려 고해상도 화면에서도 글자가 흐리지 않게 한다.
+좌표는 논리 폭 WIDTH 기준으로 계산하고, 결과 이미지는 OUTPUT_WIDTH(720px) 폭이 되도록 SCALE 배로 그린다.
 """
 
 from collections.abc import Callable
@@ -14,8 +14,9 @@ from PIL import Image, ImageDraw, ImageFont
 from orders.domain.receipt import Receipt, ReceiptRow, RowKind
 
 FONT_DIR = Path(__file__).resolve().parents[3] / "assets" / "fonts"
-SCALE = 2
 WIDTH, PAD, BAR = 640, 44, 8
+OUTPUT_WIDTH = 720  # 내려받는 이미지의 가로 픽셀
+SCALE = OUTPUT_WIDTH / WIDTH
 CONTENT = WIDTH - PAD * 2
 LABEL_COLUMN = 96  # 라벨 칸 너비. 값은 나머지 칸에 오른쪽 정렬
 PAPER, INK, MUTED, LINE, ACCENT, ALERT = "#ffffff", "#1f2937", "#6b7280", "#d1d5db", "#1b4332", "#b91c1c"
@@ -26,7 +27,7 @@ Draw = Callable[[ImageDraw.ImageDraw], None]
 @lru_cache
 def _font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
     name = "NanumGothic-Bold.ttf" if bold else "NanumGothic-Regular.ttf"
-    return ImageFont.truetype(str(FONT_DIR / name), size * SCALE)
+    return ImageFont.truetype(str(FONT_DIR / name), round(size * SCALE))
 
 
 def _width(text: str, font: ImageFont.FreeTypeFont) -> float:
@@ -56,10 +57,10 @@ class PillowReceiptRenderer:
 
     def render(self, receipt: Receipt) -> bytes:
         draws, height = self._layout(receipt.rows(), receipt.canceled)
-        image = Image.new("RGB", (WIDTH * SCALE, round(height * SCALE)), PAPER)
+        image = Image.new("RGB", (OUTPUT_WIDTH, round(height * SCALE)), PAPER)
         canvas = ImageDraw.Draw(image)
-        canvas.rectangle((0, 0, WIDTH * SCALE, BAR * SCALE), fill=ACCENT)
-        canvas.rectangle((0, image.height - BAR * SCALE, WIDTH * SCALE, image.height), fill=ACCENT)
+        canvas.rectangle((0, 0, OUTPUT_WIDTH, round(BAR * SCALE)), fill=ACCENT)
+        canvas.rectangle((0, image.height - round(BAR * SCALE), OUTPUT_WIDTH, image.height), fill=ACCENT)
         for draw in draws:
             draw(canvas)
         out = BytesIO()
@@ -83,7 +84,7 @@ class PillowReceiptRenderer:
                     box = ((WIDTH - w) / 2, y - 6, (WIDTH + w) / 2, y + 24)
                     draws.append(
                         lambda c, b=box: c.rounded_rectangle(
-                            [v * SCALE for v in b], radius=6 * SCALE, outline=ALERT, width=2 * SCALE
+                            [v * SCALE for v in b], radius=round(6 * SCALE), outline=ALERT, width=2
                         )
                     )
                     text(WIDTH / 2, y, "취소된 주문", stamp, ALERT, "ma")
@@ -101,7 +102,7 @@ class PillowReceiptRenderer:
                 line_y = y
                 draws.append(
                     lambda c, ly=line_y: [
-                        c.line(((x * SCALE, ly * SCALE), ((x + 6) * SCALE, ly * SCALE)), fill=LINE, width=SCALE)
+                        c.line(((x * SCALE, ly * SCALE), ((x + 6) * SCALE, ly * SCALE)), fill=LINE, width=1)
                         for x in range(PAD, WIDTH - PAD - 5, 10)
                     ]
                 )

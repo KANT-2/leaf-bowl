@@ -394,9 +394,9 @@ def test_receipt_of_a_canceled_order_says_so(ctx):
 
 @pytest.mark.anyio
 async def test_receipt_bytes_are_streamed_in_chunks(anyio_backend):
-    content = bytes(range(256)) * 600  # 150KB
+    content = bytes(range(256)) * 240  # 60KB, 720px 영수증과 비슷한 크기
     chunks = [chunk async for chunk in _chunks(content)]
-    assert len(chunks) == 3 and all(len(c) <= RECEIPT_CHUNK for c in chunks)
+    assert len(chunks) == 4 and all(len(c) <= RECEIPT_CHUNK for c in chunks)
     assert b"".join(chunks) == content
 
 
