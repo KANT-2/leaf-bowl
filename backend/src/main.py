@@ -10,6 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import database
 from auth.presentation.login_history import router as login_history_router
 from auth.presentation.router import router as auth_router
+from bowls.presentation.router import router as bowls_router
+from catalog.presentation.router import router as catalog_router
 from core.config import get_settings
 from core.exception_handlers import register_exception_handlers
 from core.middleware import log_requests
@@ -34,6 +36,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
+
+    # 아래에 기존 미들웨어·예외 핸들러·health 코드가 이어집니다.
 
     # 나중에 추가한 미들웨어가 바깥쪽에서 실행된다: CORS → 로깅 → 라우터
     app.middleware("http")(log_requests)
@@ -63,6 +67,8 @@ def create_app() -> FastAPI:
     app.include_router(customers_router)
     app.include_router(login_history_router)
     app.include_router(orders_router)
+    app.include_router(catalog_router)
+    app.include_router(bowls_router)
     return app
 
 
