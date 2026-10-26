@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import database
 from auth.presentation.router import router as auth_router
+from bowls.presentation.router import router as bowls_router
 from catalog.presentation.router import router as catalog_router
 from core.config import get_settings
 from core.exception_handlers import register_exception_handlers
@@ -63,6 +64,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(orders_router)
     app.include_router(catalog_router)
+    app.include_router(bowls_router)
     return app
 
 

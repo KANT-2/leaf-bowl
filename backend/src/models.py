@@ -4,4 +4,5 @@
 """
 
 from auth.infrastructure import models as auth_models  # noqa: F401
+from bowls.infrastructure import models as bowl_models  # noqa: F401
 from customers.infrastructure import models as customer_models  # noqa: F401
