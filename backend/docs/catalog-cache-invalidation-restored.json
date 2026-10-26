@@ -1,0 +1,16 @@
+{
+  "passed": false,
+  "checked_at": "2026-10-26T08:25:14.586970+00:00",
+  "key": "salad-0",
+  "field": "name",
+  "before_value": "레몬 치킨 아보카도",
+  "expected": "레몬 치킨 아보카도",
+  "actual": "레몬 치킨 아보카도",
+  "before_revision": "3",
+  "after_revision": "5",
+  "cache": "MISS",
+  "first_request_ms": 236.452,
+  "seconds_since_capture": 959.965,
+  "configured_ttl_seconds": 3600.0,
+  "within_ttl": true
+}

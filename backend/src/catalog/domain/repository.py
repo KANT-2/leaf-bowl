@@ -6,6 +6,10 @@ from catalog.domain.product import MenuQuery, Product
 
 
 class ProductRepository(Protocol):
+    async def lock_revision(self) -> int:
+        """최신 revision을 읽고 요청의 조회가 끝날 때까지 관리자 쓰기와 동기화한다."""
+        ...
+
     async def list_categories(self) -> list[str]:
         """고객에게 보이는 메뉴 분류 이름 목록 (categories 표)."""
         ...

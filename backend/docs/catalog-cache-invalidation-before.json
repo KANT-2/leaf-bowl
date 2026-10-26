@@ -1,0 +1,24 @@
+{
+  "base_url": "http://127.0.0.1:8000",
+  "captured_at": "2026-10-26T08:09:14.339803+00:00",
+  "key": "salad-0",
+  "item": {
+    "id": 0,
+    "key": "salad-0",
+    "name": "레몬 치킨 아보카도",
+    "name_en": "Lemon chicken avocado",
+    "price": 10900,
+    "category": "든든한 단백질",
+    "badge": "BEST",
+    "status": "active",
+    "image_url": "/images/salad-00-cutout.png",
+    "allergens": [
+      "닭고기",
+      "토마토"
+    ]
+  },
+  "elapsed_ms": 119.735,
+  "cache": "HIT",
+  "revision": "3",
+  "server_ms": "50.6"
+}
