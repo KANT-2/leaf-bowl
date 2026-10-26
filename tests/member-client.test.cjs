@@ -5,7 +5,8 @@ require("./register-typescript.cjs");
 const client = require("../features/member/client.ts");
 const { memberTokenStore } = require("../infrastructure/browser/member-token.ts");
 
-const NOW = Date.parse("2026-10-24T03:00:00.000Z");
+// 토큰 만료는 실제 시계(Date.now)로 판단하므로, 고정 날짜를 쓰면 그 날짜가 지난 뒤 테스트가 실패한다
+const NOW = Date.now();
 const ORDER = {
   id: "5cd63d2a-f8e0-43ed-aae9-03b07f193d2c",
   status: "received",
