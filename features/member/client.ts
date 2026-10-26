@@ -26,6 +26,8 @@ interface BackendInit {
   json?: unknown;
   form?: Record<string, string>;
   headers?: Record<string, string>;
+  /** 화면을 나가거나 계정이 바뀌면 현재 요청을 취소한다. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -33,13 +35,27 @@ interface BackendInit {
  * 인증이 필요한 요청이 401 이면 토큰을 지우고 MemberAuthError 를 던진다.
  */
 export async function backendRequest(path: string, init: BackendInit = {}) {
+  const response = await backendResponse(path, init);
+  if (response.status === 204) {
+    return null;
+  }
+  try {
+    return await response.json();
+  } catch {
+    throw new Error("서버 응답을 확인하지 못했습니다. 다시 시도해주세요.");
+  }
+}
+
+/** 성공한 응답을 그대로 돌려준다 (파일 내려받기처럼 JSON 이 아닌 응답). 오류 처리는 backendRequest 와 같다. */
+async function backendResponse(path: string, init: BackendInit = {}): Promise<Response> {
   const headers: Record<string, string> = { ...init.headers };
+  let requestToken: string | null = null;
   if (init.auth) {
-    const token = memberTokenStore.current();
-    if (!token) {
+    requestToken = memberTokenStore.current();
+    if (!requestToken) {
       throw new MemberAuthError();
     }
-    headers.authorization = `Bearer ${token}`;
+    headers.authorization = `Bearer ${requestToken}`;
   }
   let body: BodyInit | undefined;
   if (init.json !== undefined) {
@@ -49,30 +65,56 @@ export async function backendRequest(path: string, init: BackendInit = {}) {
     body = new URLSearchParams(init.form);
   }
   let response: Response;
+  const timeout = AbortSignal.timeout(15_000);
+  const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
   try {
     response = await fetch(BACKEND + path, {
       method: init.method ?? "GET",
       headers,
       body,
       cache: "no-store",
-      signal: AbortSignal.timeout(15_000),
+      signal,
     });
-  } catch {
+  } catch (cause) {
+    if (init.signal?.aborted) {
+      throw init.signal.reason;
+    }
+    if (timeout.aborted) {
+      throw new Error("서버 응답 시간이 초과됐습니다. 다시 시도해주세요.");
+    }
+    if (cause instanceof DOMException && cause.name === "AbortError") {
+      throw cause;
+    }
     throw new Error("서버에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.");
   }
-  if (response.status === 204) {
-    return null;
+  if (response.ok) {
+    return response;
+  }
+  if (response.status === 401 && init.auth) {
+    memberTokenStore.set(null);
+    throw new MemberAuthError("로그인이 만료되었습니다. 다시 로그인해주세요.");
   }
   let data;
   try {
     data = await response.json();
-  } catch {
+  } catch (cause) {
+    if (init.signal?.aborted) {
+      throw init.signal.reason;
+    }
+    if (timeout.aborted) {
+      throw new Error("서버 응답 시간이 초과됐습니다. 다시 시도해주세요.");
+    }
+    if (cause instanceof DOMException && cause.name === "AbortError") {
+      throw cause;
+    }
     throw new Error("서버 응답을 확인하지 못했습니다. 다시 시도해주세요.");
   }
   if (!response.ok) {
     const message = typeof data?.error?.message === "string" ? data.error.message : undefined;
     if (response.status === 401 && init.auth) {
-      memberTokenStore.set(null);
+      if (requestToken && memberTokenStore.current() === requestToken) {
+        memberTokenStore.set(null);
+      }
       throw new MemberAuthError("로그인이 만료되었습니다. 다시 로그인해주세요.");
     }
     throw new Error(message ?? "요청을 처리하지 못했습니다. 다시 시도해주세요.");
@@ -262,8 +304,26 @@ export async function submitMemberOrder(input: OrderInput, key: string): Promise
   return { id: body.id, total: Number(body.total) };
 }
 
-export async function loadMemberOrders(cursor?: string): Promise<ServerOrderPage> {
-  return parseOrderPage(await backendRequest("/api/v1/orders?" + orderPageQuery(cursor), { auth: true }));
+export interface MemberOrderFilter {
+  /** 비어 있으면 모든 상태 */
+  statuses?: readonly string[];
+  /** YYYY-MM-DD, 한국 시간 기준 주문일. to 는 그날 끝까지 포함한다. */
+  from?: string;
+  to?: string;
+}
+
+/** 내 주문 (최신순). 커서로 이어 읽을 때도 같은 조건을 보낸다. */
+export async function loadMemberOrders(cursor?: string, filter: MemberOrderFilter = {}): Promise<ServerOrderPage> {
+  const params = orderPageQuery(cursor);
+  for (const status of filter.statuses ?? []) {
+    params.append("status", status);
+  }
+  for (const key of ["from", "to"] as const) {
+    if (filter[key]) {
+      params.set(key, filter[key]);
+    }
+  }
+  return parseOrderPage(await backendRequest("/api/v1/orders?" + params, { auth: true }));
 }
 
 export async function cancelMemberOrder(id: string, reason?: string): Promise<{ status: string; canceledAt: string }> {
@@ -276,6 +336,13 @@ export async function cancelMemberOrder(id: string, reason?: string): Promise<{ 
     throw new Error("취소 결과를 확인하지 못했습니다. 주문 내역을 새로 고쳐주세요.");
   }
   return { status: body.status, canceledAt: body.canceledAt };
+}
+
+/** 내 주문 영수증 (텍스트 파일). 토큰을 헤더로 보내야 해서 링크 대신 받아서 저장한다. */
+export async function loadMemberReceipt(id: string): Promise<{ file: Blob; filename: string }> {
+  const response = await backendResponse(`/api/v1/orders/${encodeURIComponent(id)}/receipt`, { auth: true });
+  const named = /filename="([^"]+)"/.exec(response.headers.get("content-disposition") ?? "");
+  return { file: await response.blob(), filename: named?.[1] ?? `leafbowl-receipt-${id.slice(0, 8)}.txt` };
 }
 
 /** 회원 주문만 취소할 수 있는 상태 (FastAPI·DB 트리거와 같은 규칙) */

@@ -1,6 +1,7 @@
 """주문 API 를 HTTP 단위로 검증한다 (DB 대신 메모리 저장소, 인증은 의존성 교체)."""
 
 from datetime import UTC, datetime
+from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,6 +11,7 @@ from core.dependencies import get_current_customer
 from fakes import FakeCatalogReader, FakeSession, FakeSettingsReader, InMemoryOrderRepository
 from main import create_app
 from orders.application.service import OrderService
+from orders.container import get_order_service
 from orders.domain.catalog import (
     Catalog,
     CatalogProduct,
@@ -20,7 +22,6 @@ from orders.domain.catalog import (
 )
 from orders.domain.order import OrderStatus
 from orders.domain.request_hash import request_hash
-from orders.presentation.dependencies import get_order_service
 from orders.presentation.schemas import CreateOrderRequest
 from test_request_hash import LEGACY_SLOT_HASH, MIXED_HASH
 
@@ -279,6 +280,8 @@ def test_other_customers_order_and_bad_ids_are_404(ctx):
         assert response.status_code == 404
         assert error(response) == {"code": "not_found", "message": "주문을 찾을 수 없습니다."}
     assert ctx.client.post(f"/api/v1/orders/{order_id}/cancel").status_code == 404
+    receipt = ctx.client.get(f"/api/v1/orders/{order_id}/receipt")
+    assert receipt.status_code == 404 and receipt.headers["content-type"] == "application/json"
 
 
 def test_list_pages_through_my_orders_only(ctx):
@@ -295,9 +298,66 @@ def test_list_pages_through_my_orders_only(ctx):
     assert first["items"][0].keys() == ctx.client.get(f"/api/v1/orders/{ids[0]}").json().keys()
 
 
-@pytest.mark.parametrize(("params", "code"), [({"limit": 0}, 422), ({"limit": 51}, 422), ({"cursor": "nope"}, 400)])
+@pytest.mark.parametrize(
+    ("params", "code"),
+    [
+        ({"limit": 0}, 422),
+        ({"limit": 51}, 422),
+        ({"cursor": "nope"}, 400),
+        ({"status": "paid"}, 422),
+        ({"from": "2026-13-01"}, 422),
+        ({"from": "2026-10-11", "to": "2026-10-10"}, 400),
+    ],
+)
 def test_bad_list_query(ctx, params, code):
     assert ctx.client.get("/api/v1/orders", params=params).status_code == code
+
+
+def test_list_filters_by_several_statuses_and_korean_dates(ctx):
+    received, confirmed, canceled = (ctx.create(key=f"order-key-000{i}").json()["id"] for i in range(3))
+    ctx.orders.force_status(UUID(confirmed), OrderStatus.CONFIRMED)
+    ctx.orders.force_status(UUID(canceled), OrderStatus.CANCELED)
+
+    def listed(**params) -> set[str]:
+        response = ctx.client.get("/api/v1/orders", params=params)
+        assert response.status_code == 200
+        return {o["id"] for o in response.json()["items"]}
+
+    assert listed() == {received, confirmed, canceled}
+    assert listed(status=["received", "confirmed"]) == {received, confirmed}
+    assert listed(status="canceled") == {canceled}
+    # NOW 는 한국 시간 2026-10-10 12:00
+    assert listed(**{"from": "2026-10-10", "to": "2026-10-10"}) == {received, confirmed, canceled}
+    assert listed(**{"from": "2026-10-11"}) == set()
+    assert listed(to="2026-10-09") == set()
+    assert listed(status="canceled", to="2026-10-10") == {canceled}
+
+
+# ── 영수증 ─────────────────────────────────────────────────────────────
+
+
+def test_receipt_downloads_my_order_as_a_text_file(ctx):
+    items = [{"productId": 0, "dressingKeys": ["dressing-0"], "drinkKeys": ["drink-0"], "quantity": 3}]
+    order_id = ctx.create(order_body(items=items)).json()["id"]
+    response = ctx.client.get(f"/api/v1/orders/{order_id}/receipt")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "text/plain; charset=utf-8"
+    assert response.headers["content-disposition"] == f'attachment; filename="leafbowl-receipt-{order_id[:8]}.txt"'
+    assert response.headers["cache-control"] == "no-store"
+    lines = response.text.splitlines()
+    assert f"주문번호: {order_id}" in lines
+    assert "결제상태: 결제 완료" in lines
+    assert "  13,000원 × 3 = 39,000원" in lines
+    assert "결제 금액: 39,000원" in lines  # 3만 원 이상 무료배송
+    assert "발행일시: 2026-10-10 12:00 (KST)" in lines
+    assert "010-1234-5678" not in response.text
+
+
+def test_receipt_of_a_canceled_order_says_so(ctx):
+    order_id = ctx.create().json()["id"]
+    ctx.client.post(f"/api/v1/orders/{order_id}/cancel")
+    lines = ctx.client.get(f"/api/v1/orders/{order_id}/receipt").text.splitlines()
+    assert {"주문상태: 취소", "결제상태: 결제 취소", "취소일시: 2026-10-10 12:00 (KST)"} <= set(lines)
 
 
 # ── 취소 ─────────────────────────────────────────────────────────────
@@ -341,6 +401,7 @@ def test_every_endpoint_requires_a_customer_token():
         ("get", "/api/v1/orders"),
         ("get", f"/api/v1/orders/{order_id}"),
         ("post", f"/api/v1/orders/{order_id}/cancel"),
+        ("get", f"/api/v1/orders/{order_id}/receipt"),
     ]:
         response = client.request(method, path, json=order_body(), headers={"Idempotency-Key": "order-key-0001"})
         assert response.status_code == 401, path

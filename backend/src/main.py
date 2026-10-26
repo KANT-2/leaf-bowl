@@ -1,3 +1,4 @@
+
 """앱 조립: lifespan(DB 초기화·종료), 미들웨어, 예외 핸들러, 라우터."""
 
 import logging
@@ -8,6 +9,7 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 
 import database
+from admin_orders.presentation.router import router as admin_orders_router
 from auth.presentation.login_history import router as login_history_router
 from auth.presentation.router import router as auth_router
 from bowls.presentation.router import router as bowls_router
@@ -19,7 +21,10 @@ from customers.presentation.address_router import router as addresses_router
 from customers.presentation.router import router as customers_router
 from orders.presentation.router import router as orders_router
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
 logger = logging.getLogger("app")
 
 
@@ -29,27 +34,40 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await database.init_db()
         logger.info("DB 연결 확인, FastAPI 소유 테이블 준비 완료")
     else:
-        logger.warning("DATABASE_URL 이 없어 DB 없이 시작합니다. /health 만 동작합니다.")
+        logger.warning(
+            "DATABASE_URL 이 없어 DB 없이 시작합니다. /health 만 동작합니다."
+        )
+
     yield
+
     await database.close_db()
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
 
-    # 아래에 기존 미들웨어·예외 핸들러·health 코드가 이어집니다.
+    app = FastAPI(
+        title=settings.app_name,
+        version="0.1.0",
+        lifespan=lifespan,
+    )
 
-    # 나중에 추가한 미들웨어가 바깥쪽에서 실행된다: CORS → 로깅 → 라우터
+    # 나중에 추가한 미들웨어가 바깥쪽에서 실행된다:
+    # CORS → 로깅 → 라우터
     app.middleware("http")(log_requests)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
-        expose_headers=["X-Request-ID", "X-Process-Time-Ms"],
+        expose_headers=[
+            "X-Request-ID",
+            "X-Process-Time-Ms",
+        ],
     )
+
     register_exception_handlers(app)
 
     @app.get("/health", tags=["health"])
@@ -59,18 +77,28 @@ def create_app() -> FastAPI:
     @app.get("/health/db", tags=["health"])
     async def health_db() -> dict:
         if not database.is_configured():
-            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "DATABASE_URL 이 설정되지 않았습니다.")
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "DATABASE_URL 이 설정되지 않았습니다.",
+            )
+
         await database.ping()
         return {"status": "ok"}
 
-    # 기능 라우터는 여기에 등록한다
+    # 기능 라우터 등록
     app.include_router(auth_router)
     app.include_router(customers_router)
     app.include_router(addresses_router)
     app.include_router(login_history_router)
     app.include_router(orders_router)
+
+    # UC-D 관리자 로그인·로그아웃
+    app.include_router(admin_orders_router)
+
+    # 팀원들의 카탈로그·나만의 볼 API
     app.include_router(catalog_router)
     app.include_router(bowls_router)
+
     return app
 
 

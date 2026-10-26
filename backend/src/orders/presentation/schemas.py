@@ -198,14 +198,12 @@ class OrderItemResponse(CamelModel):
 
     @classmethod
     def of(cls, item: OrderItem) -> "OrderItemResponse":
-        o = item.options
-        names = [c.name for c in (*o.dressings, *o.drinks, *o.ingredients, *o.custom)]
         return cls(
             id=str(item.id) if item.id is not None else None,
             product_id=item.product_id,
             product_type=item.product_type,
             name=item.name,
-            options=" · ".join(names),
+            options=" · ".join(item.option_names),
             unit_price=item.unit_price,
             quantity=item.quantity,
         )

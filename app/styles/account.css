@@ -352,6 +352,12 @@
   border: 1px solid var(--color-line);
   border-radius: 8px;
 }
+.order-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .order-item-top {
   display: flex;
   justify-content: space-between;
@@ -559,6 +565,22 @@
   .pay-methods button {
     min-width: 100px;
   }
+}
+
+/* 마이페이지 주문 내역 필터 */
+.order-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  margin: 16px 0;
+}
+.order-filter .field {
+  flex: 1 1 140px;
+}
+.order-filter select,
+.order-filter input {
+  width: 100%;
 }
 
 /* 마이페이지 로그인 기록 */
