@@ -15,6 +15,7 @@ from catalog.presentation.router import router as catalog_router
 from core.config import get_settings
 from core.exception_handlers import register_exception_handlers
 from core.middleware import log_requests
+from customers.presentation.address_router import router as addresses_router
 from customers.presentation.router import router as customers_router
 from orders.presentation.router import router as orders_router
 
@@ -65,6 +66,7 @@ def create_app() -> FastAPI:
     # 기능 라우터는 여기에 등록한다
     app.include_router(auth_router)
     app.include_router(customers_router)
+    app.include_router(addresses_router)
     app.include_router(login_history_router)
     app.include_router(orders_router)
     app.include_router(catalog_router)

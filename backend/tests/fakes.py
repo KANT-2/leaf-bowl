@@ -10,6 +10,7 @@ from uuid import UUID
 from auth.domain.login_history import LoginAttempt, LoginHistoryQuery
 from auth.domain.revoked_token import RevokedToken
 from core.exceptions import Conflict, NotFound
+from customers.domain.address import Address, AddressBook
 from customers.domain.customer import Customer
 from orders.domain.catalog import Catalog, PricingPolicy
 from orders.domain.delivery import DeliveryHours
@@ -174,3 +175,26 @@ class InMemoryLoginHistory:
         ]
         found.sort(key=lambda a: (a.created_at, a.id or 0), reverse=True)
         return found[query.offset : query.offset + query.size], len(found)
+
+
+class InMemoryAddressRepository:
+    def __init__(self) -> None:
+        self.rows: dict[int, Address] = {}
+        self.locked: list[int] = []
+
+    async def load_book(self, customer_id: int, *, for_update: bool = False) -> AddressBook:
+        if for_update:
+            self.locked.append(customer_id)
+        mine = sorted((a for a in self.rows.values() if a.customer_id == customer_id), key=lambda a: a.id)
+        return AddressBook(customer_id, [replace(a) for a in mine])
+
+    async def save_book(self, book: AddressBook) -> AddressBook:
+        for aid in [aid for aid, a in self.rows.items() if a.customer_id == book.customer_id]:
+            if aid not in {a.id for a in book.addresses}:
+                del self.rows[aid]
+        for a in book.addresses:
+            if a.id is None:
+                a.id = max(self.rows, default=0) + 1
+            self.rows[a.id] = replace(a)
+        assert sum(a.is_default for a in self.rows.values() if a.customer_id == book.customer_id) <= 1
+        return book

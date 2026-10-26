@@ -135,6 +135,7 @@ src/
 | `GET /api/me` | 내 정보 |
 | `PATCH /api/me` | 내 정보 수정 (JSON: name?, phone?). 보낸 항목만 바뀌고 phone 을 빈 값으로 보내면 지운다 |
 | `GET /api/me/login-history` | 내 로그인 이력 (result=success·failure, from·to 날짜, page·size). 로그인할 때 BackgroundTasks 로 기록 |
+| `GET·POST /api/me/addresses`, `PATCH·DELETE /api/me/addresses/{id}`, `POST /api/me/addresses/{id}/default` | 내 배송지 (최대 5개, 첫 배송지 자동 기본, 기본 1개, 남의 배송지 404). 변경 API 는 바뀐 뒤 전체 목록을 돌려준다 |
 
 Swagger 오른쪽 위 **Authorize** 에 이메일·비밀번호를 넣으면 이후 요청에 토큰이 붙습니다.
 
