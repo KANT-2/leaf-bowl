@@ -30,7 +30,7 @@ from orders.application.service import OrderService, PlaceOrderCommand
 from orders.domain.catalog import OrderItemInput, PricingPolicy
 from orders.domain.delivery import KST, DeliverySlot
 from orders.domain.order import ChangedBy, OrderStatus
-from orders.domain.repository import StatusUpdate
+from orders.domain.repository import OrderListFilter, StatusUpdate
 from orders.infrastructure.repositories import SqlCatalogReader, SqlOrderRepository, SqlSettingsReader
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "")
@@ -280,6 +280,41 @@ async def test_list_pages_through_member_orders_in_index_order(sessions):
             ).scalars()
         )
     assert "idx_orders_customer" in plan
+
+
+async def test_list_filters_by_status_and_korean_order_day_in_sql(sessions):
+    # 한국 시간 10/9 23:59, 10/10 00:00, 10/10 12:00, 10/11 00:00 주문
+    midnight = datetime(2026, 10, 9, 15, 0, tzinfo=UTC)
+    times = [midnight - timedelta(minutes=1), midnight, NOW, midnight + timedelta(days=1)]
+    placed = [(await create(sessions, key=f"order-key-{i:04d}", now=NOW)).order for i in range(len(times))]
+    async with sessions() as session:
+        for order, at in zip(placed, times, strict=True):
+            await session.execute(text("UPDATE orders SET created_at = :at WHERE id = :id"), {"at": at, "id": order.id})
+        await session.commit()
+    async with sessions() as session:
+        await service(session, NOW + timedelta(minutes=1)).cancel(ME, placed[2].id)
+    await create(sessions, customer=OTHER, key="order-key-other")
+
+    async def listed(where: OrderListFilter, limit: int = 20) -> list[UUID]:
+        seen, cursor = [], None
+        async with sessions() as session:
+            svc = service(session)
+            while True:
+                page = await svc.list_mine(ME, limit=limit, cursor=cursor, where=where)
+                seen += [o.id for o in page.items]
+                cursor = page.next_cursor
+                if cursor is None:
+                    return seen
+
+    oct_10 = OrderListFilter(date_from=date(2026, 10, 10), date_to=date(2026, 10, 10))
+    assert await listed(oct_10, limit=1) == [placed[2].id, placed[1].id]
+    assert await listed(OrderListFilter(statuses=frozenset({OrderStatus.CANCELED}))) == [placed[2].id]
+    in_progress = frozenset({OrderStatus.RECEIVED, OrderStatus.CONFIRMED})
+    assert await listed(OrderListFilter(statuses=in_progress, date_to=date(2026, 10, 10)), limit=1) == [
+        placed[1].id,
+        placed[0].id,
+    ]
+    assert await listed(OrderListFilter(date_from=date(2026, 10, 12))) == []
 
 
 # ── 취소·상태 변경 ───────────────────────────────────────────────────

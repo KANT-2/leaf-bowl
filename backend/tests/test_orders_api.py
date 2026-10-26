@@ -1,6 +1,7 @@
 """주문 API 를 HTTP 단위로 검증한다 (DB 대신 메모리 저장소, 인증은 의존성 교체)."""
 
 from datetime import UTC, datetime
+from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
@@ -295,9 +296,39 @@ def test_list_pages_through_my_orders_only(ctx):
     assert first["items"][0].keys() == ctx.client.get(f"/api/v1/orders/{ids[0]}").json().keys()
 
 
-@pytest.mark.parametrize(("params", "code"), [({"limit": 0}, 422), ({"limit": 51}, 422), ({"cursor": "nope"}, 400)])
+@pytest.mark.parametrize(
+    ("params", "code"),
+    [
+        ({"limit": 0}, 422),
+        ({"limit": 51}, 422),
+        ({"cursor": "nope"}, 400),
+        ({"status": "paid"}, 422),
+        ({"from": "2026-13-01"}, 422),
+        ({"from": "2026-10-11", "to": "2026-10-10"}, 400),
+    ],
+)
 def test_bad_list_query(ctx, params, code):
     assert ctx.client.get("/api/v1/orders", params=params).status_code == code
+
+
+def test_list_filters_by_several_statuses_and_korean_dates(ctx):
+    received, confirmed, canceled = (ctx.create(key=f"order-key-000{i}").json()["id"] for i in range(3))
+    ctx.orders.force_status(UUID(confirmed), OrderStatus.CONFIRMED)
+    ctx.orders.force_status(UUID(canceled), OrderStatus.CANCELED)
+
+    def listed(**params) -> set[str]:
+        response = ctx.client.get("/api/v1/orders", params=params)
+        assert response.status_code == 200
+        return {o["id"] for o in response.json()["items"]}
+
+    assert listed() == {received, confirmed, canceled}
+    assert listed(status=["received", "confirmed"]) == {received, confirmed}
+    assert listed(status="canceled") == {canceled}
+    # NOW 는 한국 시간 2026-10-10 12:00
+    assert listed(**{"from": "2026-10-10", "to": "2026-10-10"}) == {received, confirmed, canceled}
+    assert listed(**{"from": "2026-10-11"}) == set()
+    assert listed(to="2026-10-09") == set()
+    assert listed(status="canceled", to="2026-10-10") == {canceled}
 
 
 # ── 취소 ─────────────────────────────────────────────────────────────
