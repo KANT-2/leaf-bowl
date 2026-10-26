@@ -266,12 +266,9 @@ export interface LoginHistoryFilter {
 
 /** 내 로그인 이력 (최신순). 날짜는 YYYY-MM-DD, 한국 시간 기준이다. */
 export async function loadLoginHistory(filter: LoginHistoryFilter): Promise<LoginHistoryPage> {
-  const params = new URLSearchParams({ page: String(filter.page), size: String(filter.size ?? 10) });
-  for (const key of ["result", "from", "to"] as const) {
-    if (filter[key]) {
-      params.set(key, filter[key]);
-    }
-  }
+  const params = loginHistoryParams(filter);
+  params.set("page", String(filter.page));
+  params.set("size", String(filter.size ?? 10));
   const body = await backendRequest(`/api/me/login-history?${params}`, { auth: true });
   if (!Array.isArray(body?.items) || !Number.isSafeInteger(body.total)) {
     throw new Error("로그인 기록을 확인하지 못했습니다.");
@@ -288,6 +285,26 @@ export async function loadLoginHistory(filter: LoginHistoryFilter): Promise<Logi
     totalPages: Number(body.total_pages),
     total: body.total,
   };
+}
+
+/** 목록과 같은 조건의 내 로그인 이력 전체 (CSV). 토큰을 헤더로 보내야 해서 링크 대신 받아서 저장한다. */
+export async function loadLoginHistoryCsv(
+  filter: Omit<LoginHistoryFilter, "page" | "size">,
+): Promise<{ file: Blob; filename: string }> {
+  const query = loginHistoryParams(filter).toString();
+  const response = await backendResponse(`/api/me/login-history.csv${query ? `?${query}` : ""}`, { auth: true });
+  const named = /filename="([^"]+)"/.exec(response.headers.get("content-disposition") ?? "");
+  return { file: await response.blob(), filename: named?.[1] ?? "leafbowl-login-history.csv" };
+}
+
+function loginHistoryParams(filter: Omit<LoginHistoryFilter, "page" | "size">) {
+  const params = new URLSearchParams();
+  for (const key of ["result", "from", "to"] as const) {
+    if (filter[key]) {
+      params.set(key, filter[key]);
+    }
+  }
+  return params;
 }
 
 /** 회원 주문 접수 (결제 없이). 같은 key 로 다시 보내면 기존 주문이 돌아온다. */

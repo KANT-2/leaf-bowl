@@ -79,6 +79,7 @@ raise NotFound("배송지를 찾을 수 없습니다.")
 | GET | `/api/me` | 내 정보 | 고객 |
 | PATCH | `/api/me` | 이름·전화번호 수정 (보낸 항목만, phone 빈 값은 삭제) | 고객 |
 | GET | `/api/me/login-history` | 내 로그인 기록 (`result`, `from`, `to`, `page`, `size`) | 고객 |
+| GET | `/api/me/login-history.csv` | 같은 조건의 기록 전체를 CSV 파일로 (StreamingResponse) | 고객 |
 | GET · POST | `/api/me/addresses` | 내 배송지 목록 · 추가 | 고객 |
 | PATCH · DELETE | `/api/me/addresses/{id}` | 배송지 수정 · 삭제 | 고객 |
 | POST | `/api/me/addresses/{id}/default` | 기본 배송지로 지정 | 고객 |
@@ -247,3 +248,36 @@ ASGI 단계에서 "응답 본문 전송 완료" 시점과 "이력 저장" 시점
 2. 서버 로그에서 `app.request POST /api/auth/token` 다음 줄에 `로그인 이력 기록 완료(BackgroundTasks)` 가 찍히는지 확인
 3. `GET /api/me/login-history` 로 두 건(성공·실패) 확인
 4. 자동 테스트: `uv run pytest tests/test_background_tasks.py -v`
+
+### CSV 다운로드 (StreamingResponse)
+
+마이페이지 **로그인 기록** 탭의 **[파일로 받기 (CSV)]** → `GET /api/me/login-history.csv`.
+지금 조회한 조건(성공·실패, 기간) 그대로, 페이지 구분 없이 전체를 한 파일로 받습니다.
+
+| 단계 | 하는 일 | 코드 |
+| --- | --- | --- |
+| ① 조건 검사 | `LoginHistoryQuery` 로 기간 규칙 확인 (위반이면 **응답을 시작하기 전에** 400) | `presentation/login_history.py` |
+| ② 나눠 읽기 | 50건씩 DB 에서 읽어 한 건씩 넘김. 내보내는 중 새 로그인이 기록돼도 같은 행이 두 번 나오지 않음 | `application/login_history.py` `export_mine` |
+| ③ 한 줄씩 전송 | 머리글 → 행 하나씩 `StreamingResponse` 로 흘려보냄 (`transfer-encoding: chunked`) | `_csv_chunks` |
+| ④ 완료 로그 | `로그인 이력 CSV 내보내기 완료(StreamingResponse): rows=N` | 같은 함수 |
+
+- 엑셀에서 한글이 깨지지 않게 UTF-8 BOM 을 붙이고, 시간은 한국 시간, 결과·실패 이유는 한국어로 쓴다
+- 기기 정보는 사용자가 보낸 값이라 `=`·`+`·`-`·`@` 로 시작하면 앞에 `'` 를 붙여 엑셀 수식으로 실행되지 않게 한다 (CSV 수식 주입 방지)
+- `Cache-Control: no-store`, 회원 id 는 토큰에서만 가져와 남의 기록은 받을 수 없다
+
+| 테스트 (`tests/test_login_history_csv.py`) | 확인 내용 |
+| --- | --- |
+| `test_body_is_sent_in_many_chunks` | 기록 31건 → 본문이 **32조각**(머리글 1 + 행 31)으로 나뉘어 전송 |
+| `test_export_reads_every_page_newest_first` | 50건 단위 3쪽을 모두 읽고 최신순, 다른 회원 기록 제외 |
+| `test_export_skips_rows_repeated_by_new_login_during_export` | 내보내는 중 새 로그인이 생겨도 중복 없음 |
+| `test_download_returns_only_my_history_as_csv_file` | 파일 이름·형식·BOM·머리글, 내 기록만, 비밀번호 없음 |
+| `test_download_applies_same_filters_as_list` · `test_invalid_period_is_rejected_before_streaming` | 목록과 같은 조건, 잘못된 기간은 400 |
+| `test_csv_row_blocks_formula_injection` | `=HYPERLINK(...)` → `'=HYPERLINK(...)` |
+
+실제 서버 확인 (2026-10-26, 테스트 계정은 확인 후 삭제): 응답 헤더 `transfer-encoding: chunked`, 파일 `leafbowl-login-history-20261026.csv`
+
+```text
+일시(한국 시간),결과,실패 이유,기기 정보
+2026-10-26 17:25:32,성공,,curl/8.21.0
+2026-10-26 17:25:31,실패,비밀번호 불일치,'=HYPERLINK(evil)
+```

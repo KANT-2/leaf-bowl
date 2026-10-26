@@ -631,6 +631,12 @@
   align-items: center;
   justify-content: center;
 }
+.login-history-summary {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
 @media (max-width: 640px) {
   .login-history-filter {
     grid-template-columns: 1fr 1fr;
