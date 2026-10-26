@@ -10,9 +10,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_session
 from orders.application.service import OrderService
+from orders.infrastructure.receipt_image import PillowReceiptRenderer
 from orders.infrastructure.repositories import SqlCatalogReader, SqlOrderRepository, SqlSettingsReader
 
 
 def get_order_service(session: AsyncSession = Depends(get_session)) -> OrderService:
     # 인증 의존성도 같은 get_session 을 쓰므로 FastAPI 가 한 요청 안에서 같은 세션을 나눠 쓴다
-    return OrderService(session, SqlOrderRepository(session), SqlCatalogReader(session), SqlSettingsReader(session))
+    return OrderService(
+        session,
+        SqlOrderRepository(session),
+        SqlCatalogReader(session),
+        SqlSettingsReader(session),
+        receipt_renderer=PillowReceiptRenderer(),
+    )

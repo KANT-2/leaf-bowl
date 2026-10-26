@@ -1,10 +1,12 @@
 """주문 API 를 HTTP 단위로 검증한다 (DB 대신 메모리 저장소, 인증은 의존성 교체)."""
 
 from datetime import UTC, datetime
+from io import BytesIO
 from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 
 from auth.presentation.dependencies import CurrentCustomer
 from core.dependencies import get_current_customer
@@ -21,7 +23,10 @@ from orders.domain.catalog import (
     SaleStatus,
 )
 from orders.domain.order import OrderStatus
+from orders.domain.receipt import Receipt
 from orders.domain.request_hash import request_hash
+from orders.infrastructure.receipt_image import PillowReceiptRenderer
+from orders.presentation.router import RECEIPT_CHUNK, _chunks
 from orders.presentation.schemas import CreateOrderRequest
 from test_request_hash import LEGACY_SLOT_HASH, MIXED_HASH
 
@@ -50,13 +55,30 @@ ME = CurrentCustomer(id=1, email="leaf@example.com", name="김종복")
 OTHER = CurrentCustomer(id=2, email="bowl@example.com", name="박샐러")
 
 
+class RecordingRenderer(PillowReceiptRenderer):
+    """실제 PNG 를 그리면서, 그린 영수증 행을 확인할 수 있게 남긴다."""
+
+    def __init__(self) -> None:
+        self.rendered: list[Receipt] = []
+
+    def render(self, receipt: Receipt) -> bytes:
+        self.rendered.append(receipt)
+        return super().render(receipt)
+
+
 class Ctx:
     def __init__(self) -> None:
         self.orders = InMemoryOrderRepository()
         self.session = FakeSession()
         self.customer = ME
+        self.renderer = RecordingRenderer()
         service = OrderService(
-            self.session, self.orders, FakeCatalogReader(CATALOG), FakeSettingsReader(), clock=lambda: NOW
+            self.session,
+            self.orders,
+            FakeCatalogReader(CATALOG),
+            FakeSettingsReader(),
+            clock=lambda: NOW,
+            receipt_renderer=self.renderer,
         )
         app = create_app()
         app.dependency_overrides[get_order_service] = lambda: service
@@ -65,6 +87,11 @@ class Ctx:
 
     def create(self, body: dict | None = None, key: str = "order-key-0001"):
         return self.client.post("/api/v1/orders", json=body or order_body(), headers={"Idempotency-Key": key})
+
+
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"
 
 
 @pytest.fixture
@@ -336,28 +363,41 @@ def test_list_filters_by_several_statuses_and_korean_dates(ctx):
 # ── 영수증 ─────────────────────────────────────────────────────────────
 
 
-def test_receipt_downloads_my_order_as_a_text_file(ctx):
+def test_receipt_downloads_my_order_as_a_png(ctx):
     items = [{"productId": 0, "dressingKeys": ["dressing-0"], "drinkKeys": ["drink-0"], "quantity": 3}]
     order_id = ctx.create(order_body(items=items)).json()["id"]
     response = ctx.client.get(f"/api/v1/orders/{order_id}/receipt")
     assert response.status_code == 200
-    assert response.headers["content-type"] == "text/plain; charset=utf-8"
-    assert response.headers["content-disposition"] == f'attachment; filename="leafbowl-receipt-{order_id[:8]}.txt"'
+    assert response.headers["content-type"] == "image/png"
+    assert response.headers["content-disposition"] == f'attachment; filename="leafbowl-receipt-{order_id[:8]}.png"'
     assert response.headers["cache-control"] == "no-store"
-    lines = response.text.splitlines()
-    assert f"주문번호: {order_id}" in lines
-    assert "결제상태: 결제 완료" in lines
-    assert "  13,000원 × 3 = 39,000원" in lines
-    assert "결제 금액: 39,000원" in lines  # 3만 원 이상 무료배송
-    assert "발행일시: 2026-10-10 12:00 (KST)" in lines
-    assert "010-1234-5678" not in response.text
+    image = Image.open(BytesIO(response.content))
+    assert image.format == "PNG" and image.width > 0
+    rows = {(r.left, r.right) for r in ctx.renderer.rendered[-1].rows()}
+    assert ("주문번호", order_id) in rows
+    assert ("결제상태", "결제 완료") in rows
+    assert ("닭가슴살 샐러드 × 3", "39,000원") in rows
+    assert ("결제 금액", "39,000원") in rows  # 3만 원 이상 무료배송
+    assert ("발행일시 2026-10-10 12:00 (KST)", "") in rows
+    assert not any("010-1234-5678" in left + right for left, right in rows)
 
 
 def test_receipt_of_a_canceled_order_says_so(ctx):
     order_id = ctx.create().json()["id"]
     ctx.client.post(f"/api/v1/orders/{order_id}/cancel")
-    lines = ctx.client.get(f"/api/v1/orders/{order_id}/receipt").text.splitlines()
-    assert {"주문상태: 취소", "결제상태: 결제 취소", "취소일시: 2026-10-10 12:00 (KST)"} <= set(lines)
+    assert ctx.client.get(f"/api/v1/orders/{order_id}/receipt").status_code == 200
+    receipt = ctx.renderer.rendered[-1]
+    rows = {(r.left, r.right) for r in receipt.rows()}
+    assert receipt.canceled
+    assert {("주문상태", "취소"), ("결제상태", "결제 취소"), ("취소일시", "2026-10-10 12:00 (KST)")} <= rows
+
+
+@pytest.mark.anyio
+async def test_receipt_bytes_are_streamed_in_chunks(anyio_backend):
+    content = bytes(range(256)) * 600  # 150KB
+    chunks = [chunk async for chunk in _chunks(content)]
+    assert len(chunks) == 3 and all(len(c) <= RECEIPT_CHUNK for c in chunks)
+    assert b"".join(chunks) == content
 
 
 # ── 취소 ─────────────────────────────────────────────────────────────

@@ -17,9 +17,7 @@ class FakeAdminUserReader:
     def __init__(self, admin: AdminAccount | None):
         self.admin = admin
 
-    async def find_by_login_id(
-        self, login_id: str
-    ) -> AdminAccount | None:
+    async def find_by_login_id(self, login_id: str) -> AdminAccount | None:
         if self.admin and self.admin.login_id == login_id:
             return self.admin
         return None
@@ -37,10 +35,7 @@ def admin():
         dklen=64,
     )
 
-    stored_hash = (
-        f"scrypt${base64.b64encode(salt).decode()}"
-        f"${base64.b64encode(key).decode()}"
-    )
+    stored_hash = f"scrypt${base64.b64encode(salt).decode()}${base64.b64encode(key).decode()}"
 
     return AdminAccount(
         id=uuid4(),
@@ -53,9 +48,7 @@ def admin():
 def test_successful_login(admin):
     service = AdminAuthService(FakeAdminUserReader(admin))
 
-    result = asyncio.run(
-        service.authenticate("manager", "test-password")
-    )
+    result = asyncio.run(service.authenticate("manager", "test-password"))
 
     assert result.id == admin.id
 
@@ -64,18 +57,14 @@ def test_wrong_password(admin):
     service = AdminAuthService(FakeAdminUserReader(admin))
 
     with pytest.raises(Unauthorized):
-        asyncio.run(
-            service.authenticate("manager", "wrong-password")
-        )
+        asyncio.run(service.authenticate("manager", "wrong-password"))
 
 
 def test_unknown_login_id(admin):
     service = AdminAuthService(FakeAdminUserReader(admin))
 
     with pytest.raises(Unauthorized):
-        asyncio.run(
-            service.authenticate("unknown", "test-password")
-        )
+        asyncio.run(service.authenticate("unknown", "test-password"))
 
 
 def test_disabled_admin(admin):
@@ -83,9 +72,7 @@ def test_disabled_admin(admin):
     service = AdminAuthService(FakeAdminUserReader(disabled))
 
     with pytest.raises(Unauthorized):
-        asyncio.run(
-            service.authenticate("manager", "test-password")
-        )
+        asyncio.run(service.authenticate("manager", "test-password"))
 
 
 def test_invalid_stored_hash(admin):
@@ -93,6 +80,4 @@ def test_invalid_stored_hash(admin):
     service = AdminAuthService(FakeAdminUserReader(broken))
 
     with pytest.raises(Unauthorized):
-        asyncio.run(
-            service.authenticate("manager", "test-password")
-        )
+        asyncio.run(service.authenticate("manager", "test-password"))

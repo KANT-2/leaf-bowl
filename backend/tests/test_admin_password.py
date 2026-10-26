@@ -23,10 +23,7 @@ def make_test_hash(password: str) -> str:
         dklen=64,
     )
 
-    return (
-        f"scrypt${base64.b64encode(salt).decode()}"
-        f"${base64.b64encode(key).decode()}"
-    )
+    return f"scrypt${base64.b64encode(salt).decode()}${base64.b64encode(key).decode()}"
 
 
 def test_correct_password() -> None:

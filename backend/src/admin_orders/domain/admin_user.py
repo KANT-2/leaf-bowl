@@ -12,6 +12,4 @@ class AdminAccount:
 
 
 class AdminUserReader(Protocol):
-    async def find_by_login_id(
-        self, login_id: str
-    ) -> AdminAccount | None: ...
+    async def find_by_login_id(self, login_id: str) -> AdminAccount | None: ...

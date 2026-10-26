@@ -10,9 +10,7 @@ class SqlAdminUserRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def find_by_login_id(
-        self, login_id: str
-    ) -> AdminAccount | None:
+    async def find_by_login_id(self, login_id: str) -> AdminAccount | None:
         result = await self.session.execute(
             text("""
                 SELECT id, login_id, password_hash, disabled
@@ -25,9 +23,7 @@ class SqlAdminUserRepository:
         row = result.mappings().one_or_none()
         return self._to_account(row)
 
-    async def find_by_id(
-        self, admin_id: UUID
-    ) -> AdminAccount | None:
+    async def find_by_id(self, admin_id: UUID) -> AdminAccount | None:
         result = await self.session.execute(
             text("""
                 SELECT id, login_id, password_hash, disabled

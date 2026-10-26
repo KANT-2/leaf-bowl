@@ -22,15 +22,11 @@ class AdminAuthService:
     def __init__(self, users: AdminUserReader) -> None:
         self.users = users
 
-    async def authenticate(
-        self, login_id: str, password: str
-    ) -> AdminAccount:
+    async def authenticate(self, login_id: str, password: str) -> AdminAccount:
         login_id = login_id.strip()
         admin = await self.users.find_by_login_id(login_id)
 
-        stored_hash = (
-            admin.password_hash if admin is not None else _DUMMY_HASH
-        )
+        stored_hash = admin.password_hash if admin is not None else _DUMMY_HASH
 
         password_ok = await asyncio.to_thread(
             verify_admin_password,
