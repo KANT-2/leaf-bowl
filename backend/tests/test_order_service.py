@@ -21,6 +21,7 @@ from orders.domain.catalog import (
 from orders.domain.delivery import DeliverySlot
 from orders.domain.order import ChangedBy, OrderStatus
 from orders.domain.pricing import LineType
+from orders.domain.repository import OrderListFilter
 
 pytestmark = pytest.mark.anyio
 
@@ -357,3 +358,32 @@ async def test_stored_order_is_not_changed_through_returned_objects(ctx):
     order.history.clear()
     assert orders.rows[order.id].status is OrderStatus.RECEIVED
     assert len(orders.rows[order.id].history) == 1
+
+
+async def test_list_mine_filters_by_status_and_pages_within_the_filter(ctx):
+    service, orders, _, _ = ctx
+    placed = await place_many(ctx, 6)
+    for order in placed[::2]:
+        orders.force_status(order.id, OrderStatus.CANCELED)
+    canceled = OrderListFilter(statuses=frozenset({OrderStatus.CANCELED}))
+
+    first = await service.list_mine(ME, limit=2, where=canceled)
+    last = await service.list_mine(ME, limit=2, cursor=first.next_cursor, where=canceled)
+
+    assert [o.id for o in first.items + last.items] == [o.id for o in reversed(placed[::2])]
+    assert last.next_cursor is None
+    assert all(o.status is OrderStatus.CANCELED for o in first.items + last.items)
+
+
+async def test_list_mine_filters_by_korean_order_day(ctx):
+    service, orders, _, _ = ctx
+    placed = await place_many(ctx, 3)
+    # 한국 시간 10/9 23:59, 10/10 00:00, 10/11 00:00 에 주문한 것으로 바꾼다
+    midnight = datetime(2026, 10, 9, 15, 0, tzinfo=UTC)
+    times = (midnight - timedelta(minutes=1), midnight, midnight + timedelta(days=1))
+    for order, at in zip(placed, times, strict=True):
+        orders.rows[order.id].created_at = at
+
+    page = await service.list_mine(ME, where=OrderListFilter(date_from=date(2026, 10, 10), date_to=date(2026, 10, 10)))
+    assert [o.id for o in page.items] == [placed[1].id]
+    assert (await service.list_mine(ME, where=OrderListFilter(date_from=date(2026, 10, 12)))).items == []

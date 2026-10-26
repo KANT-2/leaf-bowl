@@ -1,3 +1,4 @@
+from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, Header, Query, Response, status
@@ -5,6 +6,8 @@ from fastapi import APIRouter, Body, Depends, Header, Query, Response, status
 from core.dependencies import CurrentCustomer, get_current_customer
 from core.exceptions import NotFound
 from orders.application.service import MAX_PAGE_SIZE, NOT_FOUND, OrderService, PlaceOrderCommand
+from orders.domain.order import OrderStatus
+from orders.domain.repository import OrderListFilter
 from orders.domain.request_hash import request_hash
 from orders.presentation.dependencies import get_order_service
 from orders.presentation.schemas import (
@@ -68,14 +71,28 @@ async def create_order(
     return CreatedOrderResponse.of(result.order)
 
 
-@router.get("", response_model=OrderListResponse, summary="내 주문 목록 (최신순)", responses=ERROR_401)
+@router.get(
+    "",
+    response_model=OrderListResponse,
+    summary="내 주문 목록 (최신순, 상태·기간 필터)",
+    description=(
+        "조건을 주지 않으면 전체다. status 는 여러 번 보낼 수 있다 (?status=received&status=confirmed). "
+        "기간은 한국 시간 기준 주문일이고 to 는 그날 끝까지 포함한다. "
+        "nextCursor 로 이어 읽을 때는 같은 조건을 함께 보낸다."
+    ),
+    responses={**ERROR_401, 400: {"description": "시작일 > 종료일, 잘못된 cursor"}, 422: {"description": "형식 오류"}},
+)
 async def list_my_orders(
     limit: int = Query(20, ge=1, le=MAX_PAGE_SIZE),
     cursor: str | None = Query(None, max_length=300, description="이전 응답의 nextCursor"),
+    order_status: list[OrderStatus] | None = Query(None, alias="status", description="이 상태의 주문만"),
+    date_from: date | None = Query(None, alias="from", description="시작일 (YYYY-MM-DD, 한국 시간)"),
+    date_to: date | None = Query(None, alias="to", description="종료일 (YYYY-MM-DD, 한국 시간, 포함)"),
     customer: CurrentCustomer = Depends(get_current_customer),
     service: OrderService = Depends(get_order_service),
 ):
-    page = await service.list_mine(customer.id, limit, cursor)
+    where = OrderListFilter(statuses=frozenset(order_status or ()), date_from=date_from, date_to=date_to)
+    page = await service.list_mine(customer.id, limit, cursor, where)
     return OrderListResponse(items=[OrderDetailResponse.of(o) for o in page.items], next_cursor=page.next_cursor)
 
 
