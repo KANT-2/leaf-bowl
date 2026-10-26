@@ -2,7 +2,7 @@
 
 import logging
 from collections.abc import Awaitable, Callable
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
@@ -28,6 +28,15 @@ async def record_in_new_session(attempt: LoginAttempt) -> None:
             await LoginHistoryService(session, SqlLoginHistoryRepository(session)).record(attempt)
     except Exception:
         logger.exception("로그인 이력 기록 실패: customer_id=%s result=%s", attempt.customer_id, attempt.result)
+        return
+    # 요청 로그(app.request) 다음에 찍히므로, 응답을 보낸 뒤 기록됐다는 실행 순서를 로그로 확인할 수 있다
+    elapsed_ms = (datetime.now(UTC) - attempt.created_at).total_seconds() * 1000
+    logger.info(
+        "로그인 이력 기록 완료(BackgroundTasks): customer_id=%s result=%s 로그인 시도 후 %.1fms",
+        attempt.customer_id,
+        attempt.result,
+        elapsed_ms,
+    )
 
 
 def get_login_recorder() -> LoginRecorder:
