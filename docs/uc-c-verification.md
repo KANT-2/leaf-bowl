@@ -10,7 +10,7 @@
 | 계정 | 시연 전용 계정 `ucc-demo-a@example.com`, `ucc-demo-b@example.com` (가데이터). 비밀번호·토큰은 기록하지 않는다 |
 | 코드 | `backend/src/orders/` (4계층), `features/member/client.ts`, `components/mypage/OrdersTab.tsx`, `components/CheckoutView.tsx` |
 
-구조와 요청 흐름은 [4계층 역할](architecture/3-layers.png), [주문 생성 흐름](architecture/5-order-flow.png), [로그인 흐름](architecture/4-login-flow.png) 그림을 참고합니다.
+구조와 요청 흐름은 [4계층 역할](architecture/3-layers.png), [주문 생성 흐름](architecture/5-order-flow.png), [로그인 흐름](architecture/4-login-flow.png), [주문 모듈 계층 상세](architecture/6-orders-layers-detail.png) 그림을 참고합니다.
 
 ## 1. 화면에서 실행 (화면 → API → DB → 화면)
 
