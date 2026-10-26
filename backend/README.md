@@ -183,7 +183,7 @@ FastAPI 가 만드는 테이블(`customers`, `token_blacklist`)은 기동할 때
 | `POST /api/v1/orders` | 주문 생성. 헤더 `Idempotency-Key` 필수 | 201 신규, 200 같은 키·같은 내용 재전송, 409 같은 키·다른 내용, 400 규칙 위반 |
 | `GET /api/v1/orders?limit&cursor&status&from&to` | 내 주문 목록, 최신순 커서 페이지. `status` 여러 번, `from`·`to` 는 한국 시간 주문일 | 200 `{items, nextCursor}`, 400 시작일 > 종료일 |
 | `GET /api/v1/orders/{id}` | 내 주문 상세 | 404 없거나 남의 주문 (존재 여부를 드러내지 않음) |
-| `GET /api/v1/orders/{id}/receipt` | 내 주문 영수증 텍스트 파일. `StreamingResponse` 로 한 줄씩 나누어 보냄 | 200 `text/plain` 첨부 파일, 404·401 은 보내기 전에 JSON 오류 |
+| `GET /api/v1/orders/{id}/receipt` | 내 주문 영수증 PNG 이미지. 서버가 Pillow 로 그려 `StreamingResponse` 로 16KB 씩 나누어 보냄 (가로 720px) | 200 `image/png` 첨부 파일, 404·401 은 보내기 전에 JSON 오류 |
 | `POST /api/v1/orders/{id}/cancel` | 취소 (`{reason?}`) | 200 취소됨·이미 취소됨, 409 준비 시작 이후 |
 
 업무 규칙 (기존 Next.js `modules/orders/*` 에서 이식):
@@ -193,6 +193,7 @@ FastAPI 가 만드는 테이블(`customers`, `token_blacklist`)은 기동할 때
 - 배송 시간대: 한국 시간 오늘부터 14일 이내, 운영시간(`app_settings.delivery_hours`) 안의 1시간 단위, 지금부터 30분 이후 시작. 저장은 UTC.
 - 상태: `received → confirmed → preparing → delivering → completed`. 고객 취소는 `received`·`confirmed` 에서만 가능하고, DB 트리거도 같은 순서를 강제합니다.
 - 주문 당시 상품명·옵션·단가를 `order_items` 에 스냅샷으로 남깁니다.
+- 영수증: 도메인(`orders/domain/receipt.py`)이 보여 줄 행을 정하고, 인프라(`orders/infrastructure/receipt_image.py`)가 PNG 로 그립니다. 서버 OS 에 한글 폰트가 없어도 같은 결과가 나오도록 나눔고딕(SIL OFL, `backend/assets/fonts`)을 함께 둡니다.
 
 ## 오류 응답 규칙
 
