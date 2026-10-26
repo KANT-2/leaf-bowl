@@ -133,6 +133,7 @@ src/
 | `POST /api/auth/token` | 로그인. form 의 `username` 에 이메일. `access_token` 발급 |
 | `POST /api/auth/logout` | 토큰의 jti 를 `token_blacklist` 에 등록. 이후 같은 토큰은 401 |
 | `GET /api/me` | 내 정보 |
+| `PATCH /api/me` | 내 정보 수정 (JSON: name?, phone?). 보낸 항목만 바뀌고 phone 을 빈 값으로 보내면 지운다 |
 
 Swagger 오른쪽 위 **Authorize** 에 이메일·비밀번호를 넣으면 이후 요청에 토큰이 붙습니다.
 

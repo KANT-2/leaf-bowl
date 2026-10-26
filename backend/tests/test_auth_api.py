@@ -12,6 +12,8 @@ from auth.domain.revoked_token import RevokedToken
 from auth.presentation.dependencies import CurrentAdmin, get_auth_service, get_blacklist, require_admin
 from core import security
 from core.config import get_settings
+from customers.application.service import CustomerService
+from customers.presentation.router import get_customer_service
 from fakes import FakeSession, InMemoryBlacklist, InMemoryCustomerRepository
 from main import create_app
 
@@ -24,6 +26,7 @@ def ctx():
     app = create_app()
     app.dependency_overrides[get_auth_service] = lambda: AuthService(session, customers, blacklist)
     app.dependency_overrides[get_blacklist] = lambda: blacklist
+    app.dependency_overrides[get_customer_service] = lambda: CustomerService(session, customers)
     return TestClient(app), customers, blacklist
 
 

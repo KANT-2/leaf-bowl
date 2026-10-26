@@ -2,13 +2,9 @@ from fastapi import APIRouter, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
 
 from auth.application.service import AuthService, SignupCommand
-from auth.presentation.dependencies import (
-    CurrentCustomer,
-    customer_oauth2,
-    get_auth_service,
-    get_current_customer,
-)
-from auth.presentation.schemas import CustomerResponse, SignupRequest, TokenResponse
+from auth.presentation.dependencies import customer_oauth2, get_auth_service
+from auth.presentation.schemas import SignupRequest, TokenResponse
+from customers.presentation.schemas import CustomerResponse
 
 router = APIRouter(prefix="/api", tags=["auth"])
 
@@ -24,9 +20,7 @@ ERROR_401 = {401: {"description": "토큰 없음·만료·위조, 로그아웃�
 )
 async def signup(body: SignupRequest, service: AuthService = Depends(get_auth_service)):
     customer = await service.signup(SignupCommand(body.email, body.password, body.name, body.phone))
-    return CustomerResponse(
-        id=customer.id, email=customer.email, name=customer.name, phone=customer.phone, created_at=customer.created_at
-    )
+    return CustomerResponse.of(customer)
 
 
 @router.post(
@@ -50,14 +44,3 @@ async def login(form: OAuth2PasswordRequestForm = Depends(), service: AuthServic
 )
 async def logout(token: str = Depends(customer_oauth2), service: AuthService = Depends(get_auth_service)):
     await service.logout(token)
-
-
-@router.get("/me", response_model=CustomerResponse, summary="내 정보", responses=ERROR_401)
-async def me(
-    current: CurrentCustomer = Depends(get_current_customer), service: AuthService = Depends(get_auth_service)
-):
-    customer = await service.customers.get_by_id(current.id)
-    assert customer is not None and customer.id is not None
-    return CustomerResponse(
-        id=customer.id, email=customer.email, name=customer.name, phone=customer.phone, created_at=customer.created_at
-    )

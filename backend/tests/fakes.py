@@ -8,7 +8,7 @@ from datetime import datetime
 from uuid import UUID
 
 from auth.domain.revoked_token import RevokedToken
-from core.exceptions import Conflict
+from core.exceptions import Conflict, NotFound
 from customers.domain.customer import Customer
 from orders.domain.catalog import Catalog, PricingPolicy
 from orders.domain.delivery import DeliveryHours
@@ -44,6 +44,12 @@ class InMemoryCustomerRepository:
         saved = replace(customer, id=len(self.rows) + 1)
         self.rows[saved.id] = saved
         return saved
+
+    async def save_profile(self, customer: Customer) -> Customer:
+        if customer.id not in self.rows:
+            raise NotFound("회원 정보를 찾을 수 없습니다.")
+        self.rows[customer.id] = replace(customer)
+        return self.rows[customer.id]
 
 
 class InMemoryBlacklist:

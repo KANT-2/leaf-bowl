@@ -135,6 +135,16 @@ export async function logoutMember() {
   }
 }
 
+/** 서버에 저장된 내 정보 */
+export async function loadMember(): Promise<Member> {
+  return member(await backendRequest("/api/me", { auth: true }));
+}
+
+/** 이름·전화번호 수정. 보낸 항목만 바뀌고, 전화번호를 빈 문자열로 보내면 지운다. */
+export async function updateMember(patch: { name?: string; phone?: string }): Promise<Member> {
+  return member(await backendRequest("/api/me", { method: "PATCH", auth: true, json: patch }));
+}
+
 /** 회원 주문 접수 (결제 없이). 같은 key 로 다시 보내면 기존 주문이 돌아온다. */
 export async function submitMemberOrder(input: OrderInput, key: string): Promise<{ id: string; total: number }> {
   const body = await backendRequest("/api/v1/orders", {

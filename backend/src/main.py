@@ -12,6 +12,7 @@ from auth.presentation.router import router as auth_router
 from core.config import get_settings
 from core.exception_handlers import register_exception_handlers
 from core.middleware import log_requests
+from customers.presentation.router import router as customers_router
 from orders.presentation.router import router as orders_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -58,6 +59,7 @@ def create_app() -> FastAPI:
 
     # 기능 라우터는 여기에 등록한다
     app.include_router(auth_router)
+    app.include_router(customers_router)
     app.include_router(orders_router)
     return app
 

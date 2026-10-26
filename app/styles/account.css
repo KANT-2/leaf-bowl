@@ -28,7 +28,8 @@
 .auth-card form .form-btn {
   margin-top: 28px;
 }
-.auth-card .form-error {
+.auth-card .form-error,
+.mypage-form .form-error {
   margin: 16px 0 0;
   padding: 12px 14px;
   border-radius: 10px;
