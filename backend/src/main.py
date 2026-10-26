@@ -1,4 +1,3 @@
-
 """앱 조립: lifespan(DB 초기화·종료), 미들웨어, 예외 핸들러, 라우터."""
 
 import logging
@@ -13,6 +12,7 @@ from admin_orders.presentation.router import router as admin_orders_router
 from auth.presentation.login_history import router as login_history_router
 from auth.presentation.router import router as auth_router
 from bowls.presentation.router import router as bowls_router
+from catalog.infrastructure.cache import InMemoryMenuCache
 from catalog.presentation.router import router as catalog_router
 from core.config import get_settings
 from core.exception_handlers import register_exception_handlers
@@ -34,9 +34,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await database.init_db()
         logger.info("DB 연결 확인, FastAPI 소유 테이블 준비 완료")
     else:
-        logger.warning(
-            "DATABASE_URL 이 없어 DB 없이 시작합니다. /health 만 동작합니다."
-        )
+        logger.warning("DATABASE_URL 이 없어 DB 없이 시작합니다. /health 만 동작합니다.")
 
     yield
 
@@ -52,6 +50,15 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    app.state.menu_cache = (
+        InMemoryMenuCache(
+            ttl_seconds=settings.catalog_cache_ttl_seconds,
+            max_entries=settings.catalog_cache_max_entries,
+        )
+        if settings.catalog_cache_enabled
+        else None
+    )
+
     # 나중에 추가한 미들웨어가 바깥쪽에서 실행된다:
     # CORS → 로깅 → 라우터
     app.middleware("http")(log_requests)
@@ -65,6 +72,8 @@ def create_app() -> FastAPI:
         expose_headers=[
             "X-Request-ID",
             "X-Process-Time-Ms",
+            "X-Catalog-Cache",
+            "X-Catalog-Revision",
         ],
     )
 

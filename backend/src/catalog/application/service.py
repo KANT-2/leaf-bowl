@@ -4,16 +4,38 @@
 저장소에 조회를 맡긴다. 읽기 전용이라 커밋은 필요 없다.
 """
 
+from typing import Literal
+
+from catalog.application.cache import MenuCacheKey, MenuSearchCache
 from catalog.domain.product import MenuQuery, ProductPage
 from catalog.domain.repository import ProductRepository
 from core.exceptions import BusinessRuleViolation
 
 
 class CatalogService:
-    def __init__(self, products: ProductRepository) -> None:
+    def __init__(self, products: ProductRepository, cache: MenuSearchCache | None = None) -> None:
         self.products = products
+        self.cache = cache
+        # DI가 요청마다 서비스를 생성한다. 이 진단 값은 요청 간 공유하지 않는다.
+        self.cache_status: Literal["BYPASS", "MISS", "HIT"] = "BYPASS"
+        self.catalog_revision: int | None = None
 
     async def search_menu(self, query: MenuQuery) -> ProductPage:
+        self.cache_status = "BYPASS"
+        self.catalog_revision = None
+        if self.cache is None:
+            return await self._search_uncached(query)
+
+        # revision은 캐시하지 않는다. 공유 잠금으로 관리자 수정과 결과 조회의 시점을 맞춘다.
+        revision = await self.products.lock_revision()
+        self.catalog_revision = revision
+        result, hit = await self.cache.get_or_load(
+            MenuCacheKey.from_query(revision, query), lambda: self._search_uncached(query)
+        )
+        self.cache_status = "HIT" if hit else "MISS"
+        return result
+
+    async def _search_uncached(self, query: MenuQuery) -> ProductPage:
         # R2: 분류를 줬을 때만, DB 에 있는 분류인지 확인한다 (안 줬으면 DB 를 두드리지 않는다)
         if query.category is not None:
             categories = await self.products.list_categories()

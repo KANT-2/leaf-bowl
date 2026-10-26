@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,6 +19,11 @@ class Settings(BaseSettings):
 
     # 쉼표로 구분한 프론트엔드 주소 목록
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+
+    # 공개 메뉴 검색 결과에만 적용한다. 인증·회원·블랙리스트는 이 캐시를 사용하지 않는다.
+    catalog_cache_enabled: bool = True
+    catalog_cache_ttl_seconds: float = Field(default=60, gt=0, le=3600)
+    catalog_cache_max_entries: int = Field(default=256, ge=1, le=4096)
 
     jwt_secret_key: str = ""
     jwt_algorithm: str = "HS256"
