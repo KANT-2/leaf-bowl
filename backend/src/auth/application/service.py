@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from auth.domain.login_history import FailureReason, LoginAttempt, LoginResult
 from auth.domain.revoked_token import RevokedToken, TokenBlacklistRepository, ensure_not_revoked
 from core import security
 from core.exceptions import BusinessRuleViolation, Conflict, Unauthorized
@@ -12,6 +13,12 @@ from customers.domain.customer import Customer, normalize_email, validate_passwo
 from customers.domain.repository import CustomerRepository
 
 LOGIN_FAILED = "이메일 또는 비밀번호가 올바르지 않습니다."
+
+
+@dataclass(frozen=True)
+class LoginOutcome:
+    token: security.IssuedToken | None  # None 이면 실패 (응답은 항상 같은 401 문구)
+    attempt: LoginAttempt | None  # 이력에 남길 시도. 가입되지 않은 이메일이면 None
 
 
 @dataclass(frozen=True)
@@ -39,16 +46,30 @@ class AuthService:
         await self.session.commit()
         return customer
 
-    async def login(self, email: str, password: str) -> security.IssuedToken:
+    async def attempt_login(self, email: str, password: str, user_agent: str | None = None) -> LoginOutcome:
+        """로그인 시도. 예외 대신 결과를 돌려줘서, 실패한 시도도 이력에 남길 수 있게 한다."""
         try:
             customer = await self.customers.get_by_email(normalize_email(email))
         except BusinessRuleViolation:  # 형식이 틀린 이메일도 같은 실패로 처리한다
             customer = None
         password_ok = await security.verify_password(password, customer.password_hash if customer else None)
-        if customer is None or not password_ok:
+        if customer is None:
+            return LoginOutcome(token=None, attempt=None)  # 없는 이메일은 기록하지 않는다
+        assert customer.id is not None
+        if not password_ok:
+            reason = FailureReason.WRONG_PASSWORD
+        elif not customer.is_active:
+            reason = FailureReason.WITHDRAWN
+        else:
+            token = security.create_access_token(str(customer.id), "customer", {"email": customer.email})
+            return LoginOutcome(token, LoginAttempt(customer.id, LoginResult.SUCCESS, user_agent=user_agent))
+        return LoginOutcome(None, LoginAttempt(customer.id, LoginResult.FAILURE, reason, user_agent=user_agent))
+
+    async def login(self, email: str, password: str) -> security.IssuedToken:
+        outcome = await self.attempt_login(email, password)
+        if outcome.token is None:
             raise Unauthorized(LOGIN_FAILED)
-        customer.ensure_can_login()
-        return security.create_access_token(str(customer.id), "customer", {"email": customer.email})
+        return outcome.token
 
     async def authenticate(self, token: str) -> Customer:
         """보호된 API 마다 호출: 서명·만료 → 블랙리스트 → 회원 상태 순서로 확인한다."""
