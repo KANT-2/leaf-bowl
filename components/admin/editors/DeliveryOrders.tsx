@@ -16,6 +16,7 @@ import {
   type DeliveryOrder,
 } from "@/features/admin/delivery-filters";
 import { ORDER_STATUSES, STATUS_LABEL, type OrderStatus } from "@/modules/orders/status";
+import OrderStatusEditor from "./OrderStatusEditor";
 
 const receivedTime = (value: string) =>
   new Intl.DateTimeFormat("ko-KR", {
@@ -354,7 +355,9 @@ function Results() {
             <DialogTitle>배달 주문 상세</DialogTitle>
             <DialogDescription>주문 정보와 처리 이력을 확인하세요.</DialogDescription>
           </DialogHeader>
-          {selectedOrder && <OrderDetails key={selectedOrder} id={selectedOrder} />}
+          {selectedOrder && (
+            <OrderDetails key={selectedOrder} id={selectedOrder} onUpdated={() => setRefresh((value) => value + 1)} />
+          )}
         </DialogContent>
       </Dialog>
       {more && (
@@ -375,10 +378,11 @@ function Results() {
 }
 
 type OrderDetail = DeliveryOrder & {
+  version: number;
   cancelReason: string | null;
   history: { toStatus: OrderStatus; reason: string | null; createdAt: string }[];
 };
-function OrderDetails({ id }: { id: string }) {
+function OrderDetails({ id, onUpdated }: { id: string; onUpdated: () => void }) {
   const [data, setData] = useState<OrderDetail | null>(null);
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
@@ -454,6 +458,16 @@ function OrderDetails({ id }: { id: string }) {
         ))}
       </ul>
       {data.cancelReason && <p>취소 사유: {data.cancelReason}</p>}
+      <OrderStatusEditor
+        key={`${data.id}:${data.version}`}
+        id={data.id}
+        status={data.status}
+        version={data.version}
+        onUpdated={() => {
+          onUpdated();
+          setRetry((value) => value + 1);
+        }}
+      />
       <h3>처리 이력</h3>
       <ul>
         {data.history.map((entry, index) => (
