@@ -15,6 +15,7 @@ from core.exception_handlers import register_exception_handlers
 from core.middleware import log_requests
 from customers.presentation.router import router as customers_router
 from orders.presentation.router import router as orders_router
+from admin_orders.presentation.router import router as admin_orders_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("app")
@@ -63,6 +64,7 @@ def create_app() -> FastAPI:
     app.include_router(customers_router)
     app.include_router(login_history_router)
     app.include_router(orders_router)
+    app.include_router(admin_orders_router)
     return app
 
 
