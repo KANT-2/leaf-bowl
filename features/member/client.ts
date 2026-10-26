@@ -25,6 +25,8 @@ interface BackendInit {
   json?: unknown;
   form?: Record<string, string>;
   headers?: Record<string, string>;
+  /** 화면을 나가거나 계정이 바뀌면 현재 요청을 취소한다. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -33,12 +35,13 @@ interface BackendInit {
  */
 export async function backendRequest(path: string, init: BackendInit = {}) {
   const headers: Record<string, string> = { ...init.headers };
+  let requestToken: string | null = null;
   if (init.auth) {
-    const token = memberTokenStore.current();
-    if (!token) {
+    requestToken = memberTokenStore.current();
+    if (!requestToken) {
       throw new MemberAuthError();
     }
-    headers.authorization = `Bearer ${token}`;
+    headers.authorization = `Bearer ${requestToken}`;
   }
   let body: BodyInit | undefined;
   if (init.json !== undefined) {
@@ -48,15 +51,26 @@ export async function backendRequest(path: string, init: BackendInit = {}) {
     body = new URLSearchParams(init.form);
   }
   let response: Response;
+  const timeout = AbortSignal.timeout(15_000);
+  const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
   try {
     response = await fetch(BACKEND + path, {
       method: init.method ?? "GET",
       headers,
       body,
       cache: "no-store",
-      signal: AbortSignal.timeout(15_000),
+      signal,
     });
-  } catch {
+  } catch (cause) {
+    if (init.signal?.aborted) {
+      throw init.signal.reason;
+    }
+    if (timeout.aborted) {
+      throw new Error("서버 응답 시간이 초과됐습니다. 다시 시도해주세요.");
+    }
+    if (cause instanceof DOMException && cause.name === "AbortError") {
+      throw cause;
+    }
     throw new Error("서버에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.");
   }
   if (response.status === 204) {
@@ -65,13 +79,24 @@ export async function backendRequest(path: string, init: BackendInit = {}) {
   let data;
   try {
     data = await response.json();
-  } catch {
+  } catch (cause) {
+    if (init.signal?.aborted) {
+      throw init.signal.reason;
+    }
+    if (timeout.aborted) {
+      throw new Error("서버 응답 시간이 초과됐습니다. 다시 시도해주세요.");
+    }
+    if (cause instanceof DOMException && cause.name === "AbortError") {
+      throw cause;
+    }
     throw new Error("서버 응답을 확인하지 못했습니다. 다시 시도해주세요.");
   }
   if (!response.ok) {
     const message = typeof data?.error?.message === "string" ? data.error.message : undefined;
     if (response.status === 401 && init.auth) {
-      memberTokenStore.set(null);
+      if (requestToken && memberTokenStore.current() === requestToken) {
+        memberTokenStore.set(null);
+      }
       throw new MemberAuthError("로그인이 만료되었습니다. 다시 로그인해주세요.");
     }
     throw new Error(message ?? "요청을 처리하지 못했습니다. 다시 시도해주세요.");
