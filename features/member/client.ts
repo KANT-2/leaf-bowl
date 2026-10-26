@@ -233,8 +233,26 @@ export async function submitMemberOrder(input: OrderInput, key: string): Promise
   return { id: body.id, total: Number(body.total) };
 }
 
-export async function loadMemberOrders(cursor?: string): Promise<ServerOrderPage> {
-  return parseOrderPage(await backendRequest("/api/v1/orders?" + orderPageQuery(cursor), { auth: true }));
+export interface MemberOrderFilter {
+  /** 비어 있으면 모든 상태 */
+  statuses?: readonly string[];
+  /** YYYY-MM-DD, 한국 시간 기준 주문일. to 는 그날 끝까지 포함한다. */
+  from?: string;
+  to?: string;
+}
+
+/** 내 주문 (최신순). 커서로 이어 읽을 때도 같은 조건을 보낸다. */
+export async function loadMemberOrders(cursor?: string, filter: MemberOrderFilter = {}): Promise<ServerOrderPage> {
+  const params = orderPageQuery(cursor);
+  for (const status of filter.statuses ?? []) {
+    params.append("status", status);
+  }
+  for (const key of ["from", "to"] as const) {
+    if (filter[key]) {
+      params.set(key, filter[key]);
+    }
+  }
+  return parseOrderPage(await backendRequest("/api/v1/orders?" + params, { auth: true }));
 }
 
 export async function cancelMemberOrder(id: string, reason?: string): Promise<{ status: string; canceledAt: string }> {
