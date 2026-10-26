@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 
 from catalog.application.service import CatalogService
 from catalog.domain.product import MenuQuery, SortKey
@@ -18,6 +18,7 @@ router = APIRouter(prefix="/api/v1/menus", tags=["catalog"])
     },
 )
 async def search_menu(
+    response: Response,
     q: str | None = Query(None, max_length=100),
     category: str | None = Query(None, max_length=100),
     min_price: int | None = Query(None, ge=0),
@@ -38,4 +39,10 @@ async def search_menu(
         page=page,
         size=size,
     )
-    return await service.search_menu(query)
+    result = await service.search_menu(query)
+    # 브라우저·CDN은 보관하지 않고 매 요청 서버에서 revision을 확인한다.
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Catalog-Cache"] = service.cache_status
+    if service.catalog_revision is not None:
+        response.headers["X-Catalog-Revision"] = str(service.catalog_revision)
+    return result

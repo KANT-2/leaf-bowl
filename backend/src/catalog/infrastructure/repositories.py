@@ -10,6 +10,12 @@ class SqlProductRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
+    async def lock_revision(self) -> int:
+        revision = await self.session.scalar(text("SELECT revision FROM catalog_meta WHERE id = 1 FOR SHARE"))
+        if type(revision) is not int or revision < 0:
+            raise RuntimeError("카탈로그 revision이 없거나 올바르지 않습니다.")
+        return revision
+
     async def list_categories(self) -> list[str]:
         result = await self.session.scalars(text("SELECT name FROM categories ORDER BY sort_order, name"))
         return list(result)
