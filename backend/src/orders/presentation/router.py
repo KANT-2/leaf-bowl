@@ -1,15 +1,17 @@
+from collections.abc import AsyncIterator, Iterable
 from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, Header, Query, Response, status
+from fastapi.responses import StreamingResponse
 
 from core.dependencies import CurrentCustomer, get_current_customer
 from core.exceptions import NotFound
 from orders.application.service import MAX_PAGE_SIZE, NOT_FOUND, OrderService, PlaceOrderCommand
+from orders.container import get_order_service
 from orders.domain.order import OrderStatus
 from orders.domain.repository import OrderListFilter
 from orders.domain.request_hash import request_hash
-from orders.presentation.dependencies import get_order_service
 from orders.presentation.schemas import (
     CanceledOrderResponse,
     CancelOrderRequest,
@@ -105,6 +107,41 @@ async def get_my_order(
     service: OrderService = Depends(get_order_service),
 ):
     return OrderDetailResponse.of(await service.get_mine(customer.id, parse_order_id(order_id)))
+
+
+@router.get(
+    "/{order_id}/receipt",
+    response_class=StreamingResponse,
+    summary="주문 영수증 내려받기",
+    description=(
+        "본인 주문의 영수증을 텍스트 파일(UTF-8)로 한 줄씩 나누어 내려준다 (StreamingResponse). "
+        "주문 확인·권한 검사는 보내기 전에 끝나므로 401·404 는 JSON 오류로 답한다."
+    ),
+    responses={
+        200: {"description": "영수증 파일", "content": {"text/plain": {"schema": {"type": "string"}}}},
+        **ERROR_401,
+        **ERROR_404,
+    },
+)
+async def download_my_receipt(
+    order_id: str,
+    customer: CurrentCustomer = Depends(get_current_customer),
+    service: OrderService = Depends(get_order_service),
+):
+    receipt = await service.receipt(customer.id, parse_order_id(order_id))
+    return StreamingResponse(
+        _encoded(receipt.lines()),
+        media_type="text/plain; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{receipt.filename}"',
+            "Cache-Control": "no-store",  # 개인 주문 정보라 중간 캐시에 남기지 않는다
+        },
+    )
+
+
+async def _encoded(lines: Iterable[str]) -> AsyncIterator[bytes]:
+    for line in lines:
+        yield line.encode()
 
 
 @router.post(

@@ -95,6 +95,15 @@ class OrderItem:
     quantity: int
     id: int | None = None
 
+    @property
+    def option_names(self) -> list[str]:
+        o = self.options
+        return [c.name for c in (*o.dressings, *o.drinks, *o.ingredients, *o.custom)]
+
+    @property
+    def amount(self) -> int:
+        return self.unit_price * self.quantity
+
 
 @dataclass(frozen=True)
 class StatusChange:

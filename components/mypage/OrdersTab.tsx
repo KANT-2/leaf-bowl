@@ -14,6 +14,7 @@ import {
   cancelMemberOrder,
   isCancelable,
   loadMemberOrders,
+  loadMemberReceipt,
   MemberAuthError,
   type MemberOrderFilter,
 } from "@/features/member/client";
@@ -198,6 +199,18 @@ function OrderCard({
   );
 }
 
+/** 받은 파일을 브라우저 다운로드로 저장한다 */
+function saveFile(file: Blob, filename: string) {
+  const url = URL.createObjectURL(file);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 function LoadError({ error, retry }: { error: string; retry: () => void }) {
   return (
     <div role="alert">
@@ -287,6 +300,25 @@ function MemberOrders({
   // 토큰이 만료되면 다시 로그인하게 한다
   const member = usePagedOrders(load, () => router.replace("/login?next=/mypage"));
   const [canceling, setCanceling] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
+  async function downloadReceipt(order: ServerOrder) {
+    if (downloading) {
+      return;
+    }
+    setDownloading(order.id);
+    try {
+      const { file, filename } = await loadMemberReceipt(order.id);
+      saveFile(file, filename);
+    } catch (cause) {
+      if (cause instanceof MemberAuthError) {
+        router.replace("/login?next=/mypage");
+      }
+      toast(cause instanceof Error ? cause.message : "영수증을 받지 못했습니다.");
+    } finally {
+      setDownloading(null);
+    }
+  }
+
   async function cancel(order: ServerOrder) {
     if (canceling || !window.confirm("이 주문을 취소할까요?")) {
       return;
@@ -319,11 +351,21 @@ function MemberOrders({
               order={o}
               imageFor={imageFor}
               action={
-                isCancelable(o.status) && (
-                  <button type="button" className="ghost-btn" disabled={canceling === o.id} onClick={() => cancel(o)}>
-                    {canceling === o.id ? "취소하는 중…" : "주문 취소"}
+                <div className="order-item-actions">
+                  <button
+                    type="button"
+                    className="ghost-btn"
+                    disabled={downloading === o.id}
+                    onClick={() => downloadReceipt(o)}
+                  >
+                    {downloading === o.id ? "영수증 받는 중…" : "영수증 받기"}
                   </button>
-                )
+                  {isCancelable(o.status) && (
+                    <button type="button" className="ghost-btn" disabled={canceling === o.id} onClick={() => cancel(o)}>
+                      {canceling === o.id ? "취소하는 중…" : "주문 취소"}
+                    </button>
+                  )}
+                </div>
               }
             />
           ))}
