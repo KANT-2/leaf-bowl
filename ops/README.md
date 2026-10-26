@@ -2,12 +2,17 @@
 
 GitHub Actions의 `Frontend CI`는 PR과 `main`·`production` push에서 의존성 설치,
 린트, 빌드, 타입 검사를 수행한다. 개발 MCP의 두 앱은 각각 해당 브랜치의 최신
-커밋에 대한 CI 성공을 확인하고, 검증된 Next.js 서버 버전으로 자동 교체한다.
+커밋에 대한 CI 성공을 확인하고, 검증된 Next.js 서버와 같은 커밋의 FastAPI(`backend/`)로 자동 교체한다.
 
-| 환경 | 브랜치 | 앱 이름 | 포트 | 공개 범위 |
-| --- | --- | --- | --- | --- |
-| 검증 | `main` | `kant2-front5-staging` | 3100 | 본인·관리자 |
-| 운영 | `production` | `kant2-front5-production` | 3200 | 링크 공개 |
+| 환경 | 브랜치 | 앱 이름 | 포트 | FastAPI 내부 포트 | 공개 범위 |
+| --- | --- | --- | --- | --- | --- |
+| 검증 | `main` | `kant2-front5-staging` | 3100 | 3101 | 본인·관리자 |
+| 운영 | `production` | `kant2-front5-production` | 3200 | 3201 | 링크 공개 |
+
+FastAPI는 `127.0.0.1`의 내부 포트(기본 `--port + 1`, `--api-port`로 변경)에서만 실행한다.
+브라우저는 같은 도메인의 Next.js `/backend/*` 프록시로 FastAPI를 호출하므로 FastAPI 포트를
+공개하거나 CORS를 설정하지 않는다. supervisor가 Next.js 빌드·실행 환경에
+`BACKEND_URL=http://127.0.0.1:<FastAPI 내부 포트>`를 주입한다.
 
 개발 MCP `app_deploy`가 발급한 독립 HTTPS 도메인:
 
@@ -22,15 +27,19 @@ GitHub Actions의 `Frontend CI`는 PR과 `main`·`production` push에서 의존�
 1. 앱 프로세스가 60초마다 해당 브랜치의 최신 커밋을 가져온다.
 2. 해당 SHA·브랜치의 최신 `Frontend CI` push 실행이 완료·성공 상태인지 확인한다.
    PR 실행, 다른 워크플로, 다른 SHA의 성공은 배포 근거로 사용하지 않는다.
-3. 커밋별 별도 디렉터리에서 `npm ci`와 `npm run build`를 수행한다.
+3. 커밋별 별도 디렉터리에서 `npm ci`와 `npm run build`를 수행한다. `backend/`가 있는 커밋은
+   `backend/`에서 `uv sync --frozen --no-dev`로 잠금 파일의 의존성을 설치한다.
 4. 최신 브랜치 SHA와 CI 성공을 다시 확인한 뒤, 후보 릴리스에 설치된 Prisma CLI로
    해당 환경 DB에 `prisma migrate deploy`를 실행한다. `DATABASE_URL` 누락, CLI 누락,
    접속 오류, 적용 실패 또는 300초 시간 초과이면 후보를 시작하지 않고 기존 서버를 유지한다.
-5. 마이그레이션 성공 후 임시 로컬 포트에서 후보 서버를 실행한다. `/`가 HTTP 200이어야 하며,
+5. 마이그레이션 성공 후 임시 로컬 포트에서 후보 FastAPI를 실행해 `/health/db`가 HTTP 200
+   `{"status":"ok"}`인지 확인한다(기동·FastAPI 소유 테이블 준비·DB 조회 확인). 이어서
+   임시 로컬 포트에서 후보 Next.js 서버를 실행한다. `/`가 HTTP 200이어야 하며,
    `/api/catalog`이 있는 릴리스는 이 API도 HTTP 200과 오류 없는 JSON을 반환해야 한다.
    스트리밍 홈 화면의 HTTP 200만으로 DB 조회가 정상이라고 판단하지 않는다.
 6. 후보 확인 뒤에도 최신 브랜치 SHA와 CI 성공을 다시 확인한다. 변경됐으면 활성화를 취소한다.
-7. 기존 서버를 종료하고 새 서버를 시작한다. 시작 후 같은 HTTP·DB API 확인이 실패하면 이전 버전을 복구한다.
+7. 기존 Next.js·FastAPI를 종료하고 새 FastAPI, 새 Next.js 순서로 시작한다. 시작 후 같은 확인이
+   실패하면 이전 FastAPI·Next.js를 함께 복구한다. 둘 중 하나가 종료되면 마지막 검증 버전을 다시 시작한다.
 8. 배포한 SHA·CI 실행 URL과 상태를 저장한다. 서버 종료는 마지막 검증 버전으로 재시작한다.
    저장된 릴리스를 복원할 때도 서버 시작 전에 마이그레이션을 확인한다.
 
@@ -62,7 +71,9 @@ python3 ops/mcp_cicd.py --branch production --port 3200
 ```
 
 같은 브랜치에는 supervisor 하나만 실행할 수 있다. 종료 시 하위 Next.js 프로세스도 종료한다.
-Python 3.12 이상, Linux, Git, Node.js 22, npm과 GitHub/npm/Google Fonts 네트워크 접근이 필요하다.
+Python 3.12 이상, Linux, Git, Node.js 22, npm, [uv](https://docs.astral.sh/uv/)와
+GitHub/npm/Google Fonts/PyPI 네트워크 접근이 필요하다. FastAPI용 Python 3.13은 uv가 설치한다.
+`uv`는 supervisor 프로세스의 `PATH`에 있어야 한다. 없으면 FastAPI가 있는 커밋은 배포하지 않고 기존 버전을 유지한다.
 배포는 개발 MCP 앱 프로세스가 실행되는 동안 자동 동작한다. 실행 환경이 재생성되면
 이 문서의 준비·앱 배포 절차로 복원한다.
 
@@ -72,11 +83,14 @@ Python 3.12 이상, Linux, Git, Node.js 22, npm과 GitHub/npm/Google Fonts 네�
 - 빌드 로그: `.deploy/<브랜치>/logs/build-<SHA>.log`
 - 마이그레이션 로그: `.deploy/<브랜치>/logs/migration-<SHA>.log` (연결 주소·비밀번호 제거, 권한 600)
 - 서버 로그: `.deploy/<브랜치>/logs/server.log`
+- FastAPI 로그: `.deploy/<브랜치>/logs/api.log` (FastAPI 의존성 설치 로그는 빌드 로그에 포함)
 - 빌드 결과: `.deploy/<브랜치>/releases/<SHA>/`
 - 배포 프로세스 로그: 개발 MCP `process_logs`
 - 상태·캐시·로그는 Git에 커밋하지 않는다. 이전 정상 릴리스는 복구를 위해 보관한다.
 
 두 앱의 서버 응답은 각각 `http://127.0.0.1:3100/`, `http://127.0.0.1:3200/`에서 확인한다.
+FastAPI는 `http://127.0.0.1:3101/health/db`, `http://127.0.0.1:3201/health/db`와
+외부 주소의 `/backend/health/db`로 확인한다.
 내부 응답은 정상인데 외부 HTTPS 연결이 시간 초과되면, DNS 해석과 MCP 호스트의
 외부 443 연결·게이트웨이 경로를 확인한다. 검증 앱의 외부 접근에는 계정 인증이 필요하다.
 
@@ -92,6 +106,23 @@ PostgreSQL 저장을 사용하는 버전은 supervisor 프로세스에 환경별
 `APP_ORIGIN`은 TLS 프록시 뒤에서 로그인·주문 등 쓰기 API의 출처 확인에 사용한다.
 릴리스 안의 `.env.local` 대신 supervisor 환경을 사용한다. 상세 절차는
 [PostgreSQL 실행과 이관](../docs/postgres.md)을 따른다.
+
+FastAPI가 있는 버전은 supervisor 프로세스에 다음 값도 주입해야 한다. 없으면 후보 확인 전에
+배포를 중단하고 기존 버전을 유지한다. 릴리스 안의 `backend/.env`는 사용하지 않는다(Git에 없다).
+
+| 변수 | 필수 | 설명 |
+| --- | --- | --- |
+| `JWT_SECRET_KEY` | 예 | 회원 토큰 서명 키. 32바이트 이상 무작위 값을 환경마다 다르게 둔다. 바꾸면 기존 로그인 토큰이 무효가 된다. |
+| `BACKEND_DATABASE_URL` | 아니요 | FastAPI 전용 DB 주소. 없으면 `DATABASE_URL`을 쓴다. Supabase는 Session pooler(5432) 주소를 쓴다. |
+| `DATABASE_DISABLE_STATEMENT_CACHE` | 아니요 | Transaction pooler(6543)를 쓸 때만 `true` |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | 아니요 | 기본 60 |
+
+FastAPI는 기동할 때 자신이 소유한 테이블(`customers`, `token_blacklist`, 로그인 이력 등)이 없으면 만든다.
+Prisma 마이그레이션 대상 테이블은 변경하지 않는다.
+
+이 스크립트로 처음 갱신할 때 이미 만들어진 릴리스는 FastAPI 의존성이 없으므로 활성화 전에 같은 방식으로 설치한다.
+Next.js의 `/backend` 프록시 주소는 빌드에 포함될 수 있으므로, 갱신 후에는 새 커밋이 배포되었는지
+`/backend/health/db`로 확인한다. 이전 릴리스로 계속 실행해야 하면 앱을 중지하고 해당 릴리스 디렉터리를 정리한 뒤 다시 준비한다.
 
 마이그레이션 실패 시 위 로그와 DB 연결·권한을 확인한다. 실패한 적용 이력이 있으면
 원인과 실제 DB 상태를 조사해 Prisma의 복구 절차로 처리한 뒤 재시도한다. supervisor는
@@ -114,3 +145,5 @@ python3 -m unittest discover -s ops -p 'test_*.py' -v
 CI 실패·대기, 다른 브랜치/워크플로/PR 성공 배제, 빌드·마이그레이션·DB API 오류 시 기존 버전 유지,
 시간 초과와 종료 시 마이그레이션 프로세스 정리, 빌드 캐시·저장된 릴리스의 DB 확인,
 적용 전후 최신 커밋·CI 재검증, 시작 실패 시 이전 서버·상태 복구를 검증한다.
+FastAPI는 잠금 파일 설치·uv 누락·필수 환경변수 누락 거부, 후보 `/health/db` 실패 시 Next.js 미확인,
+FastAPI→Next.js 시작 순서와 실패 시 둘 다 복구, FastAPI 종료 감지와 종료 시 정리를 검증한다.

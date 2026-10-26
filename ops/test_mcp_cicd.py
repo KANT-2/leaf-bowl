@@ -314,5 +314,123 @@ class DeploymentTests(unittest.TestCase):
         self.assertEqual(self.deployer.current, previous)
 
 
+class BackendDeploymentTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.deployer = Deployer(Path(self.directory.name), "main", 3100)
+        self.deployer.env.update(DATABASE_URL="postgresql://user:secret@db/staging", JWT_SECRET_KEY="jwt-secret")
+
+    def backend_release(self, sha=SHA, ready=False):
+        release = self.deployer.releases / sha
+        (release / "backend").mkdir(parents=True)
+        (release / "backend" / "pyproject.toml").write_text("[project]\n")
+        if ready:
+            (release / "backend" / ".venv-ready").write_text(sha)
+        return release
+
+    def test_next_proxies_to_loopback_api_port(self):
+        self.assertEqual(self.deployer.api_port, 3101)
+        self.assertEqual(self.deployer.env["BACKEND_URL"], "http://127.0.0.1:3101")
+        deployer = Deployer(Path(self.directory.name), "production", 3200, api_port=3300)
+        self.assertEqual(deployer.env["BACKEND_URL"], "http://127.0.0.1:3300")
+
+    @patch("mcp_cicd.subprocess.Popen")
+    def test_backend_dependencies_are_installed_once_from_the_lock(self, popen):
+        release = self.backend_release()
+
+        def sync(*args, **kwargs):
+            python = self.deployer.api_python(release)
+            python.parent.mkdir(parents=True)
+            python.write_text("")
+            return process
+
+        process = Mock()
+        process.wait.return_value = 0
+        popen.side_effect = sync
+        with patch("mcp_cicd.shutil.which", return_value="/usr/bin/uv"):
+            self.deployer.prepare_backend(release, SHA)
+            self.deployer.prepare_backend(release, SHA)
+        popen.assert_called_once()
+        self.assertEqual(popen.call_args.args[0], ["uv", "sync", "--frozen", "--no-dev"])
+        self.assertEqual(popen.call_args.kwargs["cwd"], release / "backend")
+        self.assertTrue((release / "backend" / ".venv-ready").exists())
+
+    @patch("mcp_cicd.subprocess.Popen")
+    def test_backend_preparation_fails_closed_and_legacy_release_skips_it(self, popen):
+        self.deployer.prepare_backend(self.deployer.releases / OLD_SHA, OLD_SHA)
+        release = self.backend_release()
+        with patch("mcp_cicd.shutil.which", return_value=None):
+            with self.assertRaisesRegex(RuntimeError, "uv is required"):
+                self.deployer.prepare_backend(release, SHA)
+        popen.return_value.wait.return_value = 0
+        with patch("mcp_cicd.shutil.which", return_value="/usr/bin/uv"):
+            with self.assertRaisesRegex(RuntimeError, "virtual environment is missing"):
+                self.deployer.prepare_backend(release, SHA)
+        self.assertFalse((release / "backend" / ".venv-ready").exists())
+
+    def test_api_requires_secrets_and_can_use_its_own_database_url(self):
+        self.assertEqual(self.deployer.api_env()["DATABASE_URL"], "postgresql://user:secret@db/staging")
+        self.deployer.env["BACKEND_DATABASE_URL"] = "postgresql://user:secret@pooler/staging"
+        self.assertEqual(self.deployer.api_env()["DATABASE_URL"], "postgresql://user:secret@pooler/staging")
+        self.assertEqual(self.deployer.env["DATABASE_URL"], "postgresql://user:secret@db/staging")
+        del self.deployer.env["JWT_SECRET_KEY"]
+        with self.assertRaisesRegex(RuntimeError, "JWT_SECRET_KEY") as error:
+            self.deployer.api_env()
+        self.assertNotIn("secret@", str(error.exception))
+
+    @patch("mcp_cicd.stop_process")
+    @patch("mcp_cicd.subprocess.Popen")
+    def test_unhealthy_candidate_api_stops_before_next_is_checked(self, popen, stop):
+        release = self.backend_release(ready=True)
+        self.deployer.wait_api_healthy = Mock(side_effect=RuntimeError("FastAPI failed"))
+        self.deployer.start_server = Mock()
+        with self.assertRaisesRegex(RuntimeError, "FastAPI failed"):
+            self.deployer.check_candidate(release)
+        command = popen.call_args.args[0]
+        self.assertEqual(command[1:4], ["-m", "uvicorn", "main:app"])
+        self.assertEqual(command[command.index("--host") + 1], "127.0.0.1")
+        self.assertNotEqual(command[command.index("--port") + 1], "3101")
+        stop.assert_called_once_with(popen.return_value)
+        self.deployer.start_server.assert_not_called()
+
+    @patch("mcp_cicd.stop_process")
+    def test_activation_starts_api_before_next_and_restores_both_on_failure(self, stop):
+        self.backend_release(OLD_SHA, ready=True)
+        self.backend_release(SHA, ready=True)
+        previous = {"sha": OLD_SHA, "ci_run_id": 1, "status": "running"}
+        self.deployer.current = previous
+        old_api, old_next = self.deployer.api_server, self.deployer.server = Mock(), Mock()
+        new_api, restored_api, restored_next = Mock(), Mock(), Mock()
+        order = []
+        self.deployer.start_api = Mock(side_effect=lambda release, port: order.append(("api", release.name, port))
+                                       or {SHA: new_api, OLD_SHA: restored_api}[release.name])
+        self.deployer.wait_api_healthy = Mock()
+        self.deployer.start_server = Mock(side_effect=lambda release, port, host: order.append(("next", release.name))
+                                          or (Mock() if release.name == SHA else restored_next))
+        self.deployer.wait_healthy = Mock(side_effect=[RuntimeError("Next failed"), None])
+        with self.assertRaisesRegex(RuntimeError, "Next failed"):
+            self.deployer.activate({"sha": SHA, "ci_run_id": 2}, database_ready=True)
+        self.assertEqual(order, [("api", SHA, 3101), ("next", SHA), ("api", OLD_SHA, 3101), ("next", OLD_SHA)])
+        for process in (old_api, old_next, new_api):
+            stop.assert_any_call(process)
+        self.assertIs(self.deployer.api_server, restored_api)
+        self.assertIs(self.deployer.server, restored_next)
+        self.assertEqual(self.deployer.current, previous)
+
+    def test_dead_api_triggers_restart_and_shutdown_stops_it(self):
+        self.deployer.server, self.deployer.api_server = Mock(), Mock()
+        self.deployer.server.poll.return_value = None
+        self.deployer.api_server.poll.return_value = None
+        self.assertFalse(self.deployer.release_stopped())
+        self.deployer.api_server.poll.return_value = 1
+        self.assertTrue(self.deployer.release_stopped())
+        api = self.deployer.api_server
+        with patch("mcp_cicd.stop_process") as stop:
+            self.deployer.close()
+        stop.assert_any_call(api)
+        self.assertIsNone(self.deployer.api_server)
+
+
 if __name__ == "__main__":
     unittest.main()

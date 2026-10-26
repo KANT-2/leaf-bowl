@@ -247,7 +247,8 @@ GitHub Projects, 라벨, 마일스톤은 위 기준에 맞춰 구성한다.
   `python3 -m unittest discover -s ops -p 'test_*.py' -v`도 검증한다.
 - 개발 MCP 프로젝트 `front-5-cicd`에서 `ops/mcp_cicd.py`로 배포 프로세스를 운영한다.
 - `main`은 비공개 검증 앱 `kant2-front5-staging`(포트 3100), `production`은
-  공개 운영 앱 `kant2-front5-production`(포트 3200)에 연결한다.
+  공개 운영 앱 `kant2-front5-production`(포트 3200)에 연결한다. 같은 커밋의 FastAPI(`backend/`)는
+  같은 supervisor가 내부 포트(3101·3201, `127.0.0.1`)에서 실행하고 Next.js `/backend` 프록시로만 노출한다.
 - 해당 브랜치의 최신 SHA에 대한 최신 `Frontend CI` push 실행이 성공한 경우에만 배포한다.
 - 브랜치 변경은 60초마다 확인하며, CI/API 재확인은 최소 180초 간격으로 수행한다.
 - 빌드·후보 서버 확인 실패 시 기존 버전을 유지한다. 새 서버 시작 실패 시 이전 버전을 복구한다.

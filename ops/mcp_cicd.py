@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CI-gated Next.js deployment supervisor for the development MCP runner."""
+"""CI-gated Next.js and FastAPI deployment supervisor for the development MCP runner."""
 
 import argparse
 import contextlib
@@ -25,6 +25,7 @@ WORKFLOW_ID = 377985071
 BRANCHES = {"main", "production"}
 SHA_PATTERN = re.compile(r"[0-9a-f]{40}")
 MIGRATION_TIMEOUT_SECONDS = 300
+API_SECRET_VARIABLES = ("DATABASE_URL", "JWT_SECRET_KEY")
 
 
 def successful_ci(runs, branch, sha):
@@ -56,12 +57,13 @@ def stop_process(process):
 
 
 class Deployer:
-    def __init__(self, root, branch, port, poll_seconds=60, ci_retry_seconds=180):
+    def __init__(self, root, branch, port, poll_seconds=60, ci_retry_seconds=180, api_port=None):
         if branch not in BRANCHES:
             raise ValueError("Only main and production can be deployed")
         self.root = Path(root).resolve()
         self.branch = branch
         self.port = port
+        self.api_port = api_port or port + 1
         self.poll_seconds = poll_seconds
         self.ci_retry_seconds = ci_retry_seconds
         self.base = self.root / ".deploy" / branch
@@ -71,10 +73,13 @@ class Deployer:
             directory.mkdir(parents=True, exist_ok=True)
         self.state_file = self.base / "state.json"
         self.server = None
+        self.api_server = None
         self.build_process = None
         self.migration_process = None
         self.current = None
-        self.env = {**os.environ, "NEXT_TELEMETRY_DISABLED": "1", "GIT_TERMINAL_PROMPT": "0", "TZ": "UTC"}
+        # Next.js reads BACKEND_URL for its /backend proxy at build and start; FastAPI stays on loopback.
+        self.env = {**os.environ, "NEXT_TELEMETRY_DISABLED": "1", "GIT_TERMINAL_PROMPT": "0", "TZ": "UTC",
+                    "BACKEND_URL": f"http://127.0.0.1:{self.api_port}"}
 
     def log(self, message):
         now = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
@@ -111,7 +116,7 @@ class Deployer:
         return successful_ci(runs, self.branch, sha)
 
     def write_state(self, state):
-        state = {**state, "branch": self.branch, "port": self.port,
+        state = {**state, "branch": self.branch, "port": self.port, "api_port": self.api_port,
                  "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")}
         temporary = self.state_file.with_suffix(".tmp")
         temporary.write_text(json.dumps(state, indent=2) + "\n")
@@ -124,6 +129,31 @@ class Deployer:
         if not SHA_PATTERN.fullmatch(state.get("sha", "")):
             raise ValueError("Invalid saved deployment SHA")
         return state
+
+    @staticmethod
+    def has_backend(release):
+        """Releases before the FastAPI backend run Next.js alone."""
+        return (release / "backend" / "pyproject.toml").is_file()
+
+    @staticmethod
+    def api_python(release):
+        # The venv moves with the release directory, so run uvicorn through its interpreter, not a script shebang.
+        return release / "backend" / ".venv" / "bin" / "python"
+
+    def prepare_backend(self, release, sha):
+        """Install the locked FastAPI dependencies. Releases cached before FastAPI deployment get them lazily."""
+        marker = release / "backend" / ".venv-ready"
+        if not self.has_backend(release) or marker.exists():
+            return
+        if shutil.which("uv", path=self.env.get("PATH")) is None:
+            raise RuntimeError("uv is required to prepare the FastAPI backend")
+        log_path = self.logs / f"build-{sha}.log"
+        self.log(f"Preparing FastAPI for {sha}; log: {log_path}")
+        with log_path.open("a") as log:
+            self.build_command(["uv", "sync", "--frozen", "--no-dev"], release / "backend", log)
+        if not self.api_python(release).is_file():
+            raise RuntimeError("FastAPI virtual environment is missing")
+        marker.write_text(sha + "\n")
 
     def build_command(self, command, cwd, log):
         self.build_process = subprocess.Popen(
@@ -143,6 +173,7 @@ class Deployer:
             raise ValueError("Invalid release SHA")
         release = self.releases / sha
         if (release / ".ready").exists():
+            self.prepare_backend(release, sha)
             return release
         stage = Path(tempfile.mkdtemp(prefix=f".{sha}-", dir=self.releases))
         try:
@@ -159,6 +190,7 @@ class Deployer:
                 self.build_command(["npm", "run", "build"], stage, log)
             if not (stage / ".next" / "BUILD_ID").is_file():
                 raise RuntimeError("Next.js build output is missing")
+            self.prepare_backend(stage, sha)
             (stage / ".ready").write_text(sha + "\n")
             stage.rename(release)
             return release
@@ -174,6 +206,42 @@ class Deployer:
                 cwd=release, env=self.env, stdout=log, stderr=subprocess.STDOUT,
                 start_new_session=True,
             )
+
+    def api_env(self):
+        env = dict(self.env)
+        # FastAPI may need a different driver URL than Prisma (for example a Supabase session pooler).
+        if self.env.get("BACKEND_DATABASE_URL", "").strip():
+            env["DATABASE_URL"] = self.env["BACKEND_DATABASE_URL"]
+        missing = [name for name in API_SECRET_VARIABLES if not env.get(name, "").strip()]
+        if missing:
+            raise RuntimeError(f"{', '.join(missing)} required before starting FastAPI")
+        return env
+
+    def start_api(self, release, port):
+        env = self.api_env()
+        with (self.logs / "api.log").open("a") as log:
+            return subprocess.Popen(
+                [str(self.api_python(release)), "-m", "uvicorn", "main:app", "--app-dir", "src",
+                 "--host", "127.0.0.1", "--port", str(port)],
+                cwd=release / "backend", env=env, stdout=log, stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+
+    def wait_api_healthy(self, process, port):
+        """/health/db proves FastAPI started, created its tables and can query the database."""
+        deadline = time.monotonic() + 45
+        while time.monotonic() < deadline:
+            if process.poll() is not None:
+                raise RuntimeError("FastAPI exited before becoming healthy")
+            try:
+                with urlopen(f"http://127.0.0.1:{port}/health/db", timeout=3) as response:
+                    payload = json.load(response)
+                    if response.status == 200 and isinstance(payload, dict) and payload.get("status") == "ok":
+                        return
+            except (OSError, ValueError):
+                pass
+            time.sleep(0.5)
+        raise RuntimeError("FastAPI HTTP/database health check timed out")
 
     def redact_database_details(self, message):
         connection = self.env.get("DATABASE_URL", "")
@@ -250,36 +318,62 @@ class Deployer:
             time.sleep(0.5)
         raise RuntimeError("Next.js HTTP/database health check timed out")
 
-    def check_candidate(self, release):
+    @staticmethod
+    def free_port():
         with socket.socket() as listener:
             listener.bind(("127.0.0.1", 0))
-            port = listener.getsockname()[1]
+            return listener.getsockname()[1]
+
+    def check_candidate(self, release):
+        if self.has_backend(release):
+            api_port = self.free_port()
+            api = self.start_api(release, api_port)
+            try:
+                self.wait_api_healthy(api, api_port)
+            finally:
+                stop_process(api)
+        port = self.free_port()
         candidate = self.start_server(release, port, "127.0.0.1")
         try:
             self.wait_healthy(candidate, port, release)
         finally:
             stop_process(candidate)
 
+    def start_release(self, release):
+        # FastAPI first, so the Next.js /backend proxy never serves without its upstream.
+        if self.has_backend(release):
+            self.api_server = self.start_api(release, self.api_port)
+            self.wait_api_healthy(self.api_server, self.api_port)
+        self.server = self.start_server(release, self.port, "0.0.0.0")
+        self.wait_healthy(self.server, self.port, release)
+
+    def stop_release(self):
+        stop_process(self.server)
+        self.server = None
+        stop_process(self.api_server)
+        self.api_server = None
+
+    def release_stopped(self):
+        return (self.server is None or self.server.poll() is not None
+                or (self.api_server is not None and self.api_server.poll() is not None))
+
     def activate(self, state, *, database_ready=False):
         previous = self.current
         release = self.releases / state["sha"]
         if not database_ready:
             self.migrate_release(release)
-        stop_process(self.server)
-        self.server = None
+        self.prepare_backend(release, state["sha"])
+        self.stop_release()
         try:
-            self.server = self.start_server(release, self.port, "0.0.0.0")
-            self.wait_healthy(self.server, self.port, release)
+            self.start_release(release)
             self.current = {**state, "status": "running"}
             self.write_state(self.current)
             self.log(f"Serving {state['sha']} on port {self.port}; CI run {state['ci_run_id']}")
         except Exception:
-            stop_process(self.server)
-            self.server = None
+            self.stop_release()
             if previous:
                 self.log(f"Activation failed; restoring {previous['sha']}")
-                self.server = self.start_server(self.releases / previous["sha"], self.port, "0.0.0.0")
-                self.wait_healthy(self.server, self.port, self.releases / previous["sha"])
+                self.start_release(self.releases / previous["sha"])
                 self.current = previous
                 self.write_state(previous)
             raise
@@ -320,7 +414,7 @@ class Deployer:
             next_attempt = 0
             while True:
                 try:
-                    if self.current and (self.server is None or self.server.poll() is not None):
+                    if self.current and self.release_stopped():
                         self.log("Server stopped; restarting the last verified release")
                         self.activate(self.current)
                     sha = self.fetch_head()
@@ -347,19 +441,24 @@ class Deployer:
     def close(self):
         stop_process(self.migration_process)
         stop_process(self.build_process)
-        stop_process(self.server)
+        self.stop_release()
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--branch", required=True, choices=sorted(BRANCHES))
     parser.add_argument("--port", required=True, type=int)
+    parser.add_argument("--api-port", type=int, help="loopback FastAPI port (default: --port + 1)")
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--poll-seconds", type=int, default=60)
     args = parser.parse_args()
-    if not 1024 <= args.port <= 65535 or args.poll_seconds < 10:
-        parser.error("Use a port from 1024 to 65535 and a polling interval of at least 10 seconds")
-    deployer = Deployer(Path(__file__).resolve().parents[1], args.branch, args.port, args.poll_seconds)
+    api_port = args.api_port or args.port + 1
+    if not all(1024 <= port <= 65535 for port in (args.port, api_port)) or args.poll_seconds < 10:
+        parser.error("Use ports from 1024 to 65535 and a polling interval of at least 10 seconds")
+    if api_port == args.port:
+        parser.error("--api-port must differ from --port")
+    deployer = Deployer(Path(__file__).resolve().parents[1], args.branch, args.port, args.poll_seconds,
+                        api_port=api_port)
     def interrupt(*_):
         raise KeyboardInterrupt()
 
