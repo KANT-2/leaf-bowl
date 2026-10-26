@@ -1,11 +1,16 @@
 "use client";
 import { useCustomerCatalog } from "../CustomerCatalogProvider";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { MemberAuthError } from "@/features/member/client";
 import { useAuth } from "../AuthProvider";
 import { useToast } from "../ToastProvider";
 import AddressSearchModal from "./AddressSearchModal";
 import { type Address } from "@/modules/profile/types";
+
+/** 서버 규칙(backend customers.domain.address.MAX_ADDRESSES)과 같은 값 */
+const MAX_ADDRESSES = 5;
 
 function AddressForm({
   initial,
@@ -135,22 +140,64 @@ function AddressForm({
 }
 
 export default function AddressTab() {
-  const { user, addAddress, updateAddress, removeAddress, setDefaultAddress } = useAuth();
+  const { user, refreshAddresses, addAddress, updateAddress, removeAddress, setDefaultAddress } = useAuth();
   const toast = useToast();
+  const router = useRouter();
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [status, setStatus] = useState<"loading" | "ready" | "saving">("loading");
+  const [error, setError] = useState("");
+
+  const handleError = (cause: unknown) => {
+    if (cause instanceof MemberAuthError) {
+      toast(cause.message);
+      router.replace("/login?next=/mypage");
+      return;
+    }
+    setError(cause instanceof Error ? cause.message : "요청을 처리하지 못했습니다. 다시 시도해주세요.");
+  };
+
+  // 다른 기기에서 바꾼 배송지도 보이도록, 탭을 열 때 서버에 저장된 목록을 다시 불러온다
+  useEffect(() => {
+    let alive = true;
+    refreshAddresses()
+      .catch((cause) => alive && handleError(cause))
+      .finally(() => alive && setStatus("ready"));
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 탭을 열 때 한 번만 불러온다
+  }, []);
+
+  /** 서버에 저장하고, 성공하면 닫고 알린다. 실패하면 폼을 그대로 두고 이유를 보여준다. */
+  const save = async (action: () => Promise<void>, done: string, after?: () => void) => {
+    setError("");
+    setStatus("saving");
+    try {
+      await action();
+      after?.();
+      toast(done);
+    } catch (cause) {
+      handleError(cause);
+    } finally {
+      setStatus("ready");
+    }
+  };
 
   if (!user) {
     return null;
   }
 
+  const busy = status !== "ready";
+
   return (
-    <section className="surface mypage-section">
+    <section className="surface mypage-section" aria-busy={busy}>
       <div className="section-heading">
         <h2>주소록·배송지 관리</h2>
         <button
           type="button"
           className="ghost-btn"
+          disabled={busy || (!adding && user.addresses.length >= MAX_ADDRESSES)}
           onClick={() => {
             setEditingId(null);
             setAdding((v) => !v);
@@ -159,16 +206,24 @@ export default function AddressTab() {
           {adding ? "닫기" : "+ 배송지 추가"}
         </button>
       </div>
+      <p className="meta">
+        배송지는 최대 {MAX_ADDRESSES}개까지 저장할 수 있어요. ({user.addresses.length}/{MAX_ADDRESSES})
+      </p>
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+      {status === "loading" && <p aria-live="polite">저장된 배송지를 불러오고 있어요.</p>}
       {adding && (
         <AddressForm
-          onSubmit={(input) => {
-            addAddress({
-              ...input,
-              isDefault: input.isDefault || user.addresses.length === 0,
-            });
-            setAdding(false);
-            toast("배송지를 추가했어요");
-          }}
+          onSubmit={(input) =>
+            save(
+              () => addAddress(input),
+              "배송지를 추가했어요",
+              () => setAdding(false),
+            )
+          }
           onCancel={() => setAdding(false)}
         />
       )}
@@ -179,17 +234,21 @@ export default function AddressTab() {
               <li key={a.id} className="address-item">
                 <AddressForm
                   initial={a}
-                  onSubmit={(input) => {
-                    updateAddress(a.id, input);
-                    setEditingId(null);
-                    toast("배송지를 수정했어요");
-                  }}
+                  onSubmit={(input) =>
+                    save(
+                      () => updateAddress(a.id, input),
+                      "배송지를 수정했어요",
+                      () => setEditingId(null),
+                    )
+                  }
                   onCancel={() => setEditingId(null)}
-                  onDelete={() => {
-                    removeAddress(a.id);
-                    setEditingId(null);
-                    toast("배송지를 삭제했어요");
-                  }}
+                  onDelete={() =>
+                    save(
+                      () => removeAddress(a.id),
+                      "배송지를 삭제했어요",
+                      () => setEditingId(null),
+                    )
+                  }
                 />
               </li>
             ) : (
@@ -202,7 +261,12 @@ export default function AddressTab() {
                   {a.isDefault ? (
                     <span className="address-default-tag">기본 배송지</span>
                   ) : (
-                    <button type="button" className="ghost-btn" onClick={() => setDefaultAddress(a.id)}>
+                    <button
+                      type="button"
+                      className="ghost-btn"
+                      disabled={busy}
+                      onClick={() => save(() => setDefaultAddress(a.id), "기본 배송지를 바꿨어요")}
+                    >
                       기본으로 설정
                     </button>
                   )}
@@ -214,7 +278,7 @@ export default function AddressTab() {
                 {a.phone && <p className="meta">{a.phone}</p>}
                 {a.requestNote && <p className="meta">배송 요청: {a.requestNote}</p>}
                 <div className="row-actions">
-                  <button type="button" className="ghost-btn" onClick={() => setEditingId(a.id)}>
+                  <button type="button" className="ghost-btn" disabled={busy} onClick={() => setEditingId(a.id)}>
                     수정
                   </button>
                 </div>
@@ -222,9 +286,9 @@ export default function AddressTab() {
             ),
           )}
         </ul>
-      ) : (
+      ) : status !== "loading" ? (
         <p className="empty">저장한 배송지가 없어요. 배송지를 추가해주세요.</p>
-      )}
+      ) : null}
     </section>
   );
 }

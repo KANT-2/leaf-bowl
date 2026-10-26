@@ -6,6 +6,7 @@ import {
   type OrderInput,
   type ServerOrderPage,
 } from "@/features/orders/client";
+import { type Address } from "@/modules/profile/types";
 
 /** next.config.ts 의 rewrites 가 FastAPI(backend/)로 넘기는 경로 */
 const BACKEND = "/backend";
@@ -185,6 +186,59 @@ export async function loadMember(): Promise<Member> {
 /** 이름·전화번호 수정. 보낸 항목만 바뀌고, 전화번호를 빈 문자열로 보내면 지운다. */
 export async function updateMember(patch: { name?: string; phone?: string }): Promise<Member> {
   return member(await backendRequest("/api/me", { method: "PATCH", auth: true, json: patch }));
+}
+
+/** 서버 배송지(snake_case)를 화면에서 쓰던 Address 모양으로 바꾼다. id 는 문자열로 맞춘다. */
+function toAddresses(body: Awaited<ReturnType<typeof backendRequest>>): Address[] {
+  if (!Array.isArray(body?.items)) {
+    throw new Error("배송지 목록을 확인하지 못했습니다.");
+  }
+  return body.items.map((a: Record<string, unknown>) => ({
+    id: String(a.id),
+    label: String(a.label ?? ""),
+    recipientName: String(a.recipient_name ?? ""),
+    phone: typeof a.phone === "string" ? a.phone : "",
+    address: String(a.address ?? ""),
+    detail: String(a.detail ?? ""),
+    requestNote: String(a.request_note ?? ""),
+    isDefault: a.is_default === true,
+  }));
+}
+
+function addressBody(input: Omit<Address, "id">) {
+  return {
+    label: input.label,
+    recipient_name: input.recipientName,
+    phone: input.phone.trim() || null,
+    address: input.address,
+    detail: input.detail,
+    request_note: input.requestNote,
+    is_default: input.isDefault,
+  };
+}
+
+const ADDRESSES = "/api/me/addresses";
+const addressPath = (id: string) => `${ADDRESSES}/${encodeURIComponent(id)}`;
+
+/** 내 배송지 (기본 배송지가 맨 앞). 추가·수정·삭제·기본 지정은 바뀐 뒤의 전체 목록을 돌려준다. */
+export async function loadAddresses(): Promise<Address[]> {
+  return toAddresses(await backendRequest(ADDRESSES, { auth: true }));
+}
+
+export async function addAddress(input: Omit<Address, "id">): Promise<Address[]> {
+  return toAddresses(await backendRequest(ADDRESSES, { method: "POST", auth: true, json: addressBody(input) }));
+}
+
+export async function updateAddress(id: string, input: Omit<Address, "id">): Promise<Address[]> {
+  return toAddresses(await backendRequest(addressPath(id), { method: "PATCH", auth: true, json: addressBody(input) }));
+}
+
+export async function removeAddress(id: string): Promise<Address[]> {
+  return toAddresses(await backendRequest(addressPath(id), { method: "DELETE", auth: true }));
+}
+
+export async function setDefaultAddress(id: string): Promise<Address[]> {
+  return toAddresses(await backendRequest(`${addressPath(id)}/default`, { method: "POST", auth: true }));
 }
 
 export interface LoginHistoryItem {
