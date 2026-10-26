@@ -8,12 +8,14 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 
 import database
+from auth.presentation.login_history import router as login_history_router
 from auth.presentation.router import router as auth_router
 from bowls.presentation.router import router as bowls_router
 from catalog.presentation.router import router as catalog_router
 from core.config import get_settings
 from core.exception_handlers import register_exception_handlers
 from core.middleware import log_requests
+from customers.presentation.router import router as customers_router
 from orders.presentation.router import router as orders_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -62,6 +64,8 @@ def create_app() -> FastAPI:
 
     # 기능 라우터는 여기에 등록한다
     app.include_router(auth_router)
+    app.include_router(customers_router)
+    app.include_router(login_history_router)
     app.include_router(orders_router)
     app.include_router(catalog_router)
     app.include_router(bowls_router)

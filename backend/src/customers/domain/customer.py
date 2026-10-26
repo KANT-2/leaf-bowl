@@ -73,6 +73,16 @@ class Customer:
     def is_active(self) -> bool:
         return self.status is CustomerStatus.ACTIVE
 
+    def change_profile(self, *, name: str | None = None, phone: str | None = None, clear_phone: bool = False) -> bool:
+        """이름·전화번호 수정. 넘기지 않은 항목은 그대로 두고, 실제로 바뀐 것이 있으면 True."""
+        if name is None and phone is None and not clear_phone:
+            raise BusinessRuleViolation("수정할 항목을 하나 이상 입력해주세요.")
+        new_name = normalize_name(name) if name is not None else self.name
+        new_phone = None if clear_phone else (normalize_phone(phone) if phone is not None else self.phone)
+        changed = (new_name, new_phone) != (self.name, self.phone)
+        self.name, self.phone = new_name, new_phone
+        return changed
+
     def ensure_can_login(self) -> None:
         if not self.is_active:
             # 탈퇴 여부를 드러내지 않도록 로그인 실패와 같은 문구를 쓴다

@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
@@ -16,11 +14,3 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int = Field(description="만료까지 남은 초")
-
-
-class CustomerResponse(BaseModel):
-    id: int
-    email: str
-    name: str
-    phone: str | None
-    created_at: datetime

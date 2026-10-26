@@ -7,8 +7,9 @@ from dataclasses import replace
 from datetime import datetime
 from uuid import UUID
 
+from auth.domain.login_history import LoginAttempt, LoginHistoryQuery
 from auth.domain.revoked_token import RevokedToken
-from core.exceptions import Conflict
+from core.exceptions import Conflict, NotFound
 from customers.domain.customer import Customer
 from orders.domain.catalog import Catalog, PricingPolicy
 from orders.domain.delivery import DeliveryHours
@@ -44,6 +45,12 @@ class InMemoryCustomerRepository:
         saved = replace(customer, id=len(self.rows) + 1)
         self.rows[saved.id] = saved
         return saved
+
+    async def save_profile(self, customer: Customer) -> Customer:
+        if customer.id not in self.rows:
+            raise NotFound("회원 정보를 찾을 수 없습니다.")
+        self.rows[customer.id] = replace(customer)
+        return self.rows[customer.id]
 
 
 class InMemoryBlacklist:
@@ -147,3 +154,23 @@ class FakeSettingsReader:
 
     async def get_delivery_hours(self) -> DeliveryHours:
         return self.hours
+
+
+class InMemoryLoginHistory:
+    def __init__(self) -> None:
+        self.rows: list[LoginAttempt] = []
+
+    async def add(self, attempt: LoginAttempt) -> None:
+        self.rows.append(replace(attempt, id=len(self.rows) + 1))
+
+    async def search(self, customer_id: int, query: LoginHistoryQuery) -> tuple[list[LoginAttempt], int]:
+        found = [
+            a
+            for a in self.rows
+            if a.customer_id == customer_id
+            and (query.result is None or a.result is query.result)
+            and (query.starts_at is None or a.created_at >= query.starts_at)
+            and (query.ends_before is None or a.created_at < query.ends_before)
+        ]
+        found.sort(key=lambda a: (a.created_at, a.id or 0), reverse=True)
+        return found[query.offset : query.offset + query.size], len(found)
