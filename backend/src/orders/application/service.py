@@ -3,6 +3,7 @@
 Next.js modules/orders/service.ts 의 고객 쪽 흐름을 회원(customer_id) 기준으로 옮겼다.
 """
 
+import asyncio
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -22,7 +23,7 @@ from orders.domain.order import (
     resolve_cancel,
 )
 from orders.domain.pricing import price_order
-from orders.domain.receipt import Receipt
+from orders.domain.receipt import Receipt, ReceiptRenderer
 from orders.domain.repository import (
     CatalogReader,
     DuplicateRequest,
@@ -68,6 +69,13 @@ class PlaceOrderResult:
 
 
 @dataclass(frozen=True)
+class ReceiptFile:
+    filename: str
+    media_type: str
+    content: bytes
+
+
+@dataclass(frozen=True)
 class OrderPage:
     items: list[Order]
     next_cursor: str | None
@@ -81,12 +89,14 @@ class OrderService:
         catalog: CatalogReader,
         settings: SettingsReader,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+        receipt_renderer: ReceiptRenderer | None = None,
     ) -> None:
         self.session = session
         self.orders = orders
         self.catalog = catalog
         self.settings = settings
         self.clock = clock
+        self.receipt_renderer = receipt_renderer
 
     async def create(self, customer_id: int, idempotency_key: str, cmd: PlaceOrderCommand) -> PlaceOrderResult:
         """같은 키·같은 내용의 재전송이면 기존 주문을, 새 요청이면 가격을 다시 계산해 접수한다."""
@@ -135,9 +145,14 @@ class OrderService:
             raise NotFound(NOT_FOUND)
         return order
 
-    async def receipt(self, customer_id: int, order_id: UUID) -> Receipt:
-        """본인 주문의 영수증. 소유권을 확인한 뒤에 만들므로 404 는 내려보내기 전에 정해진다."""
-        return Receipt(await self.get_mine(customer_id, order_id), issued_at=self.clock())
+    async def receipt(self, customer_id: int, order_id: UUID) -> ReceiptFile:
+        """본인 주문의 영수증 파일. 소유권을 확인한 뒤에 만들므로 404 는 내려보내기 전에 정해진다."""
+        if self.receipt_renderer is None:
+            raise RuntimeError("영수증 렌더러가 설정되지 않았습니다.")
+        receipt = Receipt(await self.get_mine(customer_id, order_id), issued_at=self.clock())
+        # 이미지 그리기는 CPU 를 쓰므로 이벤트 루프를 막지 않게 스레드에서 실행한다
+        content = await asyncio.to_thread(self.receipt_renderer.render, receipt)
+        return ReceiptFile(receipt.filename, self.receipt_renderer.media_type, content)
 
     async def list_mine(
         self,
