@@ -29,7 +29,7 @@ from orders.domain.catalog import (
 from orders.domain.delivery import DeliveryHours
 from orders.domain.order import ChangedBy, Order, OrderItem, OrderStatus, StatusChange
 from orders.domain.pricing import LineOptions, LineType, PricedOption
-from orders.domain.repository import DuplicateRequest, OrderCursor, StatusUpdate
+from orders.domain.repository import DuplicateRequest, OrderCursor, OrderListFilter, StatusUpdate
 from orders.infrastructure.models import OrderItemModel, OrderModel, OrderStatusHistoryModel
 
 MEMBER_REQUEST_CONSTRAINT = "uq_order_member_request"
@@ -234,11 +234,20 @@ class SqlOrderRepository:
         await self.session.flush()
         return await self._load(update_.order_id)
 
-    async def list_by_customer(self, customer_id: int, limit: int, after: OrderCursor | None) -> list[Order]:
-        # idx_orders_customer (customer_id, created_at DESC, id DESC) 순서 그대로 읽는다
+    async def list_by_customer(
+        self, customer_id: int, limit: int, after: OrderCursor | None, where: OrderListFilter | None = None
+    ) -> list[Order]:
+        # idx_orders_customer (customer_id, created_at DESC, id DESC) 순서 그대로 읽는다. 상태는 읽으면서 거른다
         stmt = select(OrderModel).where(OrderModel.customer_id == customer_id)
         if after is not None:
             stmt = stmt.where(tuple_(OrderModel.created_at, OrderModel.id) < tuple_(after.created_at, after.id))
+        if where is not None:
+            if where.statuses:
+                stmt = stmt.where(OrderModel.status.in_(sorted(s.value for s in where.statuses)))
+            if where.starts_at is not None:
+                stmt = stmt.where(OrderModel.created_at >= where.starts_at)
+            if where.ends_before is not None:
+                stmt = stmt.where(OrderModel.created_at < where.ends_before)
         stmt = stmt.order_by(OrderModel.created_at.desc(), OrderModel.id.desc()).limit(limit)
         rows = (await self.session.scalars(stmt.execution_options(populate_existing=True))).all()
         return [to_domain(row) for row in rows]

@@ -561,6 +561,22 @@
   }
 }
 
+/* 마이페이지 주문 내역 필터 */
+.order-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  margin: 16px 0;
+}
+.order-filter .field {
+  flex: 1 1 140px;
+}
+.order-filter select,
+.order-filter input {
+  width: 100%;
+}
+
 /* 마이페이지 로그인 기록 */
 .login-history-filter {
   display: grid;

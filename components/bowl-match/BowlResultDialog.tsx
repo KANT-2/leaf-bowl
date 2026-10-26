@@ -17,6 +17,8 @@ interface Props {
   photo: string;
   price: number;
   savedNote: string;
+  saving: boolean;
+  saveError: string;
   resultAllergens: string[];
   onName: (value: string) => void;
   onDressing: (value: string) => void;
@@ -34,6 +36,8 @@ export default function BowlResultDialog({
   photo,
   price,
   savedNote,
+  saving,
+  saveError,
   resultAllergens,
   onName,
   onDressing,
@@ -84,6 +88,7 @@ export default function BowlResultDialog({
             <span>내 샐러드 이름</span>
             <input
               maxLength={30}
+              disabled={saving}
               placeholder="예: 오늘의 초록 한 그릇"
               value={name}
               onChange={(e) => onName(e.target.value)}
@@ -91,7 +96,7 @@ export default function BowlResultDialog({
           </label>
           <label className="field">
             <span>마지막으로, 드레싱</span>
-            <select value={dressing} onChange={(e) => onDressing(e.target.value)}>
+            <select value={dressing} disabled={saving} onChange={(e) => onDressing(e.target.value)}>
               {dressings.map((d) =>
                 d.name ? (
                   <option key={d.id} value={d.id} disabled={!d.available}>
@@ -111,12 +116,12 @@ export default function BowlResultDialog({
             <span>내 볼 예상 금액</span>
             <strong>{money(price)}</strong>
           </div>
-          <button type="button" className="primary add-cart" onClick={onAdd}>
+          <button type="button" className="primary add-cart" disabled={saving} onClick={onAdd}>
             장바구니에 담기
           </button>
           <div className="dialog-buttons">
-            <button type="button" className="secondary" onClick={onSave}>
-              {savedNote ? "저장 완료 ✓" : "내 조합 저장하기 ♡"}
+            <button type="button" className="secondary" disabled={saving || !!savedNote} onClick={onSave}>
+              {saving ? "저장 중…" : savedNote ? "저장 완료 ✓" : "내 조합 저장하기 ♡"}
             </button>
             <button type="button" className="secondary" onClick={() => dialogRef.current?.close()}>
               재료 다시 고르기
@@ -126,6 +131,11 @@ export default function BowlResultDialog({
             비슷한 메뉴 보기 · {similar.name} ↗
           </Link>
           {savedNote && <p className="result-note">{savedNote}</p>}
+          {saveError && (
+            <p className="form-error" role="alert">
+              {saveError}
+            </p>
+          )}
         </>
       )}
     </dialog>
