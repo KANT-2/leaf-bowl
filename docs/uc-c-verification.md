@@ -33,32 +33,9 @@ GET  200 /api/v1/orders/6524cec0-…/receipt                ← 영수증 받기
 | **⑤ 필터: 진행 중 · 최근 1개월** | **⑥ 취소 후 — 상태 "취소", 취소 버튼 사라짐** |
 | ![진행 중 필터 결과](uc-c/05-filter-active-1month.png) | ![취소된 주문](uc-c/06-canceled.png) |
 
-⑦ "영수증 받기"로 저장된 파일 (`leafbowl-receipt-6524cec0.txt`, StreamingResponse):
+⑦ "영수증 받기"로 저장된 파일 (`leafbowl-receipt-6524cec0.png`, 가로 720px PNG). 서버가 Pillow 로 그려 `StreamingResponse` 로 16KB 씩 나누어 보낸다.
 
-```text
-leaf & bowl 주문 영수증
-========================================
-주문번호: 6524cec0-4ee4-40cf-ab86-c6c7a2e65be5
-주문일시: 2026-10-26 15:59 (KST)
-주문상태: 취소
-결제상태: 결제 취소
-취소일시: 2026-10-26 15:59 (KST)
-----------------------------------------
-받는 분: 시연회원A
-배달 주소: 서울 중구 세종대로 110 (시연용)
-배달 시간: 2026-10-27 12:00–13:00
-----------------------------------------
-레몬 치킨 아보카도 × 2
-  선택: 레몬 올리브
-  10,900원 × 2 = 21,800원
-----------------------------------------
-상품 금액: 21,800원
-배달비: 3,000원
-취소 금액: 24,800원
-========================================
-발행일시: 2026-10-26 15:59 (KST)
-주문 확인용 영수증입니다. 세금계산서·현금영수증으로 사용할 수 없습니다.
-```
+<img src="uc-c/09-receipt.png" alt="화면에서 내려받은 취소 주문 영수증 PNG" width="360" />
 
 화면의 로딩·빈 결과·실패 처리: 불러오는 동안 "주문 내역을 불러오고 있어요.", 조건에 맞는 주문이 없으면 "조건에 맞는 주문이 없어요.", 실패하면 서버 메시지 + "다시 불러오기", 토큰이 만료·로그아웃되면 로그인 화면으로 이동한다.
 
@@ -97,7 +74,7 @@ order_status_history received → canceled  (changed_by=customer)
 | 13 | 다른 회원(B)이 A 의 주문 취소 — 404 | `404` |
 | 14 | 주문 취소 — 접수 상태라 가능 | `200` |
 | 15 | 다시 취소 — 이미 취소된 결과 그대로 200 | `200` |
-| 16 | 영수증 내려받기 — StreamingResponse | `200` |
+| 16 | 영수증 내려받기 — StreamingResponse (PNG, 16KB 조각) | `200` |
 | 17 | 로그아웃 — 토큰을 블랙리스트에 등록 | `204` |
 | 18 | 로그아웃한 같은 토큰으로 내 주문 목록 — 401 | `401` |
 | 19 | 로그아웃한 같은 토큰으로 영수증 — 401 | `401` |
@@ -430,7 +407,7 @@ HTTP 200
 }
 ```
 
-#### 16. 영수증 내려받기 — StreamingResponse → `200`
+#### 16. 영수증 내려받기 — StreamingResponse (PNG) → `200`
 
 ```http
 GET /api/v1/orders/dc275520-dbb0-4a33-aebe-bc792012d045/receipt
@@ -439,32 +416,11 @@ Authorization: Bearer <JWT>
 
 ```text
 HTTP 200
-content-type: text/plain; charset=utf-8
-content-disposition: attachment; filename="leafbowl-receipt-dc275520.txt"
+content-type: image/png
+content-disposition: attachment; filename="leafbowl-receipt-dc275520.png"
+cache-control: no-store
 transfer-encoding: chunked
-leaf & bowl 주문 영수증
-========================================
-주문번호: dc275520-dbb0-4a33-aebe-bc792012d045
-주문일시: 2026-10-26 15:53 (KST)
-주문상태: 취소
-결제상태: 결제 취소
-취소일시: 2026-10-26 15:53 (KST)
-취소사유: 시연용 취소
-----------------------------------------
-받는 분: 시연회원A
-배달 주소: 서울 중구 세종대로 110 시연용
-배달 시간: 2026-10-27 12:00–13:00
-----------------------------------------
-레몬 치킨 아보카도 × 2
-  선택: 레몬 올리브
-  10,900원 × 2 = 21,800원
-----------------------------------------
-상품 금액: 21,800원
-배달비: 3,000원
-취소 금액: 24,800원
-========================================
-발행일시: 2026-10-26 15:53 (KST)
-주문 확인용 영수증입니다. 세금계산서·현금영수증으로 사용할 수 없습니다.
+(본문: 720×884 PNG 65,251바이트, 받은 조각 16384 · 16384 · 16384 · 16099 바이트)
 ```
 
 #### 17. 로그아웃 — 토큰을 블랙리스트에 등록 → `204`
@@ -514,7 +470,21 @@ HTTP 401
 
 </details>
 
-## 4. Swagger UI
+## 4. 예외 처리 (4계층)
+
+규칙 위반은 안쪽 계층이 이유가 담긴 예외(`core/exceptions.py`)로 던지고, HTTP 응답으로 바꾸는 일은 공통 핸들러(`core/exception_handlers.py`) 한 곳이 맡는다. 계층마다 try/except 로 응답을 만들지 않으므로 같은 실패는 어디서 나든 같은 코드·같은 모양으로 응답한다. 위 3장의 400·401·404·409·422 응답이 실제 결과다.
+
+| 예외가 생기는 곳과 바뀌는 곳 | 예외 → HTTP 응답 대응표 |
+| --- | --- |
+| ![계층별 예외와 공통 핸들러](architecture/7-exceptions-layers.png) | ![예외와 응답 대응표](architecture/8-exceptions-mapping.png) |
+| **주문 생성 요청이 통과하는 관문** | **화면의 오류 처리** |
+| ![주문 생성 관문](architecture/9-exceptions-order-gates.png) | ![화면 오류 처리](architecture/11-exceptions-screen.png) |
+
+준비가 시작된 주문을 취소할 때 도메인이 던진 `Conflict` 가 응용·표현을 그대로 지나 409 가 되고, commit 하지 않은 변경은 세션이 닫히며 롤백된다.
+
+![취소 409 예외 전파](architecture/10-exceptions-cancel-409.png)
+
+## 5. Swagger UI
 
 http://localhost:8000/docs — 회원 주문 엔드포인트와 응답 코드 설명.
 
@@ -522,19 +492,19 @@ http://localhost:8000/docs — 회원 주문 엔드포인트와 응답 코드 �
 
 ![Swagger 주문 취소 응답 설명](uc-c/08-swagger-cancel.png)
 
-## 5. 자동 테스트
+## 6. 자동 테스트
 
 | 실행 | 결과 |
 | --- | --- |
-| `cd backend && uv run pytest` (전체) | 442 passed, 17 skipped (Postgres 통합은 `TEST_DATABASE_URL` 이 있을 때만) |
-| 주문 관련 테스트 (도메인·서비스·API·계층 규칙) | 246 passed |
+| `cd backend && uv run pytest` (전체) | 446 passed, 17 skipped (Postgres 통합은 `TEST_DATABASE_URL` 이 있을 때만) |
+| 주문 관련 테스트 (도메인·서비스·API·영수증 이미지·계층 규칙) | 250 passed |
 | Postgres 통합 (`tests/test_orders_postgres.py`, 로컬 Docker `postgres:17`) | 17 passed (PR #202 검증 때) |
 | 프론트 `tests/member-client.test.cjs` | 10 passed |
 
-## 6. 재현 방법
+## 7. 재현 방법
 
 1. 저장소 README 의 [시작하기](../README.md#시작하기) 대로 DB · FastAPI · Next.js 를 띄운다.
 2. http://localhost:3000/login 에서 회원가입 후 로그인한다.
 3. 메뉴를 담고 `/checkout` 에서 주문한다 (15,000원 이상, 내일 이후 운영시간 안의 시간대).
-4. 마이페이지 → 주문 내역에서 필터 · 주문 취소 · 영수증 받기를 실행한다.
+4. 마이페이지 → 주문 내역에서 필터 · 주문 취소 · 영수증 받기(PNG)를 실행한다.
 5. API 만 확인하려면 Swagger 의 **Authorize** 에 이메일·비밀번호를 넣고 `/api/v1/orders` 를 호출한다. `POST /api/auth/logout` 뒤 같은 토큰으로 다시 부르면 401 이다.
