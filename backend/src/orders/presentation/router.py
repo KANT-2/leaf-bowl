@@ -8,10 +8,10 @@ from fastapi.responses import StreamingResponse
 from core.dependencies import CurrentCustomer, get_current_customer
 from core.exceptions import NotFound
 from orders.application.service import MAX_PAGE_SIZE, NOT_FOUND, OrderService, PlaceOrderCommand
+from orders.container import get_order_service
 from orders.domain.order import OrderStatus
 from orders.domain.repository import OrderListFilter
 from orders.domain.request_hash import request_hash
-from orders.presentation.dependencies import get_order_service
 from orders.presentation.schemas import (
     CanceledOrderResponse,
     CancelOrderRequest,

@@ -11,6 +11,7 @@ from core.dependencies import get_current_customer
 from fakes import FakeCatalogReader, FakeSession, FakeSettingsReader, InMemoryOrderRepository
 from main import create_app
 from orders.application.service import OrderService
+from orders.container import get_order_service
 from orders.domain.catalog import (
     Catalog,
     CatalogProduct,
@@ -21,7 +22,6 @@ from orders.domain.catalog import (
 )
 from orders.domain.order import OrderStatus
 from orders.domain.request_hash import request_hash
-from orders.presentation.dependencies import get_order_service
 from orders.presentation.schemas import CreateOrderRequest
 from test_request_hash import LEGACY_SLOT_HASH, MIXED_HASH
 
