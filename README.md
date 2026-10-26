@@ -13,7 +13,7 @@
 <img src="https://img.shields.io/badge/TypeScript-5-194B38?style=flat-square" alt="TypeScript 5" />
 <img src="https://img.shields.io/badge/Tailwind_CSS-4-194B38?style=flat-square" alt="Tailwind CSS 4" />
 
-[프로젝트 소개](#프로젝트-소개) · [주요 기능](#주요-기능) · [화면 미리보기](#화면-미리보기) · [과제 요구사항](#과제-요구사항-대응) · [시작하기](#시작하기) · [개발 가이드](#개발-가이드) · [관련 문서](#관련-문서)
+[프로젝트 소개](#프로젝트-소개) · [2차 프로젝트](#2차-프로젝트--회원주문-fastapi-고도화) · [주요 기능](#주요-기능) · [화면 미리보기](#화면-미리보기) · [1차 과제 요구사항](#1차-과제-요구사항-대응) · [시작하기](#시작하기) · [개발 가이드](#개발-가이드) · [관련 문서](#관련-문서)
 
 </div>
 
@@ -25,7 +25,89 @@
 
 Next.js App Router 기반으로 고객 화면과 관리자 화면을 구성하고, 공통 카탈로그를 통해 저장한 변경 사항을 고객 화면에 반영합니다.
 
-> **체험 범위** · 고객 로그인은 실제 인증 없이 동작하는 모의 로그인입니다. 결제는 토스페이먼츠 **테스트 결제**라 실제 청구가 없고, 주문 접수·조회·결제 기록과 관리자 인증은 PostgreSQL에 연결됩니다. 초기 리뷰는 예시 데이터입니다.
+> **체험 범위** · 고객 회원가입·로그인은 FastAPI(OAuth2·JWT)로 동작하고, 회원 주문은 결제 없이 바로 접수됩니다. 비회원 주문의 결제는 토스페이먼츠 **테스트 결제**라 실제 청구가 없습니다. 주문·회원·관리자 데이터는 PostgreSQL에 저장되고, 초기 리뷰는 예시 데이터입니다.
+
+## 2차 프로젝트 — 회원·주문 FastAPI 고도화
+
+5조가 만든 **leaf & bowl**(Next.js·Prisma·PostgreSQL)을 팀 **나경님언제5조**가 인수해, 비어 있던 고객 회원·개인 데이터·회원 주문·관리자 인증을 FastAPI 도메인 중심 4계층 백엔드로 연결·확장했습니다.
+
+### 인수 정보
+
+| 항목 | 내용 |
+| --- | --- |
+| 인수 기준 | `main` 커밋 [`04d9936`](https://github.com/KANT-2/leaf-bowl/commit/04d9936) (2026-10-23, FastAPI 추가 직전) |
+| 인수 당시 상태 | 화면·API·업무 규칙·DB 접근이 Next.js 한 앱에 있음. 고객 로그인은 localStorage 모의 방식, 주문은 익명 세션 기준, 관리자만 DB 세션 인증 |
+| 이번 팀의 추가 | `backend/` FastAPI(Python 3.13·uv), 회원 테이블과 회원 주문 연결(Prisma 마이그레이션 `0011_member_orders`), 화면 연동 |
+| 기간 | 2026-10-23 ~ 2026-10-28 |
+
+### 무엇이 달라졌나
+
+| 구분 | 인수 당시 | 현재 |
+| --- | --- | --- |
+| 고객 로그인 | 브라우저 localStorage 모의 로그인 | OAuth2 password flow · JWT 발급 · 로그아웃 토큰 블랙리스트(재사용 시 401) |
+| 고객 주문 | 익명 세션 기준. 브라우저가 바뀌면 조회 불가 | 회원(`customer_id`) 기준. 어디서든 목록·상태·기간 필터·취소·영수증 |
+| 개인 데이터 | 프로필·배송지·나만의 볼이 브라우저에만 | 내 정보·배송지·나만의 볼·로그인 이력을 서버(DB)에 저장 |
+| 백엔드 구조 | TypeScript 폴더 관례로 계층 구분 | FastAPI 도메인 중심 4계층(표현·응용·도메인·인프라), 순수 파이썬 도메인 |
+| DB 접근 | Prisma | 비동기 SQLAlchemy(`AsyncSession`·asyncpg) Repository |
+
+| 인수 당시 | 현재 |
+| --- | --- |
+| ![인수 당시 구조](docs/architecture/1-before.png) | ![현재 구조](docs/architecture/2-after.png) |
+
+### Next.js 와 FastAPI 의 담당 범위
+
+두 서버가 **같은 PostgreSQL** 을 씁니다. 화면은 `/backend/*` 로 요청하고 Next.js 가 FastAPI 로 전달합니다(`next.config.ts` rewrites, `BACKEND_URL`).
+
+| 서버 | 담당 |
+| --- | --- |
+| **FastAPI** (`backend/`, 이번 팀) | 회원가입·로그인·로그아웃, 내 정보·배송지·로그인 이력, 메뉴 검색, 나만의 볼, 회원 주문(생성·목록·상세·취소·영수증), 관리자 JWT 로그인·로그아웃 |
+| **Next.js** (인수 코드 유지) | 화면 제공과 FastAPI 전달, 비회원 주문·테스트 결제·세션, 관리자 운영(배달 주문·메뉴·이벤트·매출·이미지), 공개 카탈로그·리뷰 |
+
+테이블 구조(스키마)는 Prisma 마이그레이션이 관리하고, FastAPI 는 인수한 테이블을 매핑해 직접 읽고 씁니다. 회원·토큰 블랙리스트·로그인 이력·나만의 볼처럼 FastAPI 가 새로 만든 테이블은 `lifespan` 에서 준비합니다.
+
+### 4계층 구조와 요청 흐름
+
+```
+backend/src/<기능>/
+├── presentation/    요청·응답 검증(Pydantic), 라우터 — FastAPI 는 여기서만
+├── application/     조회 → 도메인 행위 → 저장 → commit 조율
+├── domain/          업무 규칙 · 상태 전이 (순수 파이썬)
+└── infrastructure/  ORM 모델 · 비동기 SQL · ORM ↔ 도메인 변환
+```
+
+의존 방향은 `presentation → application → domain ← infrastructure` 입니다. 기능: `auth`, `customers`, `catalog`, `bowls`, `orders`, `admin_orders`. 공통 설정·보안·예외는 `core/`, 앱 조립은 `main.py`, DB 엔진·세션은 `database.py` 에 있습니다. 자세한 규칙은 [backend/README](backend/README.md#구조).
+
+![4계층 역할](docs/architecture/3-layers.png)
+
+| 로그인 (`POST /api/auth/token`) | 회원 주문 생성 (`POST /api/v1/orders`) |
+| --- | --- |
+| ![로그인 요청 흐름](docs/architecture/4-login-flow.png) | ![주문 생성 요청 흐름](docs/architecture/5-order-flow.png) |
+
+### 팀원별 담당 Use Case
+
+| 담당 | Use Case (화면 → API → 업무 규칙 → DB) | 주요 코드 | 실행 기록 |
+| --- | --- | --- | --- |
+| A | 회원가입·로그인·로그아웃, 내 정보·배송지·로그인 이력 (`/login`, `/mypage`) | `backend/src/auth`, `backend/src/customers`, `backend/src/core` | [회원 인증 문서](backend/docs/auth.md) |
+| B | 메뉴 검색·필터·페이지네이션, 나만의 볼 저장 (`/menu`, `/match`) | `backend/src/catalog`, `backend/src/bowls`, `backend/src/database.py` | 작성 예정 |
+| C | 회원 주문 생성·내 주문 목록(상태·기간 필터)·취소·영수증 (`/checkout`, `/mypage` 주문 내역) | `backend/src/orders`, `features/member/client.ts`, `components/mypage/OrdersTab.tsx` | [UC-C 실행 기록](docs/uc-c-verification.md) |
+| D | 관리자 주문 운영 (현재 `main`: 관리자 JWT 로그인·로그아웃) | `backend/src/admin_orders` | 작성 예정 |
+
+### 2차 과제 요구사항 대응
+
+| 요구사항 | 위치 |
+| --- | --- |
+| 인수·개발 방향 | 이 섹션의 인수 정보·변경 전후 |
+| 4계층·책임 분리 | `backend/src/<기능>/{presentation,application,domain,infrastructure}`, 계층 규칙 테스트 [`tests/test_layers.py`](backend/tests/test_layers.py) |
+| 순수 도메인 모델 | 예: [`orders/domain/order.py`](backend/src/orders/domain/order.py)(상태 전이·취소 규칙), [`pricing.py`](backend/src/orders/domain/pricing.py)(가격 재계산) |
+| 비동기 DB·Repository | [`database.py`](backend/src/database.py), `*/infrastructure/repositories.py`, `main.py` 의 `lifespan` |
+| 응용 서비스·트랜잭션 | `*/application/service.py` (예: `OrderService` 의 멱등키·commit·재시도) |
+| 스키마·라우터·검색·필터·페이지네이션 | `*/presentation/`, `GET /api/v1/menus`, `GET /api/v1/orders`(상태·기간·커서), `GET /api/me/login-history` |
+| OAuth2·JWT·블랙리스트 | [`core/security.py`](backend/src/core/security.py), `backend/src/auth`, 로그아웃 후 401 기록: [UC-C 실행 기록 3장](docs/uc-c-verification.md#3-api-실행-기록-정상--실패--권한--로그아웃-차단) |
+| CORS·로깅 | [`main.py`](backend/src/main.py), [`core/middleware.py`](backend/src/core/middleware.py) (토큰·본문은 기록하지 않음) |
+| 화면·API·DB 연동 | 위 팀원별 Use Case |
+| 예외·권한 처리 | [`core/exceptions.py`](backend/src/core/exceptions.py), [`core/exception_handlers.py`](backend/src/core/exception_handlers.py) — 400·401·403·404·409·422 |
+| 문서화·재실행 | 이 README 의 [시작하기](#시작하기), [backend/README](backend/README.md) |
+| API 문서 | FastAPI 실행 후 http://localhost:8000/docs (Swagger UI) |
 
 ## 주요 기능
 
@@ -36,7 +118,7 @@ Next.js App Router 기반으로 고객 화면과 관리자 화면을 구성하�
 | 🛒 장바구니 | 드레싱·음료 옵션 선택, 수량 변경, 최신 가격으로 합계 확인 |
 | 🚚 예약 배달 체험 | 배송 정보와 수령 날짜·시간대를 선택하고 결제 흐름 체험 |
 | ⭐ 상품 리뷰 | 평점 분포·정렬·더보기 확인, 리뷰 작성 및 서버 저장 |
-| 👤 마이페이지 | 프로필·배송지·취향 설정, 체험 주문 내역과 내 리뷰 확인 |
+| 👤 마이페이지 | 회원 정보·배송지·로그인 기록, 회원 주문 내역(상태·기간 필터, 취소, 영수증 받기)과 내 리뷰 확인 |
 | 🌿 관리자 | 메뉴·옵션·재료·시즌·리뷰·매장 위치 관리, 이미지 업로드, 고객 화면 미리보기 |
 
 ### 고객 화면과 연결된 카탈로그
@@ -73,7 +155,7 @@ Next.js App Router 기반으로 고객 화면과 관리자 화면을 구성하�
 | --- | --- |
 | ![관리자 메뉴 관리 화면](docs/screenshots/final/admin-products-pc.jpg) | ![관리자 이달의 이벤트 관리 화면](docs/screenshots/final/admin-events-pc.jpg) |
 
-## 과제 요구사항 대응
+## 1차 과제 요구사항 대응
 
 | 과제 요구 | 위치 |
 | --- | --- |
@@ -90,7 +172,7 @@ Next.js App Router 기반으로 고객 화면과 관리자 화면을 구성하�
 | 도전: 장바구니 뱃지 | 담으면 헤더 장바구니 숫자 증가 |
 | 도전: 배포 | GitHub Actions CI 를 통과한 커밋만 검증 서버에 자동 배포 |
 
-필수 범위를 기준선으로 먼저 두고, 과제 제외 범위였던 DB·관리자 인증·테스트 결제는 팀 합의로 확장했습니다.
+필수 범위를 기준선으로 먼저 두고, 과제 제외 범위였던 DB·관리자 인증·테스트 결제는 팀 합의로 확장했습니다. 2차 과제 대응은 [2차 과제 요구사항 대응](#2차-과제-요구사항-대응)에 있습니다.
 
 ## 기술 스택
 
@@ -102,30 +184,50 @@ Next.js App Router 기반으로 고객 화면과 관리자 화면을 구성하�
 | 컴포넌트 | Radix UI · Lucide React · Sonner |
 | 데이터 검증 | Zod |
 | 서버 저장소 | PostgreSQL 18 · Prisma 7.10 (카탈로그·앱 설정·리뷰·주문·세션) |
-| 브라우저 저장소 | 장바구니·체험 프로필·취향 localStorage |
+| 브라우저 저장소 | 장바구니·취향 localStorage, 회원 토큰 sessionStorage |
 | DB 변경 이력 | Prisma migrations · 기존 SQL 제약·뷰·트리거 보존 |
+| 백엔드 API (2차) | FastAPI · Python 3.13 · uv · Pydantic · SQLAlchemy 2 비동기(asyncpg) · PyJWT · pwdlib(Argon2) |
 | 검증·배포 | GitHub Actions `Frontend CI` · 개발 MCP 배포 스크립트 |
 
 ## 시작하기
 
 ### 로컬 개발
 
-CI와 동일한 **Node.js 22**, npm, Git을 준비합니다.
+화면(Next.js)과 백엔드 API(FastAPI)를 함께 띄웁니다. 순서는 **DB 준비 → FastAPI → Next.js** 입니다.
+CI와 동일한 **Node.js 22**, npm, Git, 그리고 [uv](https://docs.astral.sh/uv/)를 준비합니다. Python 3.13 은 uv 가 받아 줍니다.
+
+**1. DB 준비** (저장소 루트)
 
 ```bash
 git clone https://github.com/KANT-2/leaf-bowl.git
 cd leaf-bowl
 cp .env.example .env.local
-# PostgreSQL 전용 DB와 DATABASE_URL을 설정한다.
+# .env.local 에 DATABASE_URL 을 넣는다. BACKEND_URL 기본값은 http://127.0.0.1:8000
 npm ci
-npm run db:migrate
-npm run db:seed
+npm run db:migrate   # Prisma 마이그레이션 (회원 주문 0011 포함)
+npm run db:seed      # 빈 DB 일 때만. 팀 공용 DB 에는 실행하지 않는다
+```
+
+**2. FastAPI** (`backend/`, 새 터미널)
+
+```bash
+cd backend
+uv sync
+cp .env.example .env   # DATABASE_URL(1과 같은 DB), JWT_SECRET_KEY 를 채운다
+uv run uvicorn main:app --app-dir src --reload   # http://localhost:8000/docs
+```
+
+기동할 때 `lifespan` 이 DB 연결을 확인하고 FastAPI 가 쓰는 회원·토큰 블랙리스트 등의 테이블을 준비합니다. 자세한 설정은 [backend/README](backend/README.md)를 참고합니다.
+
+**3. Next.js** (저장소 루트, 새 터미널)
+
+```bash
 npm run dev
 ```
 
-브라우저에서 [http://localhost:3000](http://localhost:3000)을 엽니다. 관리자 화면은 [http://localhost:3000/admin](http://localhost:3000/admin)에서 확인할 수 있습니다.
+브라우저에서 [http://localhost:3000](http://localhost:3000)을 엽니다. 회원가입·로그인은 [/login](http://localhost:3000/login), 관리자 화면은 [/admin](http://localhost:3000/admin)입니다. FastAPI 가 꺼져 있으면 회원 기능(로그인·마이페이지·회원 주문)만 실패하고 비회원 흐름은 동작합니다.
 
-PostgreSQL과 `DATABASE_URL`이 필요합니다. `db:seed`는 실행 원본 [db/seed.sql](db/seed.sql)로 비어 있는 카탈로그를 초기화하고 배너·배송시간·가격 정책·영양정보 등의 DB 설정을 넣습니다. 기존 편집과 주문은 보존합니다. 기존 JSON을 옮길 때는 seed보다 먼저 가져오기를 실행합니다. [DB 운영 가이드](docs/postgres.md)를 참고하세요.
+`db:seed`는 실행 원본 [db/seed.sql](db/seed.sql)로 비어 있는 카탈로그를 초기화하고 배너·배송시간·가격 정책·영양정보 등의 DB 설정을 넣습니다. 기존 편집과 주문은 보존합니다. 기존 JSON을 옮길 때는 seed보다 먼저 가져오기를 실행합니다. [DB 운영 가이드](docs/postgres.md)를 참고하세요.
 
 ### 저장 경로 설정
 
@@ -248,9 +350,13 @@ Tailwind 색상·글꼴 토큰은 `app/styles/theme.css`에서 공유합니다. 
 | 배너·배송시간·가격·영양·추천·편집 선택지 | PostgreSQL `app_settings` | 런타임 정적 기본값 없이 검증된 DB 설정 사용 |
 | 서버 주문·주문 항목·상태 이력 | PostgreSQL | 비회원 세션별 조회, 재전송·상태 변경 충돌 방지 |
 | 관리자 계정·관리자/비회원 세션 | PostgreSQL | 비밀번호·토큰 해시와 만료 시각 보존 |
+| 회원 계정·배송지·로그인 이력 (2차) | PostgreSQL `customers` · `customer_addresses` · `login_history` (FastAPI) | 비밀번호는 Argon2 해시, 로그인 이력은 응답 뒤 BackgroundTasks 로 기록 |
+| 회원 주문 (2차) | PostgreSQL `orders.customer_id` (FastAPI) | 회원 기준 조회·상태·기간 필터·취소, 상태 이력 기록 |
+| 로그아웃한 JWT (2차) | PostgreSQL `token_blacklist` (FastAPI) | 같은 토큰을 다시 쓰면 401 |
+| 회원의 나만의 볼 (2차) | PostgreSQL `bowl_recipes` · `bowl_recipe_ingredients` (FastAPI) | 로그인한 회원의 조합 저장·조회·삭제 |
 | 관리자 업로드 이미지 | 서버의 `images/` 디렉터리 | `ADMIN_DATA_DIR` 아래 보관, PNG·JPEG·WebP 및 파일당 5MB 제한 |
 | 장바구니 | localStorage · `bb-cart` | 브라우저에 보존하고 최신 카탈로그로 가격·판매 가능 여부 계산 |
-| 모의 사용자·프로필·배송지·취향 | localStorage · `bb-user` | 서버 계정 없이 현재 브라우저에 저장 |
+| 화면 표시용 사용자 정보·취향 | localStorage · `bb-user` | 1차의 모의 저장소. 2차부터 회원 정보·배송지 원본은 서버, 회원 토큰은 sessionStorage `lb-member-token` |
 | 과거 체험 주문 내역 | localStorage · `bb-orders` | 이전 기록을 보존하며 새 DB 주문과 함께 표시 |
 | 저장한 bowl match 조합 | localStorage · `bm-recipe` | 저장한 조합을 보존하고 카드 진행 상태는 메모리에서 관리 |
 | 작성한 리뷰의 로컬 기록 | localStorage · `bb-user-reviews` | 서버 저장 리뷰와 연계해 내 리뷰 식별·기존 기록 이관에 사용 |
@@ -270,6 +376,8 @@ DB 구조는 [`prisma/schema.prisma`](prisma/schema.prisma), 변경 이력은 `p
 | `GET` | `/api/products` | 공통 DB 상품 목록·분류별 조회 |
 | `GET` | `/api/products/[id]` | 공통 DB 개별 상품 조회 |
 | `PATCH` | `/api/admin/products/[id]` | 관리자 인증 후 공통 DB 상품 일부 수정 |
+
+위 표는 Next.js API 입니다. 회원·회원 주문·메뉴 검색·나만의 볼 API(FastAPI)는 [backend/README](backend/README.md)와 Swagger(http://localhost:8000/docs)에 있습니다.
 
 개별 상품 API도 공통 카탈로그를 사용합니다. 오류 응답은 카탈로그 계열의 `{ "error": "메시지" }`와 개별 상품 API의 `{ "message": "메시지" }`로 구분됩니다.
 
@@ -312,6 +420,9 @@ GitHub Actions의 **Frontend CI**는 PR과 `main`·`production` push에서 의�
 | [DB 설계](docs/db-design.md) | PostgreSQL ERD, 테이블 매핑, 트랜잭션 계약 |
 | [DB 운영](docs/postgres.md) | DB 설정·초기화·JSON 이관·테스트·배포 |
 | [배포·운영](ops/README.md) | 개발 MCP 배포, CI 게이트, 로그와 복구 |
+| [백엔드 (FastAPI)](backend/README.md) | 실행·가상환경·DB·테스트, 4계층 구조, API 목록 |
+| [회원 인증](backend/docs/auth.md) | OAuth2·JWT·블랙리스트 로그아웃 |
+| [UC-C 실행 기록](docs/uc-c-verification.md) | 회원 주문의 화면·API·DB·실패·로그아웃 차단 실행 결과 |
 
 ---
 
