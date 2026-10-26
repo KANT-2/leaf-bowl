@@ -14,7 +14,9 @@ class FakeReader:
     def __init__(self, admin: AdminAccount | None):
         self.admin = admin
 
-    async def find_by_id(self, admin_id: UUID) -> AdminAccount | None:
+    async def find_by_id(
+        self, admin_id: UUID
+    ) -> AdminAccount | None:
         if self.admin and self.admin.id == admin_id:
             return self.admin
         return None
@@ -36,7 +38,9 @@ def test_active_admin_is_allowed(admin: AdminAccount) -> None:
         login_id="manager",
     )
 
-    result = asyncio.run(get_active_admin(current, FakeReader(admin)))
+    result = asyncio.run(
+        get_active_admin(current, FakeReader(admin))
+    )
 
     assert result.id == str(admin.id)
     assert result.login_id == "manager"
@@ -50,7 +54,9 @@ def test_disabled_admin_is_rejected(admin: AdminAccount) -> None:
     )
 
     with pytest.raises(Unauthorized):
-        asyncio.run(get_active_admin(current, FakeReader(disabled)))
+        asyncio.run(
+            get_active_admin(current, FakeReader(disabled))
+        )
 
 
 def test_deleted_admin_is_rejected(admin: AdminAccount) -> None:
@@ -60,7 +66,9 @@ def test_deleted_admin_is_rejected(admin: AdminAccount) -> None:
     )
 
     with pytest.raises(Unauthorized):
-        asyncio.run(get_active_admin(current, FakeReader(None)))
+        asyncio.run(
+            get_active_admin(current, FakeReader(None))
+        )
 
 
 def test_invalid_admin_id_is_rejected() -> None:
@@ -70,4 +78,6 @@ def test_invalid_admin_id_is_rejected() -> None:
     )
 
     with pytest.raises(Unauthorized):
-        asyncio.run(get_active_admin(current, FakeReader(None)))
+        asyncio.run(
+            get_active_admin(current, FakeReader(None))
+        )

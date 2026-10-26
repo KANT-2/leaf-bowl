@@ -22,7 +22,9 @@ class AdminLogoutService:
     async def logout(self, token: str) -> None:
         claims = security.decode_access_token(token, "admin")
 
-        ensure_not_revoked(await self.blacklist.is_revoked(claims.jti))
+        ensure_not_revoked(
+            await self.blacklist.is_revoked(claims.jti)
+        )
 
         await self.blacklist.add(
             RevokedToken(

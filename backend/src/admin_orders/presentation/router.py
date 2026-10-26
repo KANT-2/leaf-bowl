@@ -61,6 +61,8 @@ async def admin_login(
 )
 async def admin_logout(
     token: str = Depends(admin_oauth2),
-    service: AdminLogoutService = Depends(get_admin_logout_service),
+    service: AdminLogoutService = Depends(
+        get_admin_logout_service
+    ),
 ) -> None:
     await service.logout(token)

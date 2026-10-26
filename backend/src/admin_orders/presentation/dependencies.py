@@ -12,7 +12,9 @@ from database import get_session
 
 
 class AdminByIdReader(Protocol):
-    async def find_by_id(self, admin_id: UUID) -> AdminAccount | None: ...
+    async def find_by_id(
+        self, admin_id: UUID
+    ) -> AdminAccount | None: ...
 
 
 def get_admin_user_repository(
@@ -28,7 +30,9 @@ async def get_active_admin(
     try:
         admin_id = UUID(current.id)
     except (ValueError, TypeError) as exc:
-        raise Unauthorized("관리자 인증이 유효하지 않습니다.") from exc
+        raise Unauthorized(
+            "관리자 인증이 유효하지 않습니다."
+        ) from exc
 
     admin = await users.find_by_id(admin_id)
 

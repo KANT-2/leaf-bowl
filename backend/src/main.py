@@ -1,3 +1,4 @@
+
 """앱 조립: lifespan(DB 초기화·종료), 미들웨어, 예외 핸들러, 라우터."""
 
 import logging
@@ -33,7 +34,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await database.init_db()
         logger.info("DB 연결 확인, FastAPI 소유 테이블 준비 완료")
     else:
-        logger.warning("DATABASE_URL 이 없어 DB 없이 시작합니다. /health 만 동작합니다.")
+        logger.warning(
+            "DATABASE_URL 이 없어 DB 없이 시작합니다. /health 만 동작합니다."
+        )
 
     yield
 

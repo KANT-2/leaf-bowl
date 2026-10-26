@@ -13,7 +13,9 @@ ADMIN_ID = UUID("11111111-1111-4111-8111-111111111111")
 
 
 class FakeAdminAuthService:
-    async def authenticate(self, login_id: str, password: str) -> SimpleNamespace:
+    async def authenticate(
+        self, login_id: str, password: str
+    ) -> SimpleNamespace:
         if login_id != "manager" or password != "test-password":
             raise Unauthorized("아이디 혹은 패스워드가 다릅니다.")
 
@@ -50,7 +52,9 @@ def test_admin_login_success(client: TestClient) -> None:
     assert body["token_type"] == "bearer"
     assert body["access_token"]
 
-    claims = security.decode_access_token(body["access_token"], "admin")
+    claims = security.decode_access_token(
+        body["access_token"], "admin"
+    )
     assert claims.subject == str(ADMIN_ID)
     assert claims.role == "admin"
     assert claims.extra["login_id"] == "manager"

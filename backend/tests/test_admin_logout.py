@@ -40,8 +40,12 @@ def ctx(monkeypatch: pytest.MonkeyPatch):
     service = AdminLogoutService(session, blacklist)
 
     app = create_app()
-    app.dependency_overrides[get_admin_logout_service] = lambda: service
-    app.dependency_overrides[get_blacklist] = lambda: blacklist
+    app.dependency_overrides[get_admin_logout_service] = (
+        lambda: service
+    )
+    app.dependency_overrides[get_blacklist] = (
+        lambda: blacklist
+    )
 
     @app.get("/_test/admin-logout-check")
     async def protected(

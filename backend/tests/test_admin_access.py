@@ -26,7 +26,9 @@ class FakeAdminReader:
     def __init__(self, admin: AdminAccount):
         self.admin = admin
 
-    async def find_by_id(self, admin_id: UUID) -> AdminAccount | None:
+    async def find_by_id(
+        self, admin_id: UUID
+    ) -> AdminAccount | None:
         if self.admin.id == admin_id:
             return self.admin
         return None
@@ -73,8 +75,12 @@ def ctx(monkeypatch: pytest.MonkeyPatch):
     ):
         return {"login_id": current.login_id}
 
-    app.dependency_overrides[get_admin_user_repository] = lambda: users
-    app.dependency_overrides[get_blacklist] = lambda: blacklist
+    app.dependency_overrides[get_admin_user_repository] = (
+        lambda: users
+    )
+    app.dependency_overrides[get_blacklist] = (
+        lambda: blacklist
+    )
 
     return TestClient(app), users, blacklist
 
