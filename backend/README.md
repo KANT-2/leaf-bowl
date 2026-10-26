@@ -127,6 +127,8 @@ src/
 
 ## 인증 (OAuth2 · JWT · 블랙리스트)
 
+자세한 설명(동작 원리, 업무 규칙, 시연 순서, 문제 해결): [docs/auth.md](docs/auth.md)
+
 | API | 설명 |
 | --- | --- |
 | `POST /api/auth/signup` | 회원가입 (JSON: email, password, name, phone?) |
