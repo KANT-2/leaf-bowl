@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator, Iterable
+from collections.abc import AsyncIterator
 from datetime import date
 from uuid import UUID
 
@@ -112,13 +112,16 @@ async def get_my_order(
 @router.get(
     "/{order_id}/receipt",
     response_class=StreamingResponse,
-    summary="주문 영수증 내려받기",
+    summary="주문 영수증 내려받기 (PNG)",
     description=(
-        "본인 주문의 영수증을 텍스트 파일(UTF-8)로 한 줄씩 나누어 내려준다 (StreamingResponse). "
+        "본인 주문의 영수증을 PNG 이미지(가로 720px)로 만들어 16KB 조각으로 나누어 내려준다 (StreamingResponse). "
         "주문 확인·권한 검사는 보내기 전에 끝나므로 401·404 는 JSON 오류로 답한다."
     ),
     responses={
-        200: {"description": "영수증 파일", "content": {"text/plain": {"schema": {"type": "string"}}}},
+        200: {
+            "description": "영수증 이미지",
+            "content": {"image/png": {"schema": {"type": "string", "format": "binary"}}},
+        },
         **ERROR_401,
         **ERROR_404,
     },
@@ -130,8 +133,8 @@ async def download_my_receipt(
 ):
     receipt = await service.receipt(customer.id, parse_order_id(order_id))
     return StreamingResponse(
-        _encoded(receipt.lines()),
-        media_type="text/plain; charset=utf-8",
+        _chunks(receipt.content),
+        media_type=receipt.media_type,
         headers={
             "Content-Disposition": f'attachment; filename="{receipt.filename}"',
             "Cache-Control": "no-store",  # 개인 주문 정보라 중간 캐시에 남기지 않는다
@@ -139,9 +142,12 @@ async def download_my_receipt(
     )
 
 
-async def _encoded(lines: Iterable[str]) -> AsyncIterator[bytes]:
-    for line in lines:
-        yield line.encode()
+RECEIPT_CHUNK = 16 * 1024  # 720px 영수증(약 60KB)이 여러 조각으로 나뉘는 크기
+
+
+async def _chunks(content: bytes) -> AsyncIterator[bytes]:
+    for start in range(0, len(content), RECEIPT_CHUNK):
+        yield content[start : start + RECEIPT_CHUNK]
 
 
 @router.post(

@@ -190,25 +190,29 @@ test("network failures and non-JSON answers are explained, and logout always cle
   assert.equal(none.length, 0, "토큰이 없으면 서버에 묻지 않는다");
 });
 
-test("the receipt is fetched with the token and saved under the server file name", async () => {
+/** PNG 시그니처 8바이트 */
+const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+test("the receipt image is fetched with the token and saved under the server file name", async () => {
   signedIn();
   const calls = stubFetch(
-    new Response("leaf & bowl 주문 영수증\n", {
+    new Response(PNG_BYTES, {
       headers: {
-        "content-type": "text/plain; charset=utf-8",
-        "content-disposition": 'attachment; filename="leafbowl-receipt-5cd63d2a.txt"',
+        "content-type": "image/png",
+        "content-disposition": 'attachment; filename="leafbowl-receipt-5cd63d2a.png"',
       },
     }),
-    new Response("plain", { headers: { "content-type": "text/plain" } }),
+    new Response(PNG_BYTES, { headers: { "content-type": "image/png" } }),
     json({ error: { code: "not_found", message: "주문을 찾을 수 없습니다." } }, 404),
     json({ error: { code: "unauthorized", message: "로그아웃된 토큰입니다." } }, 401),
   );
   const receipt = await client.loadMemberReceipt(ORDER.id);
   assert.equal(calls[0].url, `/backend/api/v1/orders/${ORDER.id}/receipt`);
   assert.equal(calls[0].headers.authorization, "Bearer jwt-1");
-  assert.equal(receipt.filename, "leafbowl-receipt-5cd63d2a.txt");
-  assert.equal(await receipt.file.text(), "leaf & bowl 주문 영수증\n");
-  assert.equal((await client.loadMemberReceipt(ORDER.id)).filename, "leafbowl-receipt-5cd63d2a.txt"); // 헤더가 없으면 주문번호로
+  assert.equal(receipt.filename, "leafbowl-receipt-5cd63d2a.png");
+  assert.equal(receipt.file.type, "image/png");
+  assert.deepEqual(new Uint8Array(await receipt.file.arrayBuffer()), PNG_BYTES);
+  assert.equal((await client.loadMemberReceipt(ORDER.id)).filename, "leafbowl-receipt-5cd63d2a.png"); // 헤더가 없으면 주문번호로
   await assert.rejects(client.loadMemberReceipt(ORDER.id), /주문을 찾을 수 없습니다/);
   await assert.rejects(client.loadMemberReceipt(ORDER.id), client.MemberAuthError);
   assert.equal(memberTokenStore.getSnapshot(), null);

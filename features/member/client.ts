@@ -338,11 +338,11 @@ export async function cancelMemberOrder(id: string, reason?: string): Promise<{ 
   return { status: body.status, canceledAt: body.canceledAt };
 }
 
-/** 내 주문 영수증 (텍스트 파일). 토큰을 헤더로 보내야 해서 링크 대신 받아서 저장한다. */
+/** 내 주문 영수증 (PNG 이미지). 토큰을 헤더로 보내야 해서 링크 대신 받아서 저장한다. */
 export async function loadMemberReceipt(id: string): Promise<{ file: Blob; filename: string }> {
   const response = await backendResponse(`/api/v1/orders/${encodeURIComponent(id)}/receipt`, { auth: true });
   const named = /filename="([^"]+)"/.exec(response.headers.get("content-disposition") ?? "");
-  return { file: await response.blob(), filename: named?.[1] ?? `leafbowl-receipt-${id.slice(0, 8)}.txt` };
+  return { file: await response.blob(), filename: named?.[1] ?? `leafbowl-receipt-${id.slice(0, 8)}.png` };
 }
 
 /** 회원 주문만 취소할 수 있는 상태 (FastAPI·DB 트리거와 같은 규칙) */
