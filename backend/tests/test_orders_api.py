@@ -280,6 +280,8 @@ def test_other_customers_order_and_bad_ids_are_404(ctx):
         assert response.status_code == 404
         assert error(response) == {"code": "not_found", "message": "주문을 찾을 수 없습니다."}
     assert ctx.client.post(f"/api/v1/orders/{order_id}/cancel").status_code == 404
+    receipt = ctx.client.get(f"/api/v1/orders/{order_id}/receipt")
+    assert receipt.status_code == 404 and receipt.headers["content-type"] == "application/json"
 
 
 def test_list_pages_through_my_orders_only(ctx):
@@ -331,6 +333,33 @@ def test_list_filters_by_several_statuses_and_korean_dates(ctx):
     assert listed(status="canceled", to="2026-10-10") == {canceled}
 
 
+# ── 영수증 ─────────────────────────────────────────────────────────────
+
+
+def test_receipt_downloads_my_order_as_a_text_file(ctx):
+    items = [{"productId": 0, "dressingKeys": ["dressing-0"], "drinkKeys": ["drink-0"], "quantity": 3}]
+    order_id = ctx.create(order_body(items=items)).json()["id"]
+    response = ctx.client.get(f"/api/v1/orders/{order_id}/receipt")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "text/plain; charset=utf-8"
+    assert response.headers["content-disposition"] == f'attachment; filename="leafbowl-receipt-{order_id[:8]}.txt"'
+    assert response.headers["cache-control"] == "no-store"
+    lines = response.text.splitlines()
+    assert f"주문번호: {order_id}" in lines
+    assert "결제상태: 결제 완료" in lines
+    assert "  13,000원 × 3 = 39,000원" in lines
+    assert "결제 금액: 39,000원" in lines  # 3만 원 이상 무료배송
+    assert "발행일시: 2026-10-10 12:00 (KST)" in lines
+    assert "010-1234-5678" not in response.text
+
+
+def test_receipt_of_a_canceled_order_says_so(ctx):
+    order_id = ctx.create().json()["id"]
+    ctx.client.post(f"/api/v1/orders/{order_id}/cancel")
+    lines = ctx.client.get(f"/api/v1/orders/{order_id}/receipt").text.splitlines()
+    assert {"주문상태: 취소", "결제상태: 결제 취소", "취소일시: 2026-10-10 12:00 (KST)"} <= set(lines)
+
+
 # ── 취소 ─────────────────────────────────────────────────────────────
 
 
@@ -372,6 +401,7 @@ def test_every_endpoint_requires_a_customer_token():
         ("get", "/api/v1/orders"),
         ("get", f"/api/v1/orders/{order_id}"),
         ("post", f"/api/v1/orders/{order_id}/cancel"),
+        ("get", f"/api/v1/orders/{order_id}/receipt"),
     ]:
         response = client.request(method, path, json=order_body(), headers={"Idempotency-Key": "order-key-0001"})
         assert response.status_code == 401, path

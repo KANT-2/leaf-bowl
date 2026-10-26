@@ -34,6 +34,19 @@ interface BackendInit {
  * 인증이 필요한 요청이 401 이면 토큰을 지우고 MemberAuthError 를 던진다.
  */
 export async function backendRequest(path: string, init: BackendInit = {}) {
+  const response = await backendResponse(path, init);
+  if (response.status === 204) {
+    return null;
+  }
+  try {
+    return await response.json();
+  } catch {
+    throw new Error("서버 응답을 확인하지 못했습니다. 다시 시도해주세요.");
+  }
+}
+
+/** 성공한 응답을 그대로 돌려준다 (파일 내려받기처럼 JSON 이 아닌 응답). 오류 처리는 backendRequest 와 같다. */
+async function backendResponse(path: string, init: BackendInit = {}): Promise<Response> {
   const headers: Record<string, string> = { ...init.headers };
   let requestToken: string | null = null;
   if (init.auth) {
@@ -73,8 +86,12 @@ export async function backendRequest(path: string, init: BackendInit = {}) {
     }
     throw new Error("서버에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.");
   }
-  if (response.status === 204) {
-    return null;
+  if (response.ok) {
+    return response;
+  }
+  if (response.status === 401 && init.auth) {
+    memberTokenStore.set(null);
+    throw new MemberAuthError("로그인이 만료되었습니다. 다시 로그인해주세요.");
   }
   let data;
   try {
@@ -265,6 +282,13 @@ export async function cancelMemberOrder(id: string, reason?: string): Promise<{ 
     throw new Error("취소 결과를 확인하지 못했습니다. 주문 내역을 새로 고쳐주세요.");
   }
   return { status: body.status, canceledAt: body.canceledAt };
+}
+
+/** 내 주문 영수증 (텍스트 파일). 토큰을 헤더로 보내야 해서 링크 대신 받아서 저장한다. */
+export async function loadMemberReceipt(id: string): Promise<{ file: Blob; filename: string }> {
+  const response = await backendResponse(`/api/v1/orders/${encodeURIComponent(id)}/receipt`, { auth: true });
+  const named = /filename="([^"]+)"/.exec(response.headers.get("content-disposition") ?? "");
+  return { file: await response.blob(), filename: named?.[1] ?? `leafbowl-receipt-${id.slice(0, 8)}.txt` };
 }
 
 /** 회원 주문만 취소할 수 있는 상태 (FastAPI·DB 트리거와 같은 규칙) */
