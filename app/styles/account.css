@@ -352,6 +352,12 @@
   border: 1px solid var(--color-line);
   border-radius: 8px;
 }
+.order-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .order-item-top {
   display: flex;
   justify-content: space-between;

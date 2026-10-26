@@ -189,3 +189,27 @@ test("network failures and non-JSON answers are explained, and logout always cle
   await client.logoutMember();
   assert.equal(none.length, 0, "토큰이 없으면 서버에 묻지 않는다");
 });
+
+test("the receipt is fetched with the token and saved under the server file name", async () => {
+  signedIn();
+  const calls = stubFetch(
+    new Response("leaf & bowl 주문 영수증\n", {
+      headers: {
+        "content-type": "text/plain; charset=utf-8",
+        "content-disposition": 'attachment; filename="leafbowl-receipt-5cd63d2a.txt"',
+      },
+    }),
+    new Response("plain", { headers: { "content-type": "text/plain" } }),
+    json({ error: { code: "not_found", message: "주문을 찾을 수 없습니다." } }, 404),
+    json({ error: { code: "unauthorized", message: "로그아웃된 토큰입니다." } }, 401),
+  );
+  const receipt = await client.loadMemberReceipt(ORDER.id);
+  assert.equal(calls[0].url, `/backend/api/v1/orders/${ORDER.id}/receipt`);
+  assert.equal(calls[0].headers.authorization, "Bearer jwt-1");
+  assert.equal(receipt.filename, "leafbowl-receipt-5cd63d2a.txt");
+  assert.equal(await receipt.file.text(), "leaf & bowl 주문 영수증\n");
+  assert.equal((await client.loadMemberReceipt(ORDER.id)).filename, "leafbowl-receipt-5cd63d2a.txt"); // 헤더가 없으면 주문번호로
+  await assert.rejects(client.loadMemberReceipt(ORDER.id), /주문을 찾을 수 없습니다/);
+  await assert.rejects(client.loadMemberReceipt(ORDER.id), client.MemberAuthError);
+  assert.equal(memberTokenStore.getSnapshot(), null);
+});

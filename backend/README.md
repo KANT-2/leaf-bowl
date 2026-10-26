@@ -165,8 +165,9 @@ FastAPI 가 만드는 테이블(`customers`, `token_blacklist`)은 기동할 때
 | API | 설명 | 주요 응답 |
 | --- | --- | --- |
 | `POST /api/v1/orders` | 주문 생성. 헤더 `Idempotency-Key` 필수 | 201 신규, 200 같은 키·같은 내용 재전송, 409 같은 키·다른 내용, 400 규칙 위반 |
-| `GET /api/v1/orders?limit&cursor` | 내 주문 목록, 최신순 커서 페이지 | 200 `{items, nextCursor}` |
+| `GET /api/v1/orders?limit&cursor&status&from&to` | 내 주문 목록, 최신순 커서 페이지. `status` 여러 번, `from`·`to` 는 한국 시간 주문일 | 200 `{items, nextCursor}`, 400 시작일 > 종료일 |
 | `GET /api/v1/orders/{id}` | 내 주문 상세 | 404 없거나 남의 주문 (존재 여부를 드러내지 않음) |
+| `GET /api/v1/orders/{id}/receipt` | 내 주문 영수증 텍스트 파일. `StreamingResponse` 로 한 줄씩 나누어 보냄 | 200 `text/plain` 첨부 파일, 404·401 은 보내기 전에 JSON 오류 |
 | `POST /api/v1/orders/{id}/cancel` | 취소 (`{reason?}`) | 200 취소됨·이미 취소됨, 409 준비 시작 이후 |
 
 업무 규칙 (기존 Next.js `modules/orders/*` 에서 이식):
