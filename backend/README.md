@@ -120,12 +120,27 @@ src/
     ├── presentation/    router.py, schemas.py
     ├── application/     service.py
     ├── domain/          순수 파이썬 업무 규칙
-    └── infrastructure/  models.py, repositories.py
+    ├── infrastructure/  models.py, repositories.py
+    └── container.py     조립: 응용 서비스에 어떤 인프라 구현을 넣을지 정함 (계층 밖, orders 적용)
 ```
 
 의존 방향은 `presentation → application → domain ← infrastructure` 이고, domain 은 FastAPI·SQLAlchemy·Pydantic 을 import 하지 않습니다.
 
+| 계층 | 맡는 일 | import 할 수 있는 것 |
+| --- | --- | --- |
+| presentation | 요청·응답 검증, 응용 서비스 호출, 결과를 HTTP 응답으로 | application, domain, fastapi·pydantic, core |
+| application | 조회 → 도메인 행위 → 저장 → commit 조율 | domain (Repository 는 domain 의 Protocol 로만 안다) |
+| domain | 값 검증·업무 규칙·상태 전이 (순수 파이썬) | domain, `core.exceptions` |
+| infrastructure | ORM 모델, SQL, ORM ↔ 도메인 변환 | domain, sqlalchemy |
+
+`SqlOrderRepository` 같은 구현을 서비스에 넣는 일은 계층 밖의 `container.py` 가 맡습니다.
+그래서 router 는 `Depends(get_order_service)` 로 서비스만 받고 SQLAlchemy 를 모릅니다.
+규칙은 `tests/test_layers.py` 가 import 를 분석해 검사합니다. 위반하면 파일:줄과 이유가 나옵니다.
+현재 검사 대상은 `orders` 이고, 다른 기능도 정리되면 `CHECKED` 에 추가합니다.
+
 ## 인증 (OAuth2 · JWT · 블랙리스트)
+
+자세한 설명(동작 원리, 업무 규칙, 시연 순서, 문제 해결): [docs/auth.md](docs/auth.md)
 
 | API | 설명 |
 | --- | --- |
@@ -135,6 +150,7 @@ src/
 | `GET /api/me` | 내 정보 |
 | `PATCH /api/me` | 내 정보 수정 (JSON: name?, phone?). 보낸 항목만 바뀌고 phone 을 빈 값으로 보내면 지운다 |
 | `GET /api/me/login-history` | 내 로그인 이력 (result=success·failure, from·to 날짜, page·size). 로그인할 때 BackgroundTasks 로 기록 |
+| `GET·POST /api/me/addresses`, `PATCH·DELETE /api/me/addresses/{id}`, `POST /api/me/addresses/{id}/default` | 내 배송지 (최대 5개, 첫 배송지 자동 기본, 기본 1개, 남의 배송지 404). 변경 API 는 바뀐 뒤 전체 목록을 돌려준다 |
 
 Swagger 오른쪽 위 **Authorize** 에 이메일·비밀번호를 넣으면 이후 요청에 토큰이 붙습니다.
 
@@ -165,8 +181,9 @@ FastAPI 가 만드는 테이블(`customers`, `token_blacklist`)은 기동할 때
 | API | 설명 | 주요 응답 |
 | --- | --- | --- |
 | `POST /api/v1/orders` | 주문 생성. 헤더 `Idempotency-Key` 필수 | 201 신규, 200 같은 키·같은 내용 재전송, 409 같은 키·다른 내용, 400 규칙 위반 |
-| `GET /api/v1/orders?limit&cursor` | 내 주문 목록, 최신순 커서 페이지 | 200 `{items, nextCursor}` |
+| `GET /api/v1/orders?limit&cursor&status&from&to` | 내 주문 목록, 최신순 커서 페이지. `status` 여러 번, `from`·`to` 는 한국 시간 주문일 | 200 `{items, nextCursor}`, 400 시작일 > 종료일 |
 | `GET /api/v1/orders/{id}` | 내 주문 상세 | 404 없거나 남의 주문 (존재 여부를 드러내지 않음) |
+| `GET /api/v1/orders/{id}/receipt` | 내 주문 영수증 텍스트 파일. `StreamingResponse` 로 한 줄씩 나누어 보냄 | 200 `text/plain` 첨부 파일, 404·401 은 보내기 전에 JSON 오류 |
 | `POST /api/v1/orders/{id}/cancel` | 취소 (`{reason?}`) | 200 취소됨·이미 취소됨, 409 준비 시작 이후 |
 
 업무 규칙 (기존 Next.js `modules/orders/*` 에서 이식):

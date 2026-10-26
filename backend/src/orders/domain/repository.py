@@ -4,13 +4,13 @@ import base64
 import binascii
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime, time, timedelta
 from typing import Protocol
 from uuid import UUID
 
 from core.exceptions import BusinessRuleViolation
 from orders.domain.catalog import Catalog, PricingPolicy
-from orders.domain.delivery import DeliveryHours
+from orders.domain.delivery import KST, DeliveryHours
 from orders.domain.order import ChangedBy, Order, OrderStatus
 
 
@@ -42,6 +42,36 @@ class OrderCursor:
 
 
 @dataclass(frozen=True)
+class OrderListFilter:
+    """내 주문 목록 조건. 비어 있으면 전체다. 날짜는 한국 시간 기준 주문일이고 date_to 는 그날 끝까지 포함한다."""
+
+    statuses: frozenset[OrderStatus] = frozenset()
+    date_from: date | None = None
+    date_to: date | None = None
+
+    def __post_init__(self) -> None:
+        if self.date_from and self.date_to and self.date_from > self.date_to:
+            raise BusinessRuleViolation("시작일이 종료일보다 늦을 수 없습니다.")
+
+    @property
+    def starts_at(self) -> datetime | None:
+        return datetime.combine(self.date_from, time.min, KST) if self.date_from else None
+
+    @property
+    def ends_before(self) -> datetime | None:
+        return datetime.combine(self.date_to + timedelta(days=1), time.min, KST) if self.date_to else None
+
+    def matches(self, order: Order) -> bool:
+        """메모리 저장소용. SQL 저장소는 같은 조건을 WHERE 로 건다."""
+        starts_at, ends_before = self.starts_at, self.ends_before
+        return (
+            (not self.statuses or order.status in self.statuses)
+            and (starts_at is None or order.created_at >= starts_at)
+            and (ends_before is None or order.created_at < ends_before)
+        )
+
+
+@dataclass(frozen=True)
 class StatusUpdate:
     """읽었을 때의 version·상태와 지금 값이 같을 때만 바꾼다 (낙관적 잠금)."""
 
@@ -68,8 +98,10 @@ class OrderRepository(Protocol):
         """조건이 맞으면 상태·version·취소 정보·이력을 함께 바꾸고 바뀐 주문을, 맞지 않으면 None 을 돌려준다."""
         ...
 
-    async def list_by_customer(self, customer_id: int, limit: int, after: OrderCursor | None) -> list[Order]:
-        """(created_at, id) 내림차순. after 가 있으면 그보다 뒤(더 오래된) 주문만."""
+    async def list_by_customer(
+        self, customer_id: int, limit: int, after: OrderCursor | None, where: OrderListFilter | None = None
+    ) -> list[Order]:
+        """(created_at, id) 내림차순. after 가 있으면 그보다 뒤(더 오래된) 주문만, where 조건에 맞는 주문만."""
         ...
 
 

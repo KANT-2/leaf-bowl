@@ -22,10 +22,12 @@ from orders.domain.order import (
     resolve_cancel,
 )
 from orders.domain.pricing import price_order
+from orders.domain.receipt import Receipt
 from orders.domain.repository import (
     CatalogReader,
     DuplicateRequest,
     OrderCursor,
+    OrderListFilter,
     OrderRepository,
     SettingsReader,
     StatusUpdate,
@@ -133,12 +135,25 @@ class OrderService:
             raise NotFound(NOT_FOUND)
         return order
 
-    async def list_mine(self, customer_id: int, limit: int = DEFAULT_PAGE_SIZE, cursor: str | None = None) -> OrderPage:
-        """본인 주문만 최신순. 다음 쪽이 있는지 보려고 limit + 1 개를 읽는다."""
+    async def receipt(self, customer_id: int, order_id: UUID) -> Receipt:
+        """본인 주문의 영수증. 소유권을 확인한 뒤에 만들므로 404 는 내려보내기 전에 정해진다."""
+        return Receipt(await self.get_mine(customer_id, order_id), issued_at=self.clock())
+
+    async def list_mine(
+        self,
+        customer_id: int,
+        limit: int = DEFAULT_PAGE_SIZE,
+        cursor: str | None = None,
+        where: OrderListFilter | None = None,
+    ) -> OrderPage:
+        """본인 주문만 최신순. 다음 쪽이 있는지 보려고 limit + 1 개를 읽는다.
+
+        커서는 "마지막으로 본 위치"라서 같은 조건으로 이어 읽으면 빠지거나 겹치지 않는다. 조건을 바꾸면 처음부터 읽는다.
+        """
         if not 1 <= limit <= MAX_PAGE_SIZE:
             raise BusinessRuleViolation(f"limit 은 1~{MAX_PAGE_SIZE} 사이여야 합니다.")
         after = OrderCursor.decode(cursor) if cursor else None
-        rows = await self.orders.list_by_customer(customer_id, limit + 1, after)
+        rows = await self.orders.list_by_customer(customer_id, limit + 1, after, where)
         items = rows[:limit]
         has_more = len(rows) > limit
         next_cursor = OrderCursor(items[-1].created_at, items[-1].id).encode() if has_more and items else None

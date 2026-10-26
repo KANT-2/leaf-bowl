@@ -6,6 +6,7 @@ import {
   type OrderInput,
   type ServerOrderPage,
 } from "@/features/orders/client";
+import { type Address } from "@/modules/profile/types";
 
 /** next.config.ts 의 rewrites 가 FastAPI(backend/)로 넘기는 경로 */
 const BACKEND = "/backend";
@@ -34,6 +35,19 @@ interface BackendInit {
  * 인증이 필요한 요청이 401 이면 토큰을 지우고 MemberAuthError 를 던진다.
  */
 export async function backendRequest(path: string, init: BackendInit = {}) {
+  const response = await backendResponse(path, init);
+  if (response.status === 204) {
+    return null;
+  }
+  try {
+    return await response.json();
+  } catch {
+    throw new Error("서버 응답을 확인하지 못했습니다. 다시 시도해주세요.");
+  }
+}
+
+/** 성공한 응답을 그대로 돌려준다 (파일 내려받기처럼 JSON 이 아닌 응답). 오류 처리는 backendRequest 와 같다. */
+async function backendResponse(path: string, init: BackendInit = {}): Promise<Response> {
   const headers: Record<string, string> = { ...init.headers };
   let requestToken: string | null = null;
   if (init.auth) {
@@ -73,8 +87,12 @@ export async function backendRequest(path: string, init: BackendInit = {}) {
     }
     throw new Error("서버에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.");
   }
-  if (response.status === 204) {
-    return null;
+  if (response.ok) {
+    return response;
+  }
+  if (response.status === 401 && init.auth) {
+    memberTokenStore.set(null);
+    throw new MemberAuthError("로그인이 만료되었습니다. 다시 로그인해주세요.");
   }
   let data;
   try {
@@ -170,6 +188,59 @@ export async function updateMember(patch: { name?: string; phone?: string }): Pr
   return member(await backendRequest("/api/me", { method: "PATCH", auth: true, json: patch }));
 }
 
+/** 서버 배송지(snake_case)를 화면에서 쓰던 Address 모양으로 바꾼다. id 는 문자열로 맞춘다. */
+function toAddresses(body: Awaited<ReturnType<typeof backendRequest>>): Address[] {
+  if (!Array.isArray(body?.items)) {
+    throw new Error("배송지 목록을 확인하지 못했습니다.");
+  }
+  return body.items.map((a: Record<string, unknown>) => ({
+    id: String(a.id),
+    label: String(a.label ?? ""),
+    recipientName: String(a.recipient_name ?? ""),
+    phone: typeof a.phone === "string" ? a.phone : "",
+    address: String(a.address ?? ""),
+    detail: String(a.detail ?? ""),
+    requestNote: String(a.request_note ?? ""),
+    isDefault: a.is_default === true,
+  }));
+}
+
+function addressBody(input: Omit<Address, "id">) {
+  return {
+    label: input.label,
+    recipient_name: input.recipientName,
+    phone: input.phone.trim() || null,
+    address: input.address,
+    detail: input.detail,
+    request_note: input.requestNote,
+    is_default: input.isDefault,
+  };
+}
+
+const ADDRESSES = "/api/me/addresses";
+const addressPath = (id: string) => `${ADDRESSES}/${encodeURIComponent(id)}`;
+
+/** 내 배송지 (기본 배송지가 맨 앞). 추가·수정·삭제·기본 지정은 바뀐 뒤의 전체 목록을 돌려준다. */
+export async function loadAddresses(): Promise<Address[]> {
+  return toAddresses(await backendRequest(ADDRESSES, { auth: true }));
+}
+
+export async function addAddress(input: Omit<Address, "id">): Promise<Address[]> {
+  return toAddresses(await backendRequest(ADDRESSES, { method: "POST", auth: true, json: addressBody(input) }));
+}
+
+export async function updateAddress(id: string, input: Omit<Address, "id">): Promise<Address[]> {
+  return toAddresses(await backendRequest(addressPath(id), { method: "PATCH", auth: true, json: addressBody(input) }));
+}
+
+export async function removeAddress(id: string): Promise<Address[]> {
+  return toAddresses(await backendRequest(addressPath(id), { method: "DELETE", auth: true }));
+}
+
+export async function setDefaultAddress(id: string): Promise<Address[]> {
+  return toAddresses(await backendRequest(`${addressPath(id)}/default`, { method: "POST", auth: true }));
+}
+
 export interface LoginHistoryItem {
   id: number;
   result: "success" | "failure";
@@ -233,8 +304,26 @@ export async function submitMemberOrder(input: OrderInput, key: string): Promise
   return { id: body.id, total: Number(body.total) };
 }
 
-export async function loadMemberOrders(cursor?: string): Promise<ServerOrderPage> {
-  return parseOrderPage(await backendRequest("/api/v1/orders?" + orderPageQuery(cursor), { auth: true }));
+export interface MemberOrderFilter {
+  /** 비어 있으면 모든 상태 */
+  statuses?: readonly string[];
+  /** YYYY-MM-DD, 한국 시간 기준 주문일. to 는 그날 끝까지 포함한다. */
+  from?: string;
+  to?: string;
+}
+
+/** 내 주문 (최신순). 커서로 이어 읽을 때도 같은 조건을 보낸다. */
+export async function loadMemberOrders(cursor?: string, filter: MemberOrderFilter = {}): Promise<ServerOrderPage> {
+  const params = orderPageQuery(cursor);
+  for (const status of filter.statuses ?? []) {
+    params.append("status", status);
+  }
+  for (const key of ["from", "to"] as const) {
+    if (filter[key]) {
+      params.set(key, filter[key]);
+    }
+  }
+  return parseOrderPage(await backendRequest("/api/v1/orders?" + params, { auth: true }));
 }
 
 export async function cancelMemberOrder(id: string, reason?: string): Promise<{ status: string; canceledAt: string }> {
@@ -247,6 +336,13 @@ export async function cancelMemberOrder(id: string, reason?: string): Promise<{ 
     throw new Error("취소 결과를 확인하지 못했습니다. 주문 내역을 새로 고쳐주세요.");
   }
   return { status: body.status, canceledAt: body.canceledAt };
+}
+
+/** 내 주문 영수증 (텍스트 파일). 토큰을 헤더로 보내야 해서 링크 대신 받아서 저장한다. */
+export async function loadMemberReceipt(id: string): Promise<{ file: Blob; filename: string }> {
+  const response = await backendResponse(`/api/v1/orders/${encodeURIComponent(id)}/receipt`, { auth: true });
+  const named = /filename="([^"]+)"/.exec(response.headers.get("content-disposition") ?? "");
+  return { file: await response.blob(), filename: named?.[1] ?? `leafbowl-receipt-${id.slice(0, 8)}.txt` };
 }
 
 /** 회원 주문만 취소할 수 있는 상태 (FastAPI·DB 트리거와 같은 규칙) */

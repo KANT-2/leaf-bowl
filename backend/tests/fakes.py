@@ -10,11 +10,12 @@ from uuid import UUID
 from auth.domain.login_history import LoginAttempt, LoginHistoryQuery
 from auth.domain.revoked_token import RevokedToken
 from core.exceptions import Conflict, NotFound
+from customers.domain.address import Address, AddressBook
 from customers.domain.customer import Customer
 from orders.domain.catalog import Catalog, PricingPolicy
 from orders.domain.delivery import DeliveryHours
 from orders.domain.order import Order, OrderStatus, StatusChange
-from orders.domain.repository import DuplicateRequest, OrderCursor, StatusUpdate
+from orders.domain.repository import DuplicateRequest, OrderCursor, OrderListFilter, StatusUpdate
 
 
 class FakeSession:
@@ -121,11 +122,14 @@ class InMemoryOrderRepository:
             row.canceled_at, row.cancel_reason = update.at, update.reason
         return copy.deepcopy(row)
 
-    async def list_by_customer(self, customer_id: int, limit: int, after: OrderCursor | None) -> list[Order]:
+    async def list_by_customer(
+        self, customer_id: int, limit: int, after: OrderCursor | None, where: OrderListFilter | None = None
+    ) -> list[Order]:
         def key(o: Order) -> tuple[datetime, str]:
             return o.created_at, str(o.id)  # PostgreSQL uuid 정렬은 16진 문자열 순서와 같다
 
-        rows = sorted((o for o in self.rows.values() if o.customer_id == customer_id), key=key, reverse=True)
+        mine = (o for o in self.rows.values() if o.customer_id == customer_id and (where is None or where.matches(o)))
+        rows = sorted(mine, key=key, reverse=True)
         if after:
             rows = [o for o in rows if key(o) < (after.created_at, str(after.id))]
         return [copy.deepcopy(o) for o in rows[:limit]]
@@ -174,3 +178,26 @@ class InMemoryLoginHistory:
         ]
         found.sort(key=lambda a: (a.created_at, a.id or 0), reverse=True)
         return found[query.offset : query.offset + query.size], len(found)
+
+
+class InMemoryAddressRepository:
+    def __init__(self) -> None:
+        self.rows: dict[int, Address] = {}
+        self.locked: list[int] = []
+
+    async def load_book(self, customer_id: int, *, for_update: bool = False) -> AddressBook:
+        if for_update:
+            self.locked.append(customer_id)
+        mine = sorted((a for a in self.rows.values() if a.customer_id == customer_id), key=lambda a: a.id)
+        return AddressBook(customer_id, [replace(a) for a in mine])
+
+    async def save_book(self, book: AddressBook) -> AddressBook:
+        for aid in [aid for aid, a in self.rows.items() if a.customer_id == book.customer_id]:
+            if aid not in {a.id for a in book.addresses}:
+                del self.rows[aid]
+        for a in book.addresses:
+            if a.id is None:
+                a.id = max(self.rows, default=0) + 1
+            self.rows[a.id] = replace(a)
+        assert sum(a.is_default for a in self.rows.values() if a.customer_id == book.customer_id) <= 1
+        return book

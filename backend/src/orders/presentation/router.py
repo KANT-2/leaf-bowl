@@ -1,12 +1,17 @@
+from collections.abc import AsyncIterator, Iterable
+from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, Header, Query, Response, status
+from fastapi.responses import StreamingResponse
 
 from core.dependencies import CurrentCustomer, get_current_customer
 from core.exceptions import NotFound
 from orders.application.service import MAX_PAGE_SIZE, NOT_FOUND, OrderService, PlaceOrderCommand
+from orders.container import get_order_service
+from orders.domain.order import OrderStatus
+from orders.domain.repository import OrderListFilter
 from orders.domain.request_hash import request_hash
-from orders.presentation.dependencies import get_order_service
 from orders.presentation.schemas import (
     CanceledOrderResponse,
     CancelOrderRequest,
@@ -68,14 +73,28 @@ async def create_order(
     return CreatedOrderResponse.of(result.order)
 
 
-@router.get("", response_model=OrderListResponse, summary="내 주문 목록 (최신순)", responses=ERROR_401)
+@router.get(
+    "",
+    response_model=OrderListResponse,
+    summary="내 주문 목록 (최신순, 상태·기간 필터)",
+    description=(
+        "조건을 주지 않으면 전체다. status 는 여러 번 보낼 수 있다 (?status=received&status=confirmed). "
+        "기간은 한국 시간 기준 주문일이고 to 는 그날 끝까지 포함한다. "
+        "nextCursor 로 이어 읽을 때는 같은 조건을 함께 보낸다."
+    ),
+    responses={**ERROR_401, 400: {"description": "시작일 > 종료일, 잘못된 cursor"}, 422: {"description": "형식 오류"}},
+)
 async def list_my_orders(
     limit: int = Query(20, ge=1, le=MAX_PAGE_SIZE),
     cursor: str | None = Query(None, max_length=300, description="이전 응답의 nextCursor"),
+    order_status: list[OrderStatus] | None = Query(None, alias="status", description="이 상태의 주문만"),
+    date_from: date | None = Query(None, alias="from", description="시작일 (YYYY-MM-DD, 한국 시간)"),
+    date_to: date | None = Query(None, alias="to", description="종료일 (YYYY-MM-DD, 한국 시간, 포함)"),
     customer: CurrentCustomer = Depends(get_current_customer),
     service: OrderService = Depends(get_order_service),
 ):
-    page = await service.list_mine(customer.id, limit, cursor)
+    where = OrderListFilter(statuses=frozenset(order_status or ()), date_from=date_from, date_to=date_to)
+    page = await service.list_mine(customer.id, limit, cursor, where)
     return OrderListResponse(items=[OrderDetailResponse.of(o) for o in page.items], next_cursor=page.next_cursor)
 
 
@@ -88,6 +107,41 @@ async def get_my_order(
     service: OrderService = Depends(get_order_service),
 ):
     return OrderDetailResponse.of(await service.get_mine(customer.id, parse_order_id(order_id)))
+
+
+@router.get(
+    "/{order_id}/receipt",
+    response_class=StreamingResponse,
+    summary="주문 영수증 내려받기",
+    description=(
+        "본인 주문의 영수증을 텍스트 파일(UTF-8)로 한 줄씩 나누어 내려준다 (StreamingResponse). "
+        "주문 확인·권한 검사는 보내기 전에 끝나므로 401·404 는 JSON 오류로 답한다."
+    ),
+    responses={
+        200: {"description": "영수증 파일", "content": {"text/plain": {"schema": {"type": "string"}}}},
+        **ERROR_401,
+        **ERROR_404,
+    },
+)
+async def download_my_receipt(
+    order_id: str,
+    customer: CurrentCustomer = Depends(get_current_customer),
+    service: OrderService = Depends(get_order_service),
+):
+    receipt = await service.receipt(customer.id, parse_order_id(order_id))
+    return StreamingResponse(
+        _encoded(receipt.lines()),
+        media_type="text/plain; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{receipt.filename}"',
+            "Cache-Control": "no-store",  # 개인 주문 정보라 중간 캐시에 남기지 않는다
+        },
+    )
+
+
+async def _encoded(lines: Iterable[str]) -> AsyncIterator[bytes]:
+    for line in lines:
+        yield line.encode()
 
 
 @router.post(
