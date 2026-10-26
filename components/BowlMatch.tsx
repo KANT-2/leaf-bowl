@@ -11,28 +11,28 @@ import { useCart } from "./CartProvider";
 import { useToast } from "./ToastProvider";
 import { type Ingredient } from "@/modules/bowl/ingredient";
 import { STAGES, mainIngredient, matchProduct } from "@/modules/bowl/operations";
-import { decisionsStore, recipeStore } from "@/infrastructure/browser/bowl-store";
+import { decisionsStore } from "@/infrastructure/browser/bowl-store";
+import { useBowlRecipes } from "@/features/bowls/use-bowl-recipes";
+import { MemberAuthError } from "@/features/member/client";
+import { memberTokenStore } from "@/infrastructure/browser/member-token";
 import { type Decision } from "@/modules/bowl/model";
 import { money } from "@/modules/shared/format";
 
 const two = (n: number) => String(n).padStart(2, "0");
 
-/** 계정당 저장할 수 있는 조합 수. 넘으면 오래된 것부터 지운다. */
-const MAX_SAVED_RECIPES = 20;
-
 const unique = (list: string[]) => [...new Set(list)];
 
 /**
  * 재료 카드를 좌우로 넘겨 나만의 샐러드를 만드는 화면 (예전 public/bowl-match 정적 페이지를 옮김).
- * "내 조합 저장하기"로 남긴 조합만 예전과 같은 localStorage 키(bm-recipe)를 써서 방문이 바뀌어도
- * 남는다. 지금 넘기고 있는 카드 진행 상황은 이번 방문에서만 유지된다.
+ * 조합은 회원 API로 저장하며, 지금 넘기고 있는 카드 진행 상황은 이번 방문에서만 유지된다.
  */
 export default function BowlMatch() {
   const { ingredients, visibleProducts, DRESSINGS } = useCustomerCatalog();
+  const { user, isLoggedIn } = useAuth();
   if (!ingredients.length || !visibleProducts.length || !DRESSINGS.some((d) => d.available)) {
     return <p role="status">현재 조합할 수 있는 재료와 메뉴를 준비 중입니다.</p>;
   }
-  return <BowlMatchBody ingredients={ingredients} />;
+  return <BowlMatchBody key={isLoggedIn && user ? user.email : "guest"} ingredients={ingredients} />;
 }
 
 function BowlMatchBody({ ingredients }: { ingredients: Ingredient[] }) {
@@ -48,7 +48,8 @@ function BowlMatchBody({ ingredients }: { ingredients: Ingredient[] }) {
     decisionsStore.getSnapshot,
     decisionsStore.getServerSnapshot,
   );
-  const recipes = useSyncExternalStore(recipeStore.subscribe, recipeStore.getSnapshot, recipeStore.getServerSnapshot);
+  const recipes = useBowlRecipes(isLoggedIn);
+  const decisionsVersion = useRef(0);
   // 재료 목록이 줄어든 경우를 위해 지금 목록 길이까지만 쓴다.
   const invalid = saved.findIndex((d) => d.ingredientId && d.ingredientId !== ingredients[d.index]?.id);
   const decisions = saved.slice(0, invalid < 0 ? total : invalid);
@@ -62,16 +63,13 @@ function BowlMatchBody({ ingredients }: { ingredients: Ingredient[] }) {
   const ids = selected.map((i) => i.id);
   const price = bowlPrice(selected);
   // 가장 최근에 저장한, 지금도 주문 가능한 "내" 조합을 불러오기 버튼에 쓴다. 전체 목록은 마이페이지에서 본다.
-  const savedRecipe = !isLoggedIn
-    ? null
-    : ([...recipes]
-        .filter(
-          (r) =>
-            r.ownerEmail === user?.email &&
-            DRESSINGS.some((d) => d.id === r.dressingKey && d.available) &&
-            r.ingredients.every((id) => ingredients.some((i) => i.id === id)),
-        )
-        .sort((a, b) => b.savedAt.localeCompare(a.savedAt))[0] ?? null);
+  const savedRecipe = isLoggedIn
+    ? recipes.items.find(
+        (recipe) =>
+          DRESSINGS.some((d) => d.id === recipe.dressing_key && d.available) &&
+          recipe.ingredients.every((item) => ingredients.some((ingredient) => ingredient.id === item.ingredient_id)),
+      )
+    : undefined;
 
   const {
     busy,
@@ -100,14 +98,16 @@ function BowlMatchBody({ ingredients }: { ingredients: Ingredient[] }) {
   const [dressingId, setDressing] = useState(DRESSINGS.find((d) => d.available)?.id ?? "");
   const dressing = DRESSINGS.findIndex((d) => d.id === dressingId);
   const [savedNote, setSavedNote] = useState("");
+  const [saveError, setSaveError] = useState("");
   const makeBtn = useRef<HTMLButtonElement>(null);
 
   const setDecisions = (list: Decision[]) => decisionsStore.set(list);
 
   // 다른 페이지로 갔다 돌아와도(Activity로 숨겨졌다 다시 보여도) 카드 진행 상황과 결과 창은
-  // 유지하지 않고 새로 시작한다. "내 조합 저장하기"로 남긴 조합(recipeStore)은 건드리지 않는다.
+  // 유지하지 않고 새로 시작한다. 서버에 저장한 회원 조합은 별도 목록으로 유지한다.
   useLayoutEffect(() => {
     return () => {
+      decisionsVersion.current += 1;
       decisionsStore.set([]);
       setResultOpen(false);
       setSavedNote("");
@@ -159,6 +159,8 @@ function BowlMatchBody({ ingredients }: { ingredients: Ingredient[] }) {
     setName(preset?.name ?? `나의 ${mainIngredient(list).name} 볼`);
     setDressing(preset?.dressingKey ?? DRESSINGS.find((d) => d.available)?.id ?? "");
     setSavedNote("");
+    setSaveError("");
+    recipes.clearSaveError();
     setResultOpen(true);
   };
 
@@ -169,43 +171,58 @@ function BowlMatchBody({ ingredients }: { ingredients: Ingredient[] }) {
     const list = ingredients.map((i, index) => ({
       index,
       ingredientId: i.id,
-      liked: savedRecipe.ingredients.includes(i.id),
+      liked: savedRecipe.ingredients.some((item) => item.ingredient_id === i.id),
     }));
     setDecisions(list);
     showResult(
-      { name: savedRecipe.name, dressingKey: savedRecipe.dressingKey },
+      { name: savedRecipe.name, dressingKey: savedRecipe.dressing_key },
       list.filter((d) => d.liked).map((d) => ingredients[d.index]),
     );
     toast("저장한 조합을 불러왔어요");
   };
 
+  const closeResult = () => {
+    decisionsVersion.current += 1;
+    setResultOpen(false);
+  };
+
   const recipeName = () => (name.trim() || "나의 샐러드").slice(0, 30);
 
-  const saveRecipe = () => {
+  const saveRecipe = async () => {
     if (!isLoggedIn || !user) {
       toast("내 조합을 저장하려면 로그인해주세요");
       router.push("/login?next=/match");
       return;
     }
     const n = recipeName();
-    const mine = recipes.filter((r) => r.ownerEmail === user.email);
-    const others = recipes.filter((r) => r.ownerEmail !== user.email);
-    recipeStore.set([
-      ...others,
-      ...mine.slice(-(MAX_SAVED_RECIPES - 1)),
-      {
-        id: crypto.randomUUID(),
-        name: n,
-        ingredients: ids,
-        dressing,
-        dressingKey: dressingId,
-        price,
-        savedAt: new Date().toISOString(),
-        ownerEmail: user.email,
-      },
-    ]);
-    setSavedNote(`${n} · 마이페이지 > 내 조합에서 다시 불러올 수 있어요.`);
-    toast("내 조합을 저장했어요");
+    const version = decisionsVersion.current;
+    const requestToken = memberTokenStore.current();
+    setSaveError("");
+    try {
+      const recipe = await recipes.save({ name: n, ingredient_ids: ids, dressing_key: dressingId });
+      if (!recipe) {
+        if (version === decisionsVersion.current && requestToken && !memberTokenStore.current() && isLoggedIn) {
+          toast("로그인이 만료됐어요. 다시 로그인해주세요.");
+          router.push("/login?next=/match");
+        }
+        return;
+      }
+      if (version !== decisionsVersion.current || requestToken !== memberTokenStore.current()) {
+        return;
+      }
+      setSavedNote(`${recipe.name} · 마이페이지 > 내 조합에서 확인할 수 있어요.`);
+      toast("내 조합을 저장했어요");
+    } catch (cause) {
+      if (version !== decisionsVersion.current || requestToken !== memberTokenStore.current()) {
+        return;
+      }
+      if (cause instanceof MemberAuthError) {
+        toast("로그인이 만료됐어요. 다시 로그인해주세요.");
+        router.push("/login?next=/match");
+        return;
+      }
+      setSaveError(cause instanceof Error ? cause.message : "조합을 저장하지 못했습니다.");
+    }
   };
 
   const addToCart = () => {
@@ -442,6 +459,23 @@ function BowlMatchBody({ ingredients }: { ingredients: Ingredient[] }) {
               저장한 조합 불러오기
             </button>
           )}
+          {isLoggedIn && recipes.loaded && recipes.items.length > 0 && !savedRecipe && (
+            <p role="status">저장한 조합의 재료나 드레싱을 현재 사용할 수 없습니다.</p>
+          )}
+          {isLoggedIn && recipes.loading && <p aria-live="polite">저장한 조합을 확인하고 있어요.</p>}
+          {isLoggedIn && recipes.error && (
+            <div role="alert">
+              <p>{recipes.error}</p>
+              <button
+                type="button"
+                className="secondary"
+                disabled={recipes.loading}
+                onClick={() => void recipes.refresh()}
+              >
+                다시 불러오기
+              </button>
+            </div>
+          )}
         </div>
       </aside>
 
@@ -455,10 +489,12 @@ function BowlMatchBody({ ingredients }: { ingredients: Ingredient[] }) {
         photo={photoSrc(similar.id)}
         price={price + (DRESSINGS[dressing]?.price ?? 0)}
         savedNote={savedNote}
+        saving={recipes.saving}
+        saveError={saveError || recipes.saveError}
         resultAllergens={resultAllergens}
         onName={setName}
         onDressing={setDressing}
-        onClosed={() => setResultOpen(false)}
+        onClosed={closeResult}
         onSave={saveRecipe}
         onAdd={addToCart}
       />
