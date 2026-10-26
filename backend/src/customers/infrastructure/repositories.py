@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.exceptions import Conflict
+from core.exceptions import Conflict, NotFound
 from customers.domain.customer import Customer, CustomerStatus
 from customers.infrastructure.models import CustomerModel
 
@@ -48,4 +48,13 @@ class SqlCustomerRepository:
             # 동시에 같은 이메일로 가입하면 중복 확인을 통과한 뒤 UNIQUE 제약에서 걸린다
             raise Conflict("이미 가입된 이메일입니다.") from exc
         await self.session.refresh(row)
+        return to_domain(row)
+
+    async def save_profile(self, customer: Customer) -> Customer:
+        row = await self.session.get(CustomerModel, customer.id)
+        if row is None:
+            raise NotFound("회원 정보를 찾을 수 없습니다.")
+        row.name = customer.name
+        row.phone = customer.phone
+        await self.session.flush()
         return to_domain(row)

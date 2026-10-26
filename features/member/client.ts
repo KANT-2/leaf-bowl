@@ -135,6 +135,65 @@ export async function logoutMember() {
   }
 }
 
+/** 서버에 저장된 내 정보 */
+export async function loadMember(): Promise<Member> {
+  return member(await backendRequest("/api/me", { auth: true }));
+}
+
+/** 이름·전화번호 수정. 보낸 항목만 바뀌고, 전화번호를 빈 문자열로 보내면 지운다. */
+export async function updateMember(patch: { name?: string; phone?: string }): Promise<Member> {
+  return member(await backendRequest("/api/me", { method: "PATCH", auth: true, json: patch }));
+}
+
+export interface LoginHistoryItem {
+  id: number;
+  result: "success" | "failure";
+  reason: string | null;
+  userAgent: string | null;
+  createdAt: string;
+}
+
+export interface LoginHistoryPage {
+  items: LoginHistoryItem[];
+  page: number;
+  totalPages: number;
+  total: number;
+}
+
+export interface LoginHistoryFilter {
+  result?: "success" | "failure";
+  from?: string;
+  to?: string;
+  page: number;
+  size?: number;
+}
+
+/** 내 로그인 이력 (최신순). 날짜는 YYYY-MM-DD, 한국 시간 기준이다. */
+export async function loadLoginHistory(filter: LoginHistoryFilter): Promise<LoginHistoryPage> {
+  const params = new URLSearchParams({ page: String(filter.page), size: String(filter.size ?? 10) });
+  for (const key of ["result", "from", "to"] as const) {
+    if (filter[key]) {
+      params.set(key, filter[key]);
+    }
+  }
+  const body = await backendRequest(`/api/me/login-history?${params}`, { auth: true });
+  if (!Array.isArray(body?.items) || !Number.isSafeInteger(body.total)) {
+    throw new Error("로그인 기록을 확인하지 못했습니다.");
+  }
+  return {
+    items: body.items.map((i: Record<string, unknown>) => ({
+      id: Number(i.id),
+      result: i.result === "success" ? "success" : "failure",
+      reason: typeof i.reason === "string" ? i.reason : null,
+      userAgent: typeof i.user_agent === "string" ? i.user_agent : null,
+      createdAt: String(i.created_at),
+    })),
+    page: Number(body.page),
+    totalPages: Number(body.total_pages),
+    total: body.total,
+  };
+}
+
 /** 회원 주문 접수 (결제 없이). 같은 key 로 다시 보내면 기존 주문이 돌아온다. */
 export async function submitMemberOrder(input: OrderInput, key: string): Promise<{ id: string; total: number }> {
   const body = await backendRequest("/api/v1/orders", {

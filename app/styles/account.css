@@ -28,7 +28,8 @@
 .auth-card form .form-btn {
   margin-top: 28px;
 }
-.auth-card .form-error {
+.auth-card .form-error,
+.mypage-form .form-error {
   margin: 16px 0 0;
   padding: 12px 14px;
   border-radius: 10px;
@@ -557,5 +558,59 @@
   }
   .pay-methods button {
     min-width: 100px;
+  }
+}
+
+/* 마이페이지 로그인 기록 */
+.login-history-filter {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  gap: 12px;
+  align-items: end;
+  margin: 16px 0;
+}
+.login-history-filter select {
+  width: 100%;
+}
+.login-history-list {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+}
+.login-history-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--color-surface-muted, #f4f3ee);
+  font-size: 14px;
+}
+.login-history-list .badge {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+  background: #e3f0e6;
+  color: #1f5c35;
+}
+.login-history-list li.failure .badge {
+  background: #fbeceb;
+  color: var(--color-danger);
+}
+.login-history-list .reason {
+  color: var(--color-danger);
+}
+.login-history-pager {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+}
+@media (max-width: 640px) {
+  .login-history-filter {
+    grid-template-columns: 1fr 1fr;
   }
 }

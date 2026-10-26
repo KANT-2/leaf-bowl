@@ -3,7 +3,14 @@
 import { createContext, useCallback, useContext, useMemo, useSyncExternalStore } from "react";
 import { userStore } from "@/infrastructure/browser/profile-store";
 import { memberTokenStore } from "@/infrastructure/browser/member-token";
-import { loginMember, logoutMember, signupMember, type Member } from "@/features/member/client";
+import {
+  loadMember,
+  loginMember,
+  logoutMember,
+  signupMember,
+  updateMember,
+  type Member,
+} from "@/features/member/client";
 import { type Address, type UserProfile } from "@/modules/profile/types";
 
 import {
@@ -21,7 +28,10 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   signup: (input: { email: string; password: string; name: string; phone?: string }) => Promise<void>;
   logout: () => Promise<void>;
-  updateProfile: (patch: Partial<Pick<UserProfile, "name" | "email" | "phone">>) => void;
+  /** 서버(FastAPI)에 저장된 이름·전화번호를 다시 불러온다 */
+  refreshProfile: () => Promise<Member>;
+  /** 이름·전화번호를 서버에 저장하고, 저장된 값으로 화면을 맞춘다 */
+  updateProfile: (patch: { name?: string; phone?: string }) => Promise<Member>;
   addAddress: (input: Omit<Address, "id">) => void;
   updateAddress: (id: string, patch: Partial<Omit<Address, "id">>) => void;
   removeAddress: (id: string) => void;
@@ -53,7 +63,8 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     // 다른 회원이 같은 브라우저로 로그인하면 이전 회원의 주소·취향을 이어받지 않는다
     const previous = current?.email === member.email ? current : null;
     const profile = loginProfile(previous, { name: member.name, email: member.email, provider: "email" });
-    userStore.set({ ...profile, phone: profile.phone || member.phone || "" });
+    // 이름·전화번호는 서버 값이 기준이다 (다른 기기에서 바꾼 값도 반영)
+    userStore.set({ ...profile, name: member.name, phone: member.phone ?? "" });
   }, []);
 
   const signup = useCallback(
@@ -72,12 +83,20 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     }
   }, []);
 
-  const updateProfile = useCallback((patch: Partial<Pick<UserProfile, "name" | "email" | "phone">>) => {
+  const applyMember = useCallback((member: Member) => {
     const current = userStore.getSnapshot();
     if (current) {
-      userStore.set({ ...current, ...patch });
+      userStore.set({ ...current, name: member.name, phone: member.phone ?? "" });
     }
+    return member;
   }, []);
+
+  const refreshProfile = useCallback(async () => applyMember(await loadMember()), [applyMember]);
+
+  const updateProfile = useCallback(
+    async (patch: { name?: string; phone?: string }) => applyMember(await updateMember(patch)),
+    [applyMember],
+  );
 
   const addAddress = useCallback((input: Omit<Address, "id">) => {
     const current = userStore.getSnapshot();
@@ -125,6 +144,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       login,
       signup,
       logout,
+      refreshProfile,
       updateProfile,
       addAddress,
       updateAddress,
@@ -138,6 +158,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       login,
       signup,
       logout,
+      refreshProfile,
       updateProfile,
       addAddress,
       updateAddress,

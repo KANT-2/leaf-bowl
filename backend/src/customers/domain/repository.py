@@ -13,3 +13,7 @@ class CustomerRepository(Protocol):
     async def add(self, customer: Customer) -> Customer:
         """저장 후 id 가 채워진 회원을 돌려준다. 이메일이 이미 있으면 Conflict."""
         ...
+
+    async def save_profile(self, customer: Customer) -> Customer:
+        """이름·전화번호 변경을 반영하고 저장된 회원을 돌려준다."""
+        ...

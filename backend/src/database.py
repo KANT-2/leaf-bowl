@@ -61,6 +61,16 @@ async def get_session() -> AsyncIterator[AsyncSession]:
         yield session
 
 
+def new_session() -> AsyncSession:
+    """요청 밖(BackgroundTasks 등)에서 쓸 새 세션. 응답이 끝나면 요청 세션은 이미 닫혀 있다.
+
+    async with new_session() as session: ...
+    """
+    get_engine()
+    assert _session_factory is not None
+    return _session_factory()
+
+
 async def init_db() -> None:
     """FastAPI 소유 테이블만 만든다. 이미 있으면 건드리지 않는다."""
     import models  # noqa: F401  각 기능의 ORM 모델을 Base.metadata 에 등록한다
