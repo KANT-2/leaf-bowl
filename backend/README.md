@@ -120,10 +120,23 @@ src/
     ├── presentation/    router.py, schemas.py
     ├── application/     service.py
     ├── domain/          순수 파이썬 업무 규칙
-    └── infrastructure/  models.py, repositories.py
+    ├── infrastructure/  models.py, repositories.py
+    └── container.py     조립: 응용 서비스에 어떤 인프라 구현을 넣을지 정함 (계층 밖, orders 적용)
 ```
 
 의존 방향은 `presentation → application → domain ← infrastructure` 이고, domain 은 FastAPI·SQLAlchemy·Pydantic 을 import 하지 않습니다.
+
+| 계층 | 맡는 일 | import 할 수 있는 것 |
+| --- | --- | --- |
+| presentation | 요청·응답 검증, 응용 서비스 호출, 결과를 HTTP 응답으로 | application, domain, fastapi·pydantic, core |
+| application | 조회 → 도메인 행위 → 저장 → commit 조율 | domain (Repository 는 domain 의 Protocol 로만 안다) |
+| domain | 값 검증·업무 규칙·상태 전이 (순수 파이썬) | domain, `core.exceptions` |
+| infrastructure | ORM 모델, SQL, ORM ↔ 도메인 변환 | domain, sqlalchemy |
+
+`SqlOrderRepository` 같은 구현을 서비스에 넣는 일은 계층 밖의 `container.py` 가 맡습니다.
+그래서 router 는 `Depends(get_order_service)` 로 서비스만 받고 SQLAlchemy 를 모릅니다.
+규칙은 `tests/test_layers.py` 가 import 를 분석해 검사합니다. 위반하면 파일:줄과 이유가 나옵니다.
+현재 검사 대상은 `orders` 이고, 다른 기능도 정리되면 `CHECKED` 에 추가합니다.
 
 ## 인증 (OAuth2 · JWT · 블랙리스트)
 
