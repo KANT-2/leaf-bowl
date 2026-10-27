@@ -15,7 +15,7 @@ type TokenIssue = { access_token?: unknown; token_type?: unknown; expires_in?: u
 
 type JwtPayload = { sub?: unknown; role?: unknown };
 
-function apiOrigin(): string {
+export function apiOrigin(): string {
   const base = process.env.BACKEND_URL || "http://127.0.0.1:8000";
   const parsed = new URL(base);
   if (

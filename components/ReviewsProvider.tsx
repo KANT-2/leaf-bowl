@@ -16,6 +16,7 @@ import { startReviewMigration } from "@/features/reviews/migration";
 import { createLocalStore } from "@/infrastructure/browser/local-store";
 import { statsOf, type Review, type ReviewStats } from "@/modules/reviews/model";
 import { REVIEW_KEY, loadUserReviews, saveUserReviews } from "@/infrastructure/browser/review-storage";
+import { memberTokenStore } from "@/infrastructure/browser/member-token";
 
 const EMPTY: Review[] = [];
 const store = createLocalStore<Review[]>(REVIEW_KEY, loadUserReviews, saveUserReviews, EMPTY);
@@ -29,6 +30,12 @@ interface ReviewsContextValue {
   statsFor: (pid: number) => ReviewStats;
   /** 리뷰를 서버에 등록한다. photos 는 브라우저에서 줄인 사진(data: 주소)이며 서버가 파일로 저장한다. */
   addReview: (review: Review, photos?: string[]) => Promise<void>;
+}
+
+/** 회원이면 토큰을 붙여 서버가 회원 주문 품목도 확인하게 한다 (비회원 주문은 세션 쿠키로 확인) */
+function memberAuthorization(): Record<string, string> {
+  const token = memberTokenStore.current();
+  return token ? { authorization: `Bearer ${token}` } : {};
 }
 
 const ReviewsContext = createContext<ReviewsContextValue | null>(null);
@@ -48,7 +55,7 @@ export default function ReviewsProvider({ children }: { children: React.ReactNod
   const [submissions, setSubmissions] = useState<{ reviewId: string; orderItemId: string }[]>([]);
   useEffect(() => {
     const controller = new AbortController();
-    fetch("/api/reviews", { cache: "no-store", signal: controller.signal })
+    fetch("/api/reviews", { cache: "no-store", headers: memberAuthorization(), signal: controller.signal })
       .then(async (response) => {
         const body = response.ok ? await response.json() : null;
         if (!controller.signal.aborted) {
@@ -111,7 +118,7 @@ export default function ReviewsProvider({ children }: { children: React.ReactNod
   const addReview = useCallback(async (review: Review, photos: string[] = []) => {
     const response = await fetch("/api/reviews", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...memberAuthorization() },
       body: JSON.stringify({ ...review, photos }),
       signal: AbortSignal.timeout(30_000),
     });
