@@ -103,7 +103,7 @@
   font-size: 19px;
 }
 .hero-sticker span {
-  font-size: 10px;
+  font-size: var(--type-meta);
   margin-top: 12px;
   letter-spacing: 2px;
 }
@@ -189,7 +189,7 @@
   border: 1px solid #d5e0d673;
   background: none;
   color: #d5e0d6;
-  font-size: 9px;
+  font-size: var(--type-body);
   letter-spacing: -1px;
   cursor: pointer;
   display: inline-flex;
@@ -224,7 +224,7 @@
   padding: 40px 0;
 }
 .pill {
-  font-size: 9px;
+  font-size: var(--type-meta);
   letter-spacing: 1.5px;
   color: var(--color-brand);
   border: 1px solid #799466;
@@ -253,7 +253,7 @@
   padding-left: 35px;
 }
 .monthly-caption > span {
-  font-size: 9px;
+  font-size: var(--type-meta);
   color: #667866;
   letter-spacing: 1.4px;
   display: block;
@@ -265,7 +265,7 @@
   margin: 17px 0;
 }
 .monthly-caption > span:last-child {
-  font-size: 11px;
+  font-size: var(--type-meta);
   letter-spacing: 0;
 }
 /* 시즌 메뉴가 여러 장이면 가운데 사진 바로 밑에 화살표를 둔다 */
@@ -342,7 +342,7 @@
   font-weight: 600;
 }
 .filters span {
-  font-size: 10px;
+  font-size: var(--type-meta);
   letter-spacing: 1px;
   margin-left: 5px;
 }
@@ -457,7 +457,7 @@
 .allergy p {
   margin: 0;
   color: var(--color-muted);
-  font-size: 11px;
+  font-size: var(--type-body);
   line-height: 1.9;
 }
 
@@ -529,7 +529,7 @@
   line-height: 1.4;
 }
 .rs-info .small-label {
-  font-size: 10px;
+  font-size: var(--type-body);
   letter-spacing: 1px;
   margin-bottom: 4px;
 }
@@ -555,7 +555,7 @@
   font-size: 13px;
 }
 .rs-info p {
-  font-size: 11px;
+  font-size: var(--type-body);
   color: #637561;
   margin: 2px 0 0;
 }
@@ -598,12 +598,12 @@
   margin-top: auto;
   padding-top: 10px;
   gap: 8px;
-  font-size: 11px;
+  font-size: var(--type-body);
 }
 .rs .review-avatar {
   width: 24px;
   height: 24px;
-  font-size: 11px;
+  font-size: var(--type-body);
 }
 .rs-bar {
   height: 3px;
@@ -751,7 +751,7 @@
 }
 @media (max-width: 600px) {
   .announcement {
-    font-size: 10px;
+    font-size: var(--type-body);
   }
   .hero-inner {
     display: flex;
@@ -796,7 +796,7 @@
   .hero-bottom {
     padding-top: 12px;
     padding-bottom: 18px;
-    font-size: 10px;
+    font-size: var(--type-body);
     letter-spacing: 0.7px;
     justify-content: center;
   }
@@ -839,7 +839,7 @@
     padding: 6px 0 0;
   }
   .pill {
-    font-size: 11px;
+    font-size: var(--type-meta);
     padding: 6px 8px;
   }
   #menu .section-title {
@@ -893,7 +893,7 @@
     font-size: 21px;
   }
   .match-banner p {
-    font-size: 11px;
+    font-size: var(--type-body);
     line-height: 1.8;
   }
   .match-banner .primary {
@@ -907,7 +907,7 @@
   }
   .allergy p {
     margin-top: 12px;
-    font-size: 10px;
+    font-size: var(--type-body);
   }
   .reviews {
     margin-top: 12px;
@@ -1007,7 +1007,7 @@
 }
 .mf-sub {
   margin: 2px 0 10px;
-  font-size: 10.5px;
+  font-size: var(--type-body);
   color: #687863;
   line-height: 1.6;
 }

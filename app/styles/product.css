@@ -64,7 +64,7 @@
 }
 .origin-note {
   margin: 12px 0 0;
-  font-size: 11px;
+  font-size: var(--type-body);
   color: var(--color-muted);
 }
 .pv-photo .food-image {
@@ -154,7 +154,7 @@
 }
 .pv-kcal span {
   display: block;
-  font-size: 11px;
+  font-size: var(--type-body);
   color: var(--color-muted);
 }
 .pv-info .allergen-box {
@@ -376,7 +376,7 @@
     grid-template-columns: 1fr;
   }
   .dialog-bottom .primary {
-    font-size: 11px;
+    font-size: var(--type-body);
     padding: 15px 12px;
     gap: 8px;
   }

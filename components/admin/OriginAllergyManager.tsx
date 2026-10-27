@@ -2,10 +2,11 @@
 import type { CatalogConfig } from "@/modules/settings/schema";
 
 import { Fragment, useState } from "react";
-import { Plus, Pencil, Search, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
+import SearchField from "@/components/controls/SearchField";
 import { Button } from "./button";
 import { Input } from "./input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./dialog";
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./dialog";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "./table";
 import { type Catalog, type Ingredient } from "@/modules/catalog/schema";
 import { ingredientAllergens, matchesIngredient } from "@/modules/catalog/allergens";
@@ -164,18 +165,16 @@ export default function OriginAllergyManager({
         ))}
       </div>
       <div className="origin-filters">
-        <div className="origin-search">
-          <Search size={18} aria-hidden="true" />
-          <Input
-            aria-label="원산지 재료 검색"
-            placeholder="재료 이름, 원산지 검색"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setPage(1);
-            }}
-          />
-        </div>
+        <SearchField
+          className="admin-search admin-search-wide"
+          label="원산지 재료 검색"
+          placeholder="재료 이름, 원산지 검색"
+          value={query}
+          onChange={(value) => {
+            setQuery(value);
+            setPage(1);
+          }}
+        />
         <select
           aria-label="알레르기 필터"
           value={allergen}
@@ -394,122 +393,124 @@ export default function OriginAllergyManager({
             <DialogTitle>재료 수정</DialogTitle>
             <DialogDescription>저장하면 이 재료를 사용하는 메뉴의 알레르기 안내에 반영됩니다.</DialogDescription>
           </DialogHeader>
-          {editing && (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void save();
-              }}
-            >
-              <fieldset disabled={busy}>
-                <div className="form-grid">
-                  <label className="field">
-                    재료 이름
-                    <Input
-                      required
-                      maxLength={80}
-                      value={editing.name}
-                      onChange={(e) => setEditing({ ...editing, name: e.target.value })}
-                    />
-                  </label>
-                  <label className="field">
-                    분류
-                    <Input
-                      required
-                      maxLength={80}
-                      list="origin-categories"
-                      value={editing.category}
-                      onChange={(e) => setEditing({ ...editing, category: e.target.value })}
-                    />
-                    <datalist id="origin-categories">
-                      {config.ingredientCategories.map((x) => (
-                        <option key={x} value={x} />
-                      ))}
-                    </datalist>
-                  </label>
-                  <label className="field">
-                    원산지
-                    <Input
-                      maxLength={100}
-                      list="origin-countries"
-                      value={editing.origin ?? ""}
-                      onChange={(e) => setEditing({ ...editing, origin: e.target.value })}
-                      placeholder="예: 국내산, 미국산"
-                    />
-                    <datalist id="origin-countries">
-                      {config.originCountries.map((x) => (
-                        <option key={x} value={x} />
-                      ))}
-                    </datalist>
-                  </label>
-                  <label className="field">
-                    원산지 상세 (선택)
-                    <Input
-                      maxLength={300}
-                      value={editing.originDetail ?? ""}
-                      onChange={(e) => setEditing({ ...editing, originDetail: e.target.value })}
-                      placeholder="예: 콩 미국산, 흰다리새우"
-                    />
-                  </label>
-                </div>
-                <fieldset className="field">
-                  <legend>알레르기</legend>
-                  <div className="allergen-options">
-                    {[
-                      ...new Set([
-                        ...(showAll ? config.allergenOptions : config.allergenOptions.slice(0, 5)),
-                        ...split(editing.allergens),
-                      ]),
-                    ].map((value) => (
-                      <Button
-                        type="button"
-                        key={value}
-                        variant={split(editing.allergens).includes(value) ? "default" : "outline"}
-                        aria-pressed={split(editing.allergens).includes(value)}
-                        onClick={() =>
-                          setEditing({
-                            ...editing,
-                            allergens: split(editing.allergens).includes(value)
-                              ? split(editing.allergens)
-                                  .filter((x) => x !== value)
-                                  .join(", ")
-                              : [...split(editing.allergens), value].join(", "),
-                          })
-                        }
-                      >
-                        {value}
-                        {split(editing.allergens).includes(value) ? " ✓" : ""}
-                      </Button>
-                    ))}
-                    {config.allergenOptions.length > 5 && (
-                      <Button type="button" variant="ghost" onClick={() => setShowAll(!showAll)}>
-                        {showAll ? "접기" : `+ ${config.allergenOptions.length - 5}개 더보기`}
-                      </Button>
-                    )}
+          <DialogBody>
+            {editing && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void save();
+                }}
+              >
+                <fieldset disabled={busy}>
+                  <div className="form-grid">
+                    <label className="field">
+                      재료 이름
+                      <Input
+                        required
+                        maxLength={80}
+                        value={editing.name}
+                        onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                      />
+                    </label>
+                    <label className="field">
+                      분류
+                      <Input
+                        required
+                        maxLength={80}
+                        list="origin-categories"
+                        value={editing.category}
+                        onChange={(e) => setEditing({ ...editing, category: e.target.value })}
+                      />
+                      <datalist id="origin-categories">
+                        {config.ingredientCategories.map((x) => (
+                          <option key={x} value={x} />
+                        ))}
+                      </datalist>
+                    </label>
+                    <label className="field">
+                      원산지
+                      <Input
+                        maxLength={100}
+                        list="origin-countries"
+                        value={editing.origin ?? ""}
+                        onChange={(e) => setEditing({ ...editing, origin: e.target.value })}
+                        placeholder="예: 국내산, 미국산"
+                      />
+                      <datalist id="origin-countries">
+                        {config.originCountries.map((x) => (
+                          <option key={x} value={x} />
+                        ))}
+                      </datalist>
+                    </label>
+                    <label className="field">
+                      원산지 상세 (선택)
+                      <Input
+                        maxLength={300}
+                        value={editing.originDetail ?? ""}
+                        onChange={(e) => setEditing({ ...editing, originDetail: e.target.value })}
+                        placeholder="예: 콩 미국산, 흰다리새우"
+                      />
+                    </label>
                   </div>
+                  <fieldset className="field">
+                    <legend>알레르기</legend>
+                    <div className="allergen-options">
+                      {[
+                        ...new Set([
+                          ...(showAll ? config.allergenOptions : config.allergenOptions.slice(0, 5)),
+                          ...split(editing.allergens),
+                        ]),
+                      ].map((value) => (
+                        <Button
+                          type="button"
+                          key={value}
+                          variant={split(editing.allergens).includes(value) ? "default" : "outline"}
+                          aria-pressed={split(editing.allergens).includes(value)}
+                          onClick={() =>
+                            setEditing({
+                              ...editing,
+                              allergens: split(editing.allergens).includes(value)
+                                ? split(editing.allergens)
+                                    .filter((x) => x !== value)
+                                    .join(", ")
+                                : [...split(editing.allergens), value].join(", "),
+                            })
+                          }
+                        >
+                          {value}
+                          {split(editing.allergens).includes(value) ? " ✓" : ""}
+                        </Button>
+                      ))}
+                      {config.allergenOptions.length > 5 && (
+                        <Button type="button" variant="ghost" onClick={() => setShowAll(!showAll)}>
+                          {showAll ? "접기" : `+ ${config.allergenOptions.length - 5}개 더보기`}
+                        </Button>
+                      )}
+                    </div>
+                  </fieldset>
+                  <p className="meta">
+                    사용 중인 메뉴:{" "}
+                    {usedBy(editing)
+                      .map((p) => p.name)
+                      .join(" · ") || "없음"}
+                  </p>
                 </fieldset>
-                <p className="meta">
-                  사용 중인 메뉴:{" "}
-                  {usedBy(editing)
-                    .map((p) => p.name)
-                    .join(" · ") || "없음"}
-                </p>
-              </fieldset>
-              {error && (
-                <p className="error" role="alert">
-                  {error}
-                </p>
-              )}
-              <div className="form-footer">
-                <Button type="button" variant="outline" disabled={busy} onClick={() => setEditing(null)}>
-                  취소
-                </Button>
-                <Button disabled={busy} type="submit">
-                  {busy ? "저장 중…" : "저장"}
-                </Button>
-              </div>
-            </form>
-          )}
+                {error && (
+                  <p className="error" role="alert">
+                    {error}
+                  </p>
+                )}
+                <div className="form-footer">
+                  <Button type="button" variant="outline" disabled={busy} onClick={() => setEditing(null)}>
+                    취소
+                  </Button>
+                  <Button disabled={busy} type="submit">
+                    {busy ? "저장 중…" : "저장"}
+                  </Button>
+                </div>
+              </form>
+            )}
+          </DialogBody>
         </DialogContent>
       </Dialog>
       <AlertDialog

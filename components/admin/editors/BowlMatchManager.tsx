@@ -10,8 +10,17 @@ import {
   AlertDialogTitle,
 } from "@/components/admin/alert-dialog";
 import { Button } from "@/components/admin/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/admin/dialog";
+import {
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/admin/dialog";
 import { Input } from "@/components/admin/input";
+import SearchField from "@/components/controls/SearchField";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/admin/table";
 import { type Catalog, type Ingredient } from "@/modules/catalog/schema";
 import { GripVertical, Info, Pencil, Plus, Trash2 } from "lucide-react";
@@ -313,259 +322,265 @@ export default function BowlMatchManager({
               원산지 및 알레르기 관리에 저장된 재료를 사용합니다. 여기서는 가격·선택 단계·노출 상태를 설정하세요.
             </DialogDescription>
           </DialogHeader>
-          <ol className="bowl-registration-steps" aria-label="재료 등록 단계">
-            <li aria-current={choosing ? "step" : undefined}>
-              <span>1</span> 재료 선택
-            </li>
-            <li aria-current={!choosing ? "step" : undefined}>
-              <span>2</span> 표시 설정
-            </li>
-          </ol>
-          {choosing && (
-            <div className="bowl-registration-selection">
-              <label className="field">
-                등록 재료 선택
-                <Input
-                  value={search}
-                  disabled={busy}
-                  placeholder="재료 이름으로 검색하세요"
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </label>
-              <div className="bowl-registration-filters" aria-label="재료 분류">
-                {["", ...categories].map((category) => (
-                  <Button
-                    key={category}
-                    type="button"
-                    variant={categoryFilter === category ? "default" : "outline"}
+          <DialogBody>
+            <ol className="bowl-registration-steps" aria-label="재료 등록 단계">
+              <li aria-current={choosing ? "step" : undefined}>
+                <span>1</span> 재료 선택
+              </li>
+              <li aria-current={!choosing ? "step" : undefined}>
+                <span>2</span> 표시 설정
+              </li>
+            </ol>
+            {choosing && (
+              <div className="bowl-registration-selection">
+                <div className="field">
+                  등록 재료 선택
+                  <SearchField
+                    className="admin-search admin-search-wide"
+                    label="등록 재료 선택"
+                    value={search}
                     disabled={busy}
-                    aria-pressed={categoryFilter === category}
-                    onClick={() => setCategoryFilter(category)}
-                  >
-                    {category || "전체"}
-                  </Button>
-                ))}
-              </div>
-              <p className="meta">
-                {categoryFilter || "전체"}{" "}
-                {
-                  visible.filter(
-                    (item) =>
-                      (!categoryFilter || item.category === categoryFilter) &&
-                      item.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()),
-                  ).length
-                }
-                개
-              </p>
-              <div className="bowl-registration-cards" role="radiogroup" aria-label="등록 재료 선택">
-                {visible
-                  .filter(
-                    (item) =>
-                      (!categoryFilter || item.category === categoryFilter) &&
-                      item.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()),
-                  )
-                  .map((item) => (
-                    <label
-                      key={item.id}
-                      className={"bowl-registration-card" + (editing?.id === item.id ? " selected" : "")}
-                    >
-                      <Photo src={item.image} name={item.name} />
-                      <span>
-                        <strong>{item.name}</strong>
-                        <small>{item.category}</small>
-                      </span>
-                      <input
-                        type="radio"
-                        name="bowl-registered-ingredient"
-                        value={item.id}
-                        checked={editing?.id === item.id}
-                        disabled={busy}
-                        onChange={() =>
-                          setEditing(
-                            editing?.id === item.id
-                              ? editing
-                              : { ...item, status: item.status === "hidden" ? "active" : item.status },
-                          )
-                        }
-                      />
-                    </label>
-                  ))}
-              </div>
-              {!visible.some(
-                (item) =>
-                  (!categoryFilter || item.category === categoryFilter) &&
-                  item.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()),
-              ) && <p className="empty">조건에 맞는 재료가 없습니다.</p>}
-              <div className="bowl-registration-summary" aria-live="polite">
-                <strong>선택한 재료</strong>
-                {editing ? (
-                  <>
-                    <Photo src={editing.image} name={editing.name} />
-                    <span>{editing.name}</span>
-                    <small>{editing.category}</small>
-                  </>
-                ) : (
-                  <span>재료를 선택해주세요</span>
-                )}
-              </div>
-              <div className="form-footer bowl-registration-footer">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={busy}
-                  onClick={() => {
-                    setChoosing(false);
-                    setEditing(null);
-                    window.location.hash = "origins";
-                  }}
-                >
-                  재료가 없나요? 재료 관리에서 등록 ›
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() => {
-                    setChoosing(false);
-                    setEditing(null);
-                  }}
-                >
-                  취소
-                </Button>
-                <Button type="button" disabled={busy || !editing} onClick={() => setChoosing(false)}>
-                  다음: 표시 설정 ›
-                </Button>
-              </div>
-            </div>
-          )}
-          {editing && !choosing && (
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                if (busy) {
-                  return;
-                }
-                const source = items.find((item) => item.id === editing.id && !item.deleted);
-                if (!source) {
-                  setError("등록 재료가 변경되었습니다. 목록을 다시 확인해주세요.");
-                  return;
-                }
-                if (
-                  await persist(
-                    items.map((item) =>
-                      item.id === source.id
-                        ? {
-                            ...item,
-                            price: editing.price ?? 0,
-                            stage: editing.stage ?? "TOPPINGS",
-                            status: editing.status,
-                          }
-                        : item,
-                    ),
-                  )
-                ) {
-                  setEditing(null);
-                  setChoosing(false);
-                }
-              }}
-            >
-              <fieldset disabled={busy}>
-                <div className="form-grid">
-                  <div>
-                    <div className="field">
-                      <strong>{editing.name}</strong>
-                      <p className="meta">분류: {editing.category}</p>
-                      <p className="meta">
-                        원산지: {editing.origin || "미입력"}
-                        {editing.originDetail ? ` · ${editing.originDetail}` : ""}
-                      </p>
-                      <p className="meta">알레르기: {editing.allergens || "등록된 안내 없음"}</p>
-                    </div>
-                    <label className="field">
-                      추가 가격
-                      <Input
-                        type="number"
-                        min={0}
-                        max={1000000}
-                        value={editing.price ?? 0}
-                        onChange={(e) =>
-                          setEditing({
-                            ...editing,
-                            price: Number(e.target.value),
-                          })
-                        }
-                      />
-                    </label>
-                    <label className="field">
-                      선택 단계
-                      <Picker
-                        label="재료 선택 단계"
-                        value={editing.stage ?? "TOPPINGS"}
-                        options={[
-                          ["GREENS", "채소"],
-                          ["PROTEIN", "단백질"],
-                          ["VEGGIES", "추가 채소"],
-                          ["TOPPINGS", "토핑"],
-                        ]}
-                        onChange={(v) =>
-                          setEditing({
-                            ...editing,
-                            stage: v as Ingredient["stage"],
-                          })
-                        }
-                      />
-                    </label>
-                    <label className="field">
-                      카드 상태
-                      <Picker
-                        label="재료 카드 상태"
-                        value={editing.status}
-                        options={Object.entries(labels)}
-                        onChange={(v) =>
-                          setEditing({
-                            ...editing,
-                            status: v as Ingredient["status"],
-                          })
-                        }
-                      />
-                    </label>
-                  </div>
-                  <div>
-                    <div className="field">
-                      등록된 재료 이미지
-                      <Photo src={editing.image} name={editing.name} className="upload-photo" />
-                    </div>
-                    <div className="field">
-                      등록된 재료 설명<p className="muted">{editing.description || "등록된 설명 없음"}</p>
-                    </div>
-                  </div>
+                    placeholder="재료 이름으로 검색하세요"
+                    onChange={setSearch}
+                  />
                 </div>
-              </fieldset>
-              {error && (
-                <p role="alert" className="error">
-                  {error}
+                <div className="bowl-registration-filters" aria-label="재료 분류">
+                  {["", ...categories].map((category) => (
+                    <Button
+                      key={category}
+                      type="button"
+                      variant={categoryFilter === category ? "default" : "outline"}
+                      disabled={busy}
+                      aria-pressed={categoryFilter === category}
+                      onClick={() => setCategoryFilter(category)}
+                    >
+                      {category || "전체"}
+                    </Button>
+                  ))}
+                </div>
+                <p className="meta">
+                  {categoryFilter || "전체"}{" "}
+                  {
+                    visible.filter(
+                      (item) =>
+                        (!categoryFilter || item.category === categoryFilter) &&
+                        item.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()),
+                    ).length
+                  }
+                  개
                 </p>
-              )}
-              <div className="form-footer">
-                <Button type="button" variant="ghost" disabled={busy} onClick={() => setChoosing(true)}>
-                  ‹ 이전: 재료 선택
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() => {
+                <div className="bowl-registration-cards" role="radiogroup" aria-label="등록 재료 선택">
+                  {visible
+                    .filter(
+                      (item) =>
+                        (!categoryFilter || item.category === categoryFilter) &&
+                        item.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()),
+                    )
+                    .map((item) => (
+                      <label
+                        key={item.id}
+                        className={"bowl-registration-card" + (editing?.id === item.id ? " selected" : "")}
+                      >
+                        <Photo src={item.image} name={item.name} />
+                        <span>
+                          <strong>{item.name}</strong>
+                          <small>{item.category}</small>
+                        </span>
+                        <input
+                          type="radio"
+                          name="bowl-registered-ingredient"
+                          value={item.id}
+                          checked={editing?.id === item.id}
+                          disabled={busy}
+                          onChange={() =>
+                            setEditing(
+                              editing?.id === item.id
+                                ? editing
+                                : { ...item, status: item.status === "hidden" ? "active" : item.status },
+                            )
+                          }
+                        />
+                      </label>
+                    ))}
+                </div>
+                {!visible.some(
+                  (item) =>
+                    (!categoryFilter || item.category === categoryFilter) &&
+                    item.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()),
+                ) && <p className="empty">조건에 맞는 재료가 없습니다.</p>}
+                <div className="bowl-registration-summary" aria-live="polite">
+                  <strong>선택한 재료</strong>
+                  {editing ? (
+                    <>
+                      <Photo src={editing.image} name={editing.name} />
+                      <span>{editing.name}</span>
+                      <small>{editing.category}</small>
+                    </>
+                  ) : (
+                    <span>재료를 선택해주세요</span>
+                  )}
+                </div>
+              </div>
+            )}
+            {editing && !choosing && (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (busy) {
+                    return;
+                  }
+                  const source = items.find((item) => item.id === editing.id && !item.deleted);
+                  if (!source) {
+                    setError("등록 재료가 변경되었습니다. 목록을 다시 확인해주세요.");
+                    return;
+                  }
+                  if (
+                    await persist(
+                      items.map((item) =>
+                        item.id === source.id
+                          ? {
+                              ...item,
+                              price: editing.price ?? 0,
+                              stage: editing.stage ?? "TOPPINGS",
+                              status: editing.status,
+                            }
+                          : item,
+                      ),
+                    )
+                  ) {
                     setEditing(null);
                     setChoosing(false);
-                  }}
-                >
-                  취소
-                </Button>
-                <Button type="submit" disabled={busy}>
-                  설정 저장
-                </Button>
-              </div>
-            </form>
+                  }
+                }}
+              >
+                <fieldset disabled={busy}>
+                  <div className="form-grid">
+                    <div>
+                      <div className="field">
+                        <strong>{editing.name}</strong>
+                        <p className="meta">분류: {editing.category}</p>
+                        <p className="meta">
+                          원산지: {editing.origin || "미입력"}
+                          {editing.originDetail ? ` · ${editing.originDetail}` : ""}
+                        </p>
+                        <p className="meta">알레르기: {editing.allergens || "등록된 안내 없음"}</p>
+                      </div>
+                      <label className="field">
+                        추가 가격
+                        <Input
+                          type="number"
+                          min={0}
+                          max={1000000}
+                          value={editing.price ?? 0}
+                          onChange={(e) =>
+                            setEditing({
+                              ...editing,
+                              price: Number(e.target.value),
+                            })
+                          }
+                        />
+                      </label>
+                      <label className="field">
+                        선택 단계
+                        <Picker
+                          label="재료 선택 단계"
+                          value={editing.stage ?? "TOPPINGS"}
+                          options={[
+                            ["GREENS", "채소"],
+                            ["PROTEIN", "단백질"],
+                            ["VEGGIES", "추가 채소"],
+                            ["TOPPINGS", "토핑"],
+                          ]}
+                          onChange={(v) =>
+                            setEditing({
+                              ...editing,
+                              stage: v as Ingredient["stage"],
+                            })
+                          }
+                        />
+                      </label>
+                      <label className="field">
+                        카드 상태
+                        <Picker
+                          label="재료 카드 상태"
+                          value={editing.status}
+                          options={Object.entries(labels)}
+                          onChange={(v) =>
+                            setEditing({
+                              ...editing,
+                              status: v as Ingredient["status"],
+                            })
+                          }
+                        />
+                      </label>
+                    </div>
+                    <div>
+                      <div className="field">
+                        등록된 재료 이미지
+                        <Photo src={editing.image} name={editing.name} className="upload-photo" />
+                      </div>
+                      <div className="field">
+                        등록된 재료 설명<p className="muted">{editing.description || "등록된 설명 없음"}</p>
+                      </div>
+                    </div>
+                  </div>
+                </fieldset>
+                {error && (
+                  <p role="alert" className="error">
+                    {error}
+                  </p>
+                )}
+                <div className="form-footer">
+                  <Button type="button" variant="ghost" disabled={busy} onClick={() => setChoosing(true)}>
+                    ‹ 이전: 재료 선택
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => {
+                      setEditing(null);
+                      setChoosing(false);
+                    }}
+                  >
+                    취소
+                  </Button>
+                  <Button type="submit" disabled={busy}>
+                    설정 저장
+                  </Button>
+                </div>
+              </form>
+            )}
+          </DialogBody>
+          {choosing && (
+            <DialogFooter className="form-footer bowl-registration-footer">
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={busy}
+                onClick={() => {
+                  setChoosing(false);
+                  setEditing(null);
+                  window.location.hash = "origins";
+                }}
+              >
+                재료가 없나요? 재료 관리에서 등록 ›
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy}
+                onClick={() => {
+                  setChoosing(false);
+                  setEditing(null);
+                }}
+              >
+                취소
+              </Button>
+              <Button type="button" disabled={busy || !editing} onClick={() => setChoosing(false)}>
+                다음: 표시 설정 ›
+              </Button>
+            </DialogFooter>
           )}
         </DialogContent>
       </Dialog>

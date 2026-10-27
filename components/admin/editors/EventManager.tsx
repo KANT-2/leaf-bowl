@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/admin/button";
 import { Input } from "@/components/admin/input";
+import SearchField from "@/components/controls/SearchField";
 import {
   eventSchema,
   eventStatus,
@@ -131,11 +132,12 @@ export default function EventManager() {
             </Button>
           ))}
         </div>
-        <Input
-          aria-label="이벤트 검색"
+        <SearchField
+          className="admin-search"
+          label="이벤트 검색"
           placeholder="이벤트 제목·내용 검색"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={setSearch}
         />
         <Button variant="secondary" disabled={busy || uploading} onClick={load}>
           최신 목록 불러오기

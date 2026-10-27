@@ -10,8 +10,16 @@ import {
   AlertDialogTitle,
 } from "@/components/admin/alert-dialog";
 import { Button } from "@/components/admin/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/admin/dialog";
-import { Input } from "@/components/admin/input";
+import {
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/admin/dialog";
+import SearchField from "@/components/controls/SearchField";
 import { Tabs, TabsList, TabsTrigger } from "@/components/admin/tabs";
 import { reviewDateTime, reviewMenuLabel } from "@/features/admin/catalog-presentation";
 import { type Catalog, type Review } from "@/modules/catalog/schema";
@@ -152,15 +160,15 @@ export default function ReviewManager({
             노출 중 {visible.length}개 · 삭제된 리뷰 {removed.length}개
           </span>
         </div>
-        <Input
-          aria-label="리뷰 검색"
+        <SearchField
+          className="admin-search"
+          label="리뷰 검색"
           placeholder="작성자, 메뉴, 리뷰 내용 검색"
           value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
+          onChange={(value) => {
+            setQuery(value);
             setReviewPage(1);
           }}
-          style={{ maxWidth: 320 }}
         />
       </div>
       <div className="review-calendar-controls">
@@ -443,94 +451,98 @@ export default function ReviewManager({
               {detail?.author} · {detail ? reviewDateTime(detail) : ""}
             </DialogDescription>
           </DialogHeader>
+          <DialogBody>
+            {detail && (
+              <>
+                <section aria-label="리뷰 첨부 이미지" className="review-attachments">
+                  {detail.images?.length ? (
+                    <>
+                      <h3>첨부 사진 {detail.images.length}장</h3>
+                      <div className="review-image-stage">
+                        <Image
+                          unoptimized
+                          width={1024}
+                          height={1024}
+                          className="review-large-image"
+                          src={detail.images[imageIndex] || detail.images[0]}
+                          alt={"리뷰 첨부 사진 " + (imageIndex + 1)}
+                        />
+                        {detail.images.length > 1 && (
+                          <>
+                            <button
+                              type="button"
+                              className="review-photo-arrow previous"
+                              aria-label="이전 리뷰 사진"
+                              disabled={imageIndex === 0}
+                              onClick={() => setImageIndex((i) => Math.max(0, i - 1))}
+                            >
+                              ←
+                            </button>
+                            <button
+                              type="button"
+                              className="review-photo-arrow next"
+                              aria-label="다음 리뷰 사진"
+                              disabled={imageIndex === detail.images.length - 1}
+                              onClick={() => setImageIndex((i) => Math.min(detail.images!.length - 1, i + 1))}
+                            >
+                              →
+                            </button>
+                            <span className="review-photo-counter" aria-live="polite">
+                              {imageIndex + 1} / {detail.images.length}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      <div className="review-image-thumbnails">
+                        {detail.images.map((src, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            className={imageIndex === i ? "selected" : ""}
+                            aria-label={"첨부 사진 " + (i + 1) + " 크게 보기"}
+                            aria-pressed={imageIndex === i}
+                            onClick={() => setImageIndex(i)}
+                          >
+                            <Image unoptimized width={1024} height={1024} src={src} alt={"첨부 사진 " + (i + 1)} />
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="meta">첨부된 사진이 없습니다.</p>
+                  )}
+                </section>
+                <div className="review-rating" aria-label={"별점 " + detail.rating + "점"}>
+                  {"★".repeat(detail.rating)}
+                  {"☆".repeat(5 - detail.rating)} <span>{detail.rating}.0</span>
+                </div>
+                <div className="meta">
+                  {reviewMenuLabel(detail)}
+                  {detail.deleted ? " · 삭제된 리뷰" : ""}
+                </div>
+                <p className="review-full-body">{detail.body}</p>
+              </>
+            )}
+          </DialogBody>
           {detail && (
-            <>
-              <section aria-label="리뷰 첨부 이미지" className="review-attachments">
-                {detail.images?.length ? (
-                  <>
-                    <h3>첨부 사진 {detail.images.length}장</h3>
-                    <div className="review-image-stage">
-                      <Image
-                        unoptimized
-                        width={1024}
-                        height={1024}
-                        className="review-large-image"
-                        src={detail.images[imageIndex] || detail.images[0]}
-                        alt={"리뷰 첨부 사진 " + (imageIndex + 1)}
-                      />
-                      {detail.images.length > 1 && (
-                        <>
-                          <button
-                            type="button"
-                            className="review-photo-arrow previous"
-                            aria-label="이전 리뷰 사진"
-                            disabled={imageIndex === 0}
-                            onClick={() => setImageIndex((i) => Math.max(0, i - 1))}
-                          >
-                            ←
-                          </button>
-                          <button
-                            type="button"
-                            className="review-photo-arrow next"
-                            aria-label="다음 리뷰 사진"
-                            disabled={imageIndex === detail.images.length - 1}
-                            onClick={() => setImageIndex((i) => Math.min(detail.images!.length - 1, i + 1))}
-                          >
-                            →
-                          </button>
-                          <span className="review-photo-counter" aria-live="polite">
-                            {imageIndex + 1} / {detail.images.length}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                    <div className="review-image-thumbnails">
-                      {detail.images.map((src, i) => (
-                        <button
-                          key={i}
-                          type="button"
-                          className={imageIndex === i ? "selected" : ""}
-                          aria-label={"첨부 사진 " + (i + 1) + " 크게 보기"}
-                          aria-pressed={imageIndex === i}
-                          onClick={() => setImageIndex(i)}
-                        >
-                          <Image unoptimized width={1024} height={1024} src={src} alt={"첨부 사진 " + (i + 1)} />
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <p className="meta">첨부된 사진이 없습니다.</p>
-                )}
-              </section>
-              <div className="review-rating" aria-label={"별점 " + detail.rating + "점"}>
-                {"★".repeat(detail.rating)}
-                {"☆".repeat(5 - detail.rating)} <span>{detail.rating}.0</span>
-              </div>
-              <div className="meta">
-                {reviewMenuLabel(detail)}
-                {detail.deleted ? " · 삭제된 리뷰" : ""}
-              </div>
-              <p className="review-full-body">{detail.body}</p>
-              <div className="form-footer">
-                <Button type="button" variant="outline" onClick={() => setDetailId(null)}>
-                  닫기
+            <DialogFooter className="form-footer">
+              <Button type="button" variant="outline" onClick={() => setDetailId(null)}>
+                닫기
+              </Button>
+              {!detail.deleted && (
+                <Button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    setDetailId(null);
+                    setSelected(detail.id);
+                  }}
+                >
+                  <Trash2 size={15} />
+                  리뷰 삭제
                 </Button>
-                {!detail.deleted && (
-                  <Button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => {
-                      setDetailId(null);
-                      setSelected(detail.id);
-                    }}
-                  >
-                    <Trash2 size={15} />
-                    리뷰 삭제
-                  </Button>
-                )}
-              </div>
-            </>
+              )}
+            </DialogFooter>
           )}
         </DialogContent>
       </Dialog>

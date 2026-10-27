@@ -182,7 +182,7 @@
     display: block;
     margin-top: 7px;
     font:
-      400 11px/1.4 Arial,
+      400 12px/1.4 Arial,
       sans-serif;
     letter-spacing: 1.6px;
   }
@@ -251,7 +251,7 @@
     padding: 0 4px;
     display: grid;
     place-items: center;
-    font-size: 11px;
+    font-size: var(--type-meta);
     line-height: 1;
   }
 
@@ -282,7 +282,7 @@
     margin-left: 18px;
   }
   .section-title > a {
-    font-size: 11px;
+    font-size: var(--type-body);
     color: #778373;
   }
 
@@ -332,7 +332,7 @@
     border: 1px solid #799466;
     border-radius: 3px;
     padding: 6px 8px;
-    font-size: 11px;
+    font-size: var(--type-meta);
     font-weight: 400;
     letter-spacing: 0.8px;
     line-height: 1.9;
@@ -416,7 +416,7 @@
     font-weight: 400;
   }
   .card-rate small {
-    font-size: 11px;
+    font-size: var(--type-meta);
     color: var(--color-muted);
     margin-left: 4px;
   }
@@ -511,7 +511,7 @@
     overflow-wrap: anywhere;
   }
   .review-menu {
-    font-size: 11px;
+    font-size: var(--type-body);
     color: #7c8674;
     margin-top: auto;
     line-height: 1.7;
@@ -539,7 +539,7 @@
   }
   .review-author small {
     display: block;
-    font-size: 10px;
+    font-size: var(--type-body);
     color: var(--color-muted);
     margin-top: 3px;
   }
@@ -641,14 +641,14 @@
     background: #e8eedc;
     border-radius: 7px;
     padding: 12px;
-    font-size: 11px;
+    font-size: var(--type-body);
     line-height: 1.8;
     color: #637561;
   }
   .check-label {
     display: flex;
     gap: 8px;
-    font-size: 11px;
+    font-size: var(--type-body);
     line-height: 1.8;
     margin: 20px 0;
   }
@@ -709,7 +709,7 @@
     font-size: 23px;
   }
   footer .footer-sub {
-    font-size: 9px;
+    font-size: var(--type-body);
     letter-spacing: 0;
   }
   .footer-store {
@@ -797,7 +797,7 @@
     }
     .announcement {
       height: 29px;
-      font-size: 10px;
+      font-size: var(--type-body);
     }
     .header {
       height: auto;
@@ -836,10 +836,10 @@
       font-size: 24px;
     }
     .section-title h2 span {
-      font-size: 11px;
+      font-size: var(--type-body);
     }
     .section-title > a {
-      font-size: 10px;
+      font-size: var(--type-body);
     }
     .product-grid {
       grid-template-columns: repeat(2, 1fr);
@@ -875,7 +875,7 @@
     }
     .field input,
     .field select {
-      font-size: 11px;
+      font-size: var(--type-body);
       padding: 12px 8px;
     }
     .crumb {
@@ -947,7 +947,7 @@
     padding: clamp(6px, 2.4cqw, 9px) clamp(14px, 6cqw, 26px);
   }
   .product-photo .soldout-cover span {
-    font-size: clamp(10px, 5cqw, 12px);
+    font-size: var(--type-meta);
     padding: clamp(4px, 1.6cqw, 6px) clamp(8px, 3.5cqw, 12px);
   }
   .card-soldout {
@@ -968,7 +968,7 @@
     border-radius: 12px;
     background: var(--color-brand);
     color: var(--color-cream);
-    font-size: 11px;
+    font-size: var(--type-meta);
     font-weight: 600;
     line-height: 1.5;
     vertical-align: middle;
