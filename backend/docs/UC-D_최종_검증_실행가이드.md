@@ -138,3 +138,41 @@ uv run ruff check src/admin_orders tests/test_admin_order_status.py tests/test_a
 ```
 
 **팀 전체 `npm run lint`**는 과거 Prettier 342개 파일의 광범위한 포맷 경고가 있었으므로 D 변경 범위 검사와 별도로 보고하고 팀 코드 전체에 자동 `--write` 하지 않는다. **`backend/tests/test_orders_postgres.py`는 공유 DB의 public schema를 DROP할 수 있으므로 공유 DB에서 절대 실행하지 않는다.**
+
+## Redmine #888 · DB 커넥션 풀 튜닝 및 비교 (2026-10-27)
+
+`backend/src/database.py`의 기존 AsyncEngine·세션 수명 관리를 유지하면서 `DATABASE_POOL_SIZE`(기본 5), `DATABASE_MAX_OVERFLOW`(10), `DATABASE_POOL_TIMEOUT`(30초), `DATABASE_POOL_RECYCLE`(-1: 비활성)를 설정 가능하게 했다. 기본값은 SQLAlchemy의 기존 풀 동작과 같고 `pool_pre_ping` 및 선택적인 statement cache 비활성화도 유지한다. 설정 범위는 각각 1~50, 0~50, 0초 초과~300초, -1 또는 1~86400초이며 잘못된 값은 앱 설정 로딩 시 거부된다.
+
+### 격리 환경과 측정 방법
+
+- PostgreSQL 18.4, `127.0.0.1:55432`, 전용 `leaf_bowl_uc_d_test` DB, 데이터 디렉터리 `C:\dev\leaf-bowl\.data\uc-d-postgres-20261026`, 시스템 식별자 `7700979184671432628`을 서버 쿼리와 `pg_controldata`로 대조했다. 서버 `max_connections=100`; 측정 시작 시 주문 6건. 기존 `.env` 파일과 공용 Supabase는 사용하거나 변경하지 않았다.
+- 읽기 전용 `SELECT 1`과 실제 `SqlAdminOrderReader.list_all(20, None, OrderListFilter())`를 각각 비교했다. 설정마다 동시 요청 12개, 워밍업 24개, 단일 요청 20개, 본 측정 60개 × 3회. `pool_timeout=30`, `pool_recycle=-1`은 세 설정에서 동일하다.
+- 지연은 요청 전체 시간이다. checkout 시간은 세션 연결 요청부터 연결 획득까지로, **순수 큐 대기 외에 새 연결 생성과 pre-ping도 포함**한다. 최대 연결 수는 풀 checkout/checkin 이벤트로 측정했다. 처리량은 3회의 성공 요청 수 / 3회 실제 경과 시간이다.
+
+| 작업 | 설정 (size/overflow) | 단일 평균 ms | 처리량 req/s | 평균 ms | p50 / p95 ms | checkout 평균 / p95 ms | 오류 | 최대 사용 / 종료 시 대여 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| SELECT 1 | 기본 5/10 | 1.56 | 363.7 | 19.72 | 6.00 / 103.88 | 15.42 / 97.84 | 0 | 6 / 0 |
+| SELECT 1 | A 5/5 | 1.51 | 423.2 | 18.64 | 10.64 / 87.14 | 13.79 / 79.31 | 0 | 7 / 0 |
+| SELECT 1 | B 10/10 | 1.73 | 527.6 | 14.12 | 11.90 / 17.69 | 8.10 / 11.73 | 0 | 11 / 0 |
+| 관리자 주문 조회 | 기본 5/10 | 5.71 | 119.1 | 84.19 | 62.25 / 209.65 | 35.75 / 136.52 | 0 | 12 / 0 |
+| 관리자 주문 조회 | A 5/5 | 5.31 | 192.0 | 57.73 | 44.37 / 153.97 | 26.50 / 90.46 | 0 | 10 / 0 |
+| 관리자 주문 조회 | B 10/10 | 5.58 | 203.0 | 54.51 | 45.56 / 105.01 | 12.53 / 26.34 | 0 | 12 / 0 |
+
+로컬 12개 동시 요청에서는 B가 관리자 주문 조회의 처리량·p95·checkout 지연에서 가장 양호했고 오류와 연결 미반환이 없었다. **로컬 격리 환경의 조건부 권장값은 B(10/10)**이다. 운영 기본값 5/10은 유지한다. 주문 6건·단일 머신·한 번의 측정 세트이므로 운영 적용 전에 DB의 전체 연결 한도에서 앱 프로세스 수 × (pool size + overflow), 다른 사용자의 연결 수, p95를 함께 확인해야 한다. A는 최대 연결 수를 10개로 제한해야 할 때 대안이다. 실측에서 타임아웃은 0건이었고, 1/0 풀에 연결 하나를 점유해 둔 별도 실DB 테스트에서 0.05초 타임아웃 예외를 확인했다.
+
+### 재실행과 검증 범위
+
+기존 식별자가 같은 **폐기 가능한 로컬 클러스터**에만 아래 환경변수를 현재 셸 프로세스에 설정한 뒤 실행한다. 스크립트가 루프백 주소·포트·DB명·데이터 디렉터리·시스템 식별자·서버 연결 한도를 재확인한다. `TEST_DATABASE_URL`은 출력 파일에 기록하지 않는다.
+
+```powershell
+$env:TEST_DATABASE_URL = 'postgresql://<local-test-user>@127.0.0.1:55432/leaf_bowl_uc_d_test'
+$env:UC_D_TEST_DATA_DIRECTORY = 'C:\dev\leaf-bowl\.data\uc-d-postgres-20261026'
+$env:UC_D_TEST_SYSTEM_ID = '7700979184671432628'
+backend\.venv\Scripts\python.exe tools\uc_d_pool_benchmark.py
+cd backend
+.venv\Scripts\python.exe -m pytest tests/test_database_pool.py -q
+```
+
+`tests/test_database_pool.py`에서 설정 범위·기본값·엔진 옵션·종료 시 엔진 해제, 실DB checkout 타임아웃·관리자 주문 조회·연결 반환을 검증한다. 기존 관리자 상태 변경 서비스와 UC-C 세션 코드는 변경하지 않았다. 공용 DB, 실제 주문, 팀 공용 계정에는 벤치마크나 쓰기 테스트를 실행하지 않는다.
+
+실행 결과: 풀 설정 및 관리자 상태 변경 단위 테스트 27개, UC-C 주문 API Fake 테스트 44개, 새 풀 설정(2/1)을 적용한 실DB 관리자 상태 변경 트랜잭션 테스트 1개 통과. 수정 파일 Ruff와 `git diff --check` 통과. 벤치마크 직후 주문 수는 6건으로 시작 시와 같고 테스트 DB 접속 세션은 확인 쿼리 자체의 1개뿐이었다. 이후 별도 상태 변경 시험 주문 1건을 생성해 status/version/history가 함께 영속화되고 연결이 반환되는지 확인했다. 기존 동시성·롤백 검증은 변경 범위 밖이므로 반복 실행하지 않았다.
