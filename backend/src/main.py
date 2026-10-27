@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 
 import database
+from admin_orders.presentation.order_router import router as admin_order_query_router
 from admin_orders.presentation.router import router as admin_orders_router
 from auth.presentation.login_history import router as login_history_router
 from auth.presentation.router import router as auth_router
@@ -103,6 +104,7 @@ def create_app() -> FastAPI:
 
     # UC-D 관리자 로그인·로그아웃
     app.include_router(admin_orders_router)
+    app.include_router(admin_order_query_router)
 
     # 팀원들의 카탈로그·나만의 볼 API
     app.include_router(catalog_router)

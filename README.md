@@ -105,7 +105,7 @@ backend/src/<기능>/
 | OAuth2·JWT·블랙리스트 | [`core/security.py`](backend/src/core/security.py), `backend/src/auth`, 로그아웃 후 401 기록: [UC-C 실행 기록 3장](docs/uc-c-verification.md#3-api-실행-기록-정상--실패--권한--로그아웃-차단) |
 | CORS·로깅 | [`main.py`](backend/src/main.py), [`core/middleware.py`](backend/src/core/middleware.py) (토큰·본문은 기록하지 않음) |
 | 화면·API·DB 연동 | 위 팀원별 Use Case |
-| 예외·권한 처리 | [`core/exceptions.py`](backend/src/core/exceptions.py), [`core/exception_handlers.py`](backend/src/core/exception_handlers.py) — 400·401·403·404·409·422 |
+| 예외·권한 처리 | [`core/exceptions.py`](backend/src/core/exceptions.py), [`core/exception_handlers.py`](backend/src/core/exception_handlers.py) — 400·401·403·404·409·422, 계층별 흐름 그림: [UC-C 실행 기록 4장](docs/uc-c-verification.md#4-예외-처리-4계층) |
 | 문서화·재실행 | 이 README 의 [시작하기](#시작하기), [backend/README](backend/README.md) |
 | API 문서 | FastAPI 실행 후 http://localhost:8000/docs (Swagger UI) |
 

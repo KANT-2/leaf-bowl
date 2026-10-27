@@ -1,5 +1,7 @@
 """로그인 이력 도메인: 기록할 내용과 조회 조건 규칙. FastAPI·SQLAlchemy 를 모르는 순수 파이썬이다."""
 
+import csv
+import io
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, timedelta, timezone
 from enum import StrEnum
@@ -88,6 +90,34 @@ class LoginHistoryPage:
     @property
     def total_pages(self) -> int:
         return ceil(self.total / self.size) if self.total else 0
+
+
+# CSV 내보내기: 엑셀에서 바로 읽히는 한국어 열 이름과 값
+CSV_HEADER = ("일시(한국 시간)", "결과", "실패 이유", "기기 정보")
+RESULT_LABEL = {LoginResult.SUCCESS: "성공", LoginResult.FAILURE: "실패"}
+REASON_LABEL = {FailureReason.WRONG_PASSWORD: "비밀번호 불일치", FailureReason.WITHDRAWN: "탈퇴 회원"}
+_FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
+
+
+def csv_row(attempt: LoginAttempt) -> tuple[str, ...]:
+    return (
+        attempt.created_at.astimezone(KST).strftime("%Y-%m-%d %H:%M:%S"),
+        RESULT_LABEL[attempt.result],
+        REASON_LABEL[attempt.reason] if attempt.reason else "",
+        _safe_cell(attempt.user_agent or ""),
+    )
+
+
+def csv_line(values: tuple[str, ...]) -> str:
+    """값 하나를 CSV 한 줄(줄바꿈 포함)로. 쉼표·따옴표가 들어간 값은 따옴표로 감싼다."""
+    buffer = io.StringIO()
+    csv.writer(buffer, lineterminator="\r\n").writerow(values)
+    return buffer.getvalue()
+
+
+def _safe_cell(value: str) -> str:
+    # 기기 정보는 사용자가 보낸 값이라 = 로 시작하면 엑셀이 수식으로 실행할 수 있다 (CSV 수식 주입)
+    return "'" + value if value.startswith(_FORMULA_START) else value
 
 
 class LoginHistoryRepository(Protocol):
