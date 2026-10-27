@@ -7,7 +7,6 @@ import { useReviews } from "@/components/ReviewsProvider";
 import { loadServerOrders, type ServerOrderPage } from "@/features/orders/client";
 import { loadMemberOrders } from "@/features/member/client";
 import { CUSTOM_BOWL_PID, dateStr } from "@/modules/reviews/model";
-import { dateStr } from "@/modules/reviews/model";
 
 export interface ReviewableOrderItem {
   orderItemId: string;
@@ -32,8 +31,6 @@ const SOURCES: LoadOrders[] = [loadServerOrders, (cursor) => loadMemberOrders(cu
 /**
  * 로그인한 사용자가 받은(완료) 주문(회원 주문 + 이 브라우저의 비회원 주문) 중 아직 리뷰를 쓰지 않은
  * 샐러드 메뉴·내 취향 볼 품목. 음료는 리뷰 대상이 아니라서 뺀다.
- * 로그인한 사용자가 받은(완료) 주문(회원 주문 + 이 브라우저의 비회원 주문) 중 아직 리뷰를 쓰지 않은 샐러드 메뉴 품목.
- * 음료·내 취향 볼은 리뷰 대상이 아니라서 뺀다.
  */
 export function useReviewableOrderItems(): { loading: boolean; items: ReviewableOrderItem[] } {
   const { isLoggedIn } = useAuth();
