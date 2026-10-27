@@ -289,10 +289,14 @@ function MemberOrders({
   filter,
   filtered,
   imageFor,
+  reviewablePids,
+  onReview,
 }: {
   filter: MemberOrderFilter;
   filtered: boolean;
   imageFor: (productId?: string | null) => string;
+  reviewablePids: Map<string, number>;
+  onReview: (pid: number) => void;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -350,6 +354,8 @@ function MemberOrders({
               key={o.id}
               order={o}
               imageFor={imageFor}
+              reviewablePids={reviewablePids}
+              onReview={onReview}
               action={
                 <div className="order-item-actions">
                   <button
@@ -401,7 +407,7 @@ export default function OrdersTab() {
   // 같은 조건으로 다시 조회해도 새로 읽도록 횟수(n)를 key 로 쓴다
   const [search, setSearch] = useState({ filter: {} as MemberOrderFilter, filtered: false, n: 0 });
 
-  // 이 브라우저에서 비회원으로 접수한 주문 (Next.js 세션·이전 기록). 리뷰 작성은 이 주문 기준이다
+  // 이 브라우저에서 비회원으로 접수한 주문 (Next.js 세션·이전 기록)
   const guest = usePagedOrders(loadServerOrders);
   const legacy = useSyncExternalStore(ordersStore.subscribe, ordersStore.getSnapshot, ordersStore.getServerSnapshot);
   const guestOrders = [...guest.orders, ...legacy.filter((o) => !guest.orders.some((server) => server.id === o.id))];
@@ -411,7 +417,14 @@ export default function OrdersTab() {
       <section className="surface mypage-section">
         <h2>주문 내역</h2>
         <OrderFilterForm onSearch={(filter, filtered) => setSearch(({ n }) => ({ filter, filtered, n: n + 1 }))} />
-        <MemberOrders key={search.n} filter={search.filter} filtered={search.filtered} imageFor={imageFor} />
+        <MemberOrders
+          key={search.n}
+          filter={search.filter}
+          filtered={search.filtered}
+          imageFor={imageFor}
+          reviewablePids={reviewablePids}
+          onReview={openWrite}
+        />
       </section>
 
       {(guestOrders.length > 0 || guest.error) && (
