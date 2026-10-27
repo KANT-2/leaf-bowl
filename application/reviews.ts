@@ -96,6 +96,7 @@ export function appendPurchasedReview(identity: ReviewIdentity, input: Purchased
     await lockCatalog(tx, "write");
     const current = await readCatalogState(tx);
     const { retry, owner, customMenu } = await checkPurchase(tx, identity, input);
+    const { retry, owner } = await checkPurchase(tx, identity, input);
     if (retry) {
       return { ...snapshot(current), defaults: await readAppDefaults(tx) };
     }
