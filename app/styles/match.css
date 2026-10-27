@@ -32,7 +32,7 @@
   padding: 0 20px 24px;
 }
 .bm .intro .eyebrow {
-  font-size: 9px;
+  font-size: var(--type-meta);
   letter-spacing: 2.1px;
   font-weight: 700;
   color: #667866;
@@ -71,7 +71,7 @@
 }
 .bm .step-label {
   color: #667866;
-  font-size: 8px;
+  font-size: var(--type-meta);
   letter-spacing: 1.8px;
 }
 .bm .guide h2 {
@@ -94,7 +94,7 @@
   height: 23px;
   display: grid;
   place-items: center;
-  font-size: 8px;
+  font-size: var(--type-meta);
   flex: none;
 }
 .bm .guide-step strong {
@@ -103,7 +103,7 @@
   color: var(--color-ink);
 }
 .bm .guide-step p {
-  font-size: 10px;
+  font-size: var(--type-body);
   color: #7b8674;
   margin: 7px 0 0;
 }
@@ -122,7 +122,7 @@
 .bm .deck-meta {
   display: flex;
   justify-content: space-between;
-  font-size: 9px;
+  font-size: var(--type-meta);
   color: #667866;
   font-weight: 600;
   letter-spacing: 1.3px;
@@ -209,7 +209,7 @@
   pointer-events: none;
   background: #f8f6efe0;
   color: #637561;
-  font-size: 9px;
+  font-size: var(--type-meta);
   border-radius: 20px;
   padding: 6px 10px;
 }
@@ -229,7 +229,7 @@
   margin: 0 0 8px;
 }
 .bm .ingredient-info p {
-  font-size: 11px;
+  font-size: var(--type-body);
   color: #687863;
   margin: 0 0 13px;
 }
@@ -239,7 +239,7 @@
   justify-content: space-between;
 }
 .bm .ingredient-bottom > span {
-  font-size: 10px;
+  font-size: var(--type-body);
   color: #7b8674;
 }
 .bm .ingredient-bottom strong {
@@ -367,14 +367,14 @@
 }
 .bm .swipe-help {
   text-align: center;
-  font-size: 10px;
+  font-size: var(--type-body);
   color: #7b8674;
   line-height: 1.8;
   margin: 14px 0 0;
 }
 .bm .swipe-help span {
   display: block;
-  font-size: 9px;
+  font-size: var(--type-body);
   letter-spacing: 1px;
 }
 
@@ -405,7 +405,7 @@
   place-items: center;
   background: var(--color-soft);
   color: var(--color-brand);
-  font-size: 10px;
+  font-size: var(--type-meta);
 }
 .bm .bowl-sub-row {
   display: flex;
@@ -416,7 +416,7 @@
   min-height: 28px;
 }
 .bm .bowl-subtitle {
-  font-size: 10px;
+  font-size: var(--type-body);
   color: #7b8674;
   margin: 0;
 }
@@ -431,7 +431,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 11px;
+  font-size: var(--type-body);
   color: #637561;
   padding: 5px 9px;
   border: 1px solid #d0dbcb;
@@ -444,13 +444,13 @@
   color: var(--color-brand);
 }
 .bm .clear-q {
-  font-size: 11px;
+  font-size: var(--type-body);
   color: var(--color-ink);
   font-weight: 600;
 }
 .bm .clear-yes,
 .bm .clear-no {
-  font-size: 11px;
+  font-size: var(--type-body);
   padding: 5px 10px;
   border-radius: 20px;
   border: 1px solid #bbcab6;
@@ -498,7 +498,7 @@
 }
 .bm .empty-bowl {
   text-align: center;
-  font-size: 11px;
+  font-size: var(--type-body);
   line-height: 1.9;
   color: #b0bbab;
   width: 100%;
@@ -508,7 +508,7 @@
   border: 1px solid var(--color-line);
   border-radius: 20px;
   padding: 7px 9px;
-  font-size: 10px;
+  font-size: var(--type-body);
   background: #f1f5e6;
 }
 .bm .ingredient-chip button {
@@ -527,7 +527,7 @@
   margin-bottom: 18px;
 }
 .bm .bowl-footer > div span {
-  font-size: 11px;
+  font-size: var(--type-body);
   color: #7b8674;
 }
 .bm .bowl-footer strong {
@@ -542,7 +542,7 @@
 }
 .bm .bowl-footer p {
   text-align: center;
-  font-size: 9px;
+  font-size: var(--type-body);
   color: #9aa594;
   line-height: 1.9;
   margin: 13px 0 0;
@@ -550,7 +550,7 @@
 .bm .load-recipe {
   width: 100%;
   margin-top: 12px;
-  font-size: 10px;
+  font-size: var(--type-body);
 }
 
 .bm .primary:hover:not(:disabled) {
@@ -569,13 +569,15 @@
   border-top: 1px solid var(--color-line);
   border-bottom: 1px solid var(--color-line);
   display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
   justify-content: space-around;
   max-width: 1160px;
   margin: 0 auto 40px;
   padding: 23px;
   letter-spacing: 1.6px;
   color: #667866;
-  font-size: 9px;
+  font-size: var(--type-meta);
 }
 
 /* 결과 창 */
@@ -589,7 +591,7 @@
   align-items: center;
 }
 .bm-result .eyebrow {
-  font-size: 9px;
+  font-size: var(--type-meta);
   letter-spacing: 2.1px;
   font-weight: 700;
 }
@@ -626,7 +628,7 @@
   padding: 4%;
 }
 .bm-result .result-note {
-  font-size: 9px;
+  font-size: var(--type-body);
   line-height: 1.8;
 }
 .bm-result .result-chips {
@@ -641,7 +643,7 @@
   background: var(--color-soft);
   color: #4a6150;
   border-radius: 20px;
-  font-size: 11px;
+  font-size: var(--type-meta);
 }
 .bm-result .field {
   margin: 15px 0;
@@ -654,7 +656,7 @@
   background: var(--color-pale);
   padding: 14px;
   border-radius: 7px;
-  font-size: 10px;
+  font-size: var(--type-body);
   line-height: 1.9;
   color: #637561;
   margin: 17px 0;
@@ -732,10 +734,10 @@
     margin-top: 8px;
   }
   .bm .intro p {
-    font-size: 11px;
+    font-size: var(--type-body);
   }
   .bm .intro .eyebrow {
-    font-size: 7px;
+    font-size: var(--type-meta);
     letter-spacing: 1.8px;
   }
   .bm .mobile {
@@ -779,7 +781,7 @@
     height: 57px;
   }
   .bm .swipe-help {
-    font-size: 9px;
+    font-size: var(--type-body);
     margin-top: 17px;
   }
   .bm .my-bowl {
@@ -810,7 +812,7 @@
   }
   .bm .bottom-strip {
     padding: 18px 15px;
-    font-size: 6px;
+    font-size: var(--type-meta);
     letter-spacing: 1px;
     margin: 0 14px 28px;
   }

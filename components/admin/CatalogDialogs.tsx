@@ -10,7 +10,14 @@ import {
   AlertDialogTitle,
 } from "@/components/admin/alert-dialog";
 import { Button } from "@/components/admin/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/admin/dialog";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/admin/dialog";
 import { saladCategories } from "@/features/admin/catalog-presentation";
 import { type Catalog } from "@/modules/catalog/schema";
 import GroupForm from "./editors/GroupForm";
@@ -63,33 +70,35 @@ export default function CatalogDialogs({
             </DialogTitle>
             <DialogDescription className="sr-only">메뉴 정보와 구성 재료를 수정합니다.</DialogDescription>
           </DialogHeader>
-          {product && (
-            <ProductForm
-              key={product.id}
-              initial={product}
-              ingredients={catalog.ingredients ?? []}
-              categories={saladCategories(catalog)}
-              groups={catalog.groups.filter((g) => !g.deleted)}
-              originCountries={originCountries}
-              busy={busy}
-              onManageIngredients={() => {
-                setProduct(null);
-                window.location.hash = "origins";
-              }}
-              onUploadBusy={setUploading}
-              onRefresh={load}
-              onCancel={() => setProduct(null)}
-              onSave={async (p) => {
-                await save({
-                  ...catalog,
-                  products: catalog.products.some((x) => x.id === p.id)
-                    ? catalog.products.map((x) => (x.id === p.id ? p : x))
-                    : [...catalog.products, p],
-                });
-                setProduct(null);
-              }}
-            />
-          )}
+          <DialogBody>
+            {product && (
+              <ProductForm
+                key={product.id}
+                initial={product}
+                ingredients={catalog.ingredients ?? []}
+                categories={saladCategories(catalog)}
+                groups={catalog.groups.filter((g) => !g.deleted)}
+                originCountries={originCountries}
+                busy={busy}
+                onManageIngredients={() => {
+                  setProduct(null);
+                  window.location.hash = "origins";
+                }}
+                onUploadBusy={setUploading}
+                onRefresh={load}
+                onCancel={() => setProduct(null)}
+                onSave={async (p) => {
+                  await save({
+                    ...catalog,
+                    products: catalog.products.some((x) => x.id === p.id)
+                      ? catalog.products.map((x) => (x.id === p.id ? p : x))
+                      : [...catalog.products, p],
+                  });
+                  setProduct(null);
+                }}
+              />
+            )}
+          </DialogBody>
         </DialogContent>
       </Dialog>
       <Dialog
@@ -105,34 +114,36 @@ export default function CatalogDialogs({
             <DialogTitle>옵션 그룹 설정</DialogTitle>
             <DialogDescription>선택 방식과 항목별 추가 금액을 설정합니다.</DialogDescription>
           </DialogHeader>
-          {group && (
-            <GroupForm
-              key={group.id}
-              initial={group}
-              busy={busy}
-              onRefresh={load}
-              onCancel={() => setGroup(null)}
-              onSave={async (g, connectAll) => {
-                await save({
-                  ...catalog,
-                  products: connectAll
-                    ? catalog.products.map((p) =>
-                        p.type === "salad" && !p.deleted
-                          ? {
-                              ...p,
-                              optionIds: [...new Set([...p.optionIds, g.id])],
-                            }
-                          : p,
-                      )
-                    : catalog.products,
-                  groups: catalog.groups.some((x) => x.id === g.id)
-                    ? catalog.groups.map((x) => (x.id === g.id ? g : x))
-                    : [...catalog.groups, g],
-                });
-                setGroup(null);
-              }}
-            />
-          )}
+          <DialogBody>
+            {group && (
+              <GroupForm
+                key={group.id}
+                initial={group}
+                busy={busy}
+                onRefresh={load}
+                onCancel={() => setGroup(null)}
+                onSave={async (g, connectAll) => {
+                  await save({
+                    ...catalog,
+                    products: connectAll
+                      ? catalog.products.map((p) =>
+                          p.type === "salad" && !p.deleted
+                            ? {
+                                ...p,
+                                optionIds: [...new Set([...p.optionIds, g.id])],
+                              }
+                            : p,
+                        )
+                      : catalog.products,
+                    groups: catalog.groups.some((x) => x.id === g.id)
+                      ? catalog.groups.map((x) => (x.id === g.id ? g : x))
+                      : [...catalog.groups, g],
+                  });
+                  setGroup(null);
+                }}
+              />
+            )}
+          </DialogBody>
         </DialogContent>
       </Dialog>
       <AlertDialog
@@ -247,10 +258,12 @@ export default function CatalogDialogs({
             <DialogTitle>고객 미리보기</DialogTitle>
             <DialogDescription>실제 고객 페이지를 미리 볼 수 있습니다.</DialogDescription>
           </DialogHeader>
-          <a href="/" target="_blank" rel="noreferrer" className="text-sm underline">
-            전체 페이지 새 창에서 보기 ↗
-          </a>
-          <iframe title="고객 페이지 미리보기" src="/" className="customer-preview-frame" />
+          <DialogBody>
+            <a href="/" target="_blank" rel="noreferrer" className="text-sm underline">
+              전체 페이지 새 창에서 보기 ↗
+            </a>
+            <iframe title="고객 페이지 미리보기" src="/" className="customer-preview-frame" />
+          </DialogBody>
         </DialogContent>
       </Dialog>
     </>

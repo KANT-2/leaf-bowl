@@ -181,7 +181,7 @@
   border-radius: 30px;
 }
 .rv-filter span {
-  font-size: 11px;
+  font-size: var(--type-body);
 }
 .rv-count {
   font-size: 13px;
@@ -659,7 +659,7 @@ html:has(dialog[open]) {
   border-radius: 8px;
   background: #fff;
   color: var(--color-brand);
-  font-size: 11px;
+  font-size: var(--type-body);
   font-weight: 600;
   display: flex;
   flex-direction: column;
@@ -703,7 +703,7 @@ html:has(dialog[open]) {
   border-radius: 10px;
   background: #233d31d9;
   color: #fff;
-  font-size: 11px;
+  font-size: var(--type-meta);
   font-weight: 600;
 }
 .rv-photo-hover {

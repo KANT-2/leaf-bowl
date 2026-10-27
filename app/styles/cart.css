@@ -91,7 +91,7 @@ body.lock {
 .cart-item p {
   margin: 0;
   color: #7c8674;
-  font-size: 11px;
+  font-size: var(--type-body);
 }
 .cart-item .cart-allergy {
   margin-top: 5px;
@@ -111,7 +111,7 @@ body.lock {
   min-height: 24px;
 }
 .remove {
-  font-size: 11px;
+  font-size: var(--type-body);
   color: var(--color-muted);
 }
 .totals {
@@ -173,13 +173,13 @@ body.lock {
 .field-hint {
   display: block;
   margin-top: 6px;
-  font-size: 11px;
+  font-size: var(--type-body);
   color: #637561;
   line-height: 1.6;
 }
 .totals .free-hint {
   margin: -4px 0 8px;
-  font-size: 11px;
+  font-size: var(--type-body);
   color: #4c7a3a;
   text-align: right;
 }
@@ -199,7 +199,7 @@ body.lock {
   border-radius: 10px;
   background: var(--color-lime);
   color: var(--color-brand);
-  font-size: 9px;
+  font-size: var(--type-meta);
   letter-spacing: 0.5px;
   vertical-align: 2px;
 }
@@ -251,7 +251,7 @@ body.lock {
 }
 .cart-drink-price {
   grid-row: 2;
-  font-size: 11px;
+  font-size: var(--type-body);
   color: #637561;
 }
 .cart-drink-add {
@@ -275,7 +275,7 @@ body.lock {
 .cart-drink.is-in .cart-drink-add {
   background: var(--color-brand);
   color: var(--color-cream);
-  font-size: 11px;
+  font-size: var(--type-body);
   font-weight: 600;
 }
 
@@ -302,7 +302,7 @@ body.lock {
   align-items: center;
   gap: 8px;
   margin-top: 8px;
-  font-size: 11px;
+  font-size: var(--type-body);
   color: #637561;
 }
 .cart-dressing-multi {
@@ -321,7 +321,7 @@ body.lock {
   border: 1px solid #c4cfba;
   border-radius: 20px;
   padding: 4px 11px;
-  font-size: 11px;
+  font-size: var(--type-body);
   color: #637561;
   background: #fff;
 }
@@ -357,7 +357,7 @@ body.lock {
   border-radius: 6px;
   background: none;
   color: var(--color-brand);
-  font-size: 11px;
+  font-size: var(--type-body);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -384,7 +384,7 @@ body.lock {
   border-radius: 10px;
   background: var(--color-brand);
   color: var(--color-cream);
-  font-size: 10px;
+  font-size: var(--type-body);
 }
 .cart-drink.is-soldout {
   background: #eeefe8;
@@ -395,6 +395,6 @@ body.lock {
 .cart-drink.is-soldout .cart-drink-add {
   background: var(--color-brand);
   color: var(--color-cream);
-  font-size: 11px;
+  font-size: var(--type-body);
   font-weight: 600;
 }

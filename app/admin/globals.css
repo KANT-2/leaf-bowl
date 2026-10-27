@@ -2,6 +2,23 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "../styles/theme.css";
+
+/* Shared search contract, scoped to the administrator surface. */
+.admin-search {
+  width: 100%;
+  max-width: 320px;
+  flex: 1 1 240px;
+}
+.admin-search-wide {
+  max-width: none;
+}
+@media (max-width: 640px) {
+  .admin-search {
+    max-width: none;
+    flex-basis: 100%;
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -305,15 +322,15 @@
   .editor-dialog {
     max-width: 820px !important;
     width: calc(100% - 32px);
-    max-height: 90dvh;
-    overflow-y: auto;
+    max-height: min(90dvh, 960px);
+    overflow: hidden;
     background: var(--card);
   }
   .preview-dialog {
     max-width: 1100px !important;
     width: calc(100% - 32px);
-    max-height: 92dvh;
-    overflow-y: auto;
+    max-height: min(90dvh, 960px);
+    overflow: hidden;
   }
   .form-grid {
     display: grid;
@@ -966,7 +983,7 @@
     display: flex;
     align-items: center;
     gap: 14px;
-    font-size: 11px;
+    font-size: var(--type-meta);
   }
   .season-preview-arrows button {
     border: 0;
@@ -1088,8 +1105,8 @@
     border-radius: 4px;
   }
   .review-detail-dialog {
-    max-height: 88dvh;
-    overflow-y: auto;
+    max-height: min(90dvh, 960px);
+    overflow: hidden;
   }
 
   .review-filter-controls {
@@ -1429,17 +1446,6 @@
   padding: 8px 12px;
   font-size: 13px;
 }
-.menu-ingredient-search {
-  position: relative;
-}
-.menu-ingredient-search > svg {
-  position: absolute;
-  left: 12px;
-  top: 12px;
-}
-.menu-ingredient-search > input {
-  padding-left: 38px;
-}
 .menu-ingredient-filters {
   display: flex;
   flex-wrap: wrap;
@@ -1509,8 +1515,50 @@
   margin: 0;
   padding: 18px 28px;
   background: var(--card);
-  position: sticky;
-  bottom: 0;
+  flex-shrink: 0;
+}
+
+/* Dialog headers and form actions stay visible; only their bodies scroll. */
+.editor-dialog > [data-slot="dialog-header"],
+.preview-dialog > [data-slot="dialog-header"] {
+  flex-shrink: 0;
+  padding-right: var(--space-12);
+}
+.menu-editor-dialog > [data-slot="dialog-header"] {
+  padding-right: 80px;
+}
+.editor-dialog > [data-slot="dialog-body"],
+.preview-dialog > [data-slot="dialog-body"] {
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+.editor-dialog > [data-slot="dialog-body"]:has(> form) {
+  overflow: hidden;
+}
+.editor-dialog > [data-slot="dialog-body"] > form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.editor-dialog > [data-slot="dialog-body"] > form > fieldset {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.editor-dialog > [data-slot="dialog-body"] > form > :is(.form-footer, .error) {
+  flex-shrink: 0;
+}
+.editor-dialog > [data-slot="dialog-close"] {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+}
+.editor-dialog :is(.form-footer, [data-slot="dialog-footer"]) button {
+  min-height: var(--control-height);
 }
 .menu-editor-dialog .error {
   margin: 12px 28px;
@@ -1589,19 +1637,6 @@
   gap: 24px;
   margin-bottom: 14px;
 }
-.origin-search {
-  position: relative;
-  flex: 1;
-  max-width: 560px;
-}
-.origin-search > svg {
-  position: absolute;
-  top: 12px;
-  left: 14px;
-}
-.origin-search > input {
-  padding-left: 42px;
-}
 .origin-filters > select {
   min-width: 220px;
   border: 1px solid var(--border);
@@ -1656,9 +1691,6 @@
     align-items: stretch;
     flex-direction: column;
     gap: 10px;
-  }
-  .origin-search {
-    max-width: none;
   }
   .origin-table th,
   .origin-table td {

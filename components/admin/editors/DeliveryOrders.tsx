@@ -2,8 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/admin/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/admin/dialog";
-import { Input } from "@/components/admin/input";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/admin/dialog";
+import SearchField from "@/components/controls/SearchField";
 import { Tabs, TabsList, TabsTrigger } from "@/components/admin/tabs";
 import {
   DELIVERY_PAGE_SIZE,
@@ -136,12 +143,12 @@ function Results() {
             </TabsList>
           </Tabs>
         </div>
-        <Input
-          aria-label="주문 검색"
+        <SearchField
+          className="admin-search"
+          label="주문 검색"
           placeholder="주문자, 전화, 주소, 메뉴, 주문번호 검색"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          style={{ maxWidth: 320 }}
+          onChange={setQuery}
         />
       </div>
       <div className="review-calendar-controls">
@@ -355,9 +362,11 @@ function Results() {
             <DialogTitle>배달 주문 상세</DialogTitle>
             <DialogDescription>주문 정보와 처리 이력을 확인하세요.</DialogDescription>
           </DialogHeader>
-          {selectedOrder && (
-            <OrderDetails key={selectedOrder} id={selectedOrder} onUpdated={() => setRefresh((value) => value + 1)} />
-          )}
+          <DialogBody>
+            {selectedOrder && (
+              <OrderDetails key={selectedOrder} id={selectedOrder} onUpdated={() => setRefresh((value) => value + 1)} />
+            )}
+          </DialogBody>
         </DialogContent>
       </Dialog>
       {more && (

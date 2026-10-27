@@ -235,7 +235,7 @@
   margin: 4px 0 0;
 }
 .address-default-tag {
-  font-size: 11px;
+  font-size: var(--type-meta);
   font-weight: 600;
   color: var(--color-brand);
   background: var(--color-soft);
@@ -243,7 +243,7 @@
   border-radius: 20px;
 }
 .address-label-tag {
-  font-size: 11px;
+  font-size: var(--type-meta);
   font-weight: 600;
   color: var(--color-muted);
   background: var(--color-pale);
@@ -436,7 +436,7 @@
 }
 .checkout-summary {
   flex: 1 1 320px;
-  min-width: 300px;
+  min-width: min(300px, 100%);
   max-width: 380px;
   position: sticky;
   top: 24px;

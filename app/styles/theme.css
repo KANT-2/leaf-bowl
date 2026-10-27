@@ -39,3 +39,41 @@ h3 {
 .pv-meta dd {
   font-weight: 500;
 }
+
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --type-meta: 12px;
+  --type-support: 13px;
+  --type-body: 14px;
+  --type-control: 14px;
+  --type-input: 16px;
+  --leading-body: 1.6;
+  --radius-field: 6px;
+  --radius-control: 8px;
+  --radius-panel: 12px;
+  --control-height: 44px;
+  --icon-sm: 16px;
+  --icon-md: 18px;
+  --icon-lg: 20px;
+  --icon-stroke: 1.75;
+  --control-border: var(--color-input-border);
+  --control-surface: var(--color-surface);
+  --control-hover: var(--color-soft);
+  --control-selected: var(--color-brand);
+  --control-selected-text: var(--color-cream);
+  --control-error: var(--color-danger);
+  --control-disabled-opacity: 0.55;
+  --control-focus-width: 3px;
+  --control-focus-offset: 3px;
+  --control-focus-color: var(--color-focus);
+  --motion-control: 160ms;
+}

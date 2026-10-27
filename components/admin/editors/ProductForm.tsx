@@ -6,7 +6,8 @@ import { Textarea } from "@/components/admin/textarea";
 import { ingredientAllergens, matchesIngredient } from "@/modules/catalog/allergens";
 import { type Catalog, type OptionGroup, type Product } from "@/modules/catalog/schema";
 import { statusNames } from "@/features/admin/editor-helpers";
-import { Check, Search, ShieldCheck, X } from "lucide-react";
+import { Check, ShieldCheck, X } from "lucide-react";
+import SearchField from "@/components/controls/SearchField";
 import { useState } from "react";
 import { Picker, Upload } from "./EditorFields";
 
@@ -224,15 +225,13 @@ export default function ProductForm({
               ))}
               {!tokens.length && <span className="meta">아래에서 구성 재료를 선택해주세요.</span>}
             </div>
-            <div className="menu-ingredient-search">
-              <Search size={18} aria-hidden="true" />
-              <Input
-                aria-label="구성 재료 검색"
-                placeholder="재료 검색"
-                value={ingredientQuery}
-                onChange={(e) => setIngredientQuery(e.target.value)}
-              />
-            </div>
+            <SearchField
+              className="admin-search admin-search-wide"
+              label="구성 재료 검색"
+              placeholder="재료 검색"
+              value={ingredientQuery}
+              onChange={setIngredientQuery}
+            />
             <div className="menu-ingredient-filters">
               {["전체", ...new Set(availableIngredients.map((ingredient) => ingredient.category))].map((category) => (
                 <Button
