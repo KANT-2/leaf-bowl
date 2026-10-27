@@ -5,7 +5,7 @@ import type { Product } from "@/modules/catalog/customer-product";
 import { deliveryFee } from "@/modules/settings/pricing";
 import { type Ingredient } from "@/modules/bowl/ingredient";
 import { ingredientOrigins } from "@/modules/catalog/allergens";
-import { reviewDisplayDate, type Review } from "@/modules/reviews/model";
+import { CUSTOM_BOWL_PID, customBowlChoices, reviewDisplayDate, type Review } from "@/modules/reviews/model";
 import { createCartSelectors } from "@/modules/cart/selectors";
 
 function totalKcal(values: (number | undefined)[]): number | undefined {
@@ -98,12 +98,23 @@ export function customerCatalog(snapshot: PublicSnapshot) {
     .filter((r) => !r.deleted)
     .flatMap((r) => {
       const t = reviewTimestamp(r) ?? 0;
-      const product = salads.find((p) => p.id === r.productId || (!r.productId && p.name === r.menu.split(" · ")[0]));
-      return product && !product.deleted && product.status !== "hidden"
-        ? [
+      const choices = r.productId ? null : customBowlChoices(r.menu);
+      const product =
+        choices === null
+          ? salads.find((p) => p.id === r.productId || (!r.productId && p.name === r.menu.split(" · ")[0]))
+          : undefined;
+      const pid =
+        choices !== null
+          ? CUSTOM_BOWL_PID
+          : product && !product.deleted && product.status !== "hidden"
+            ? product.customerId!
+            : null;
+      return pid === null
+        ? []
+        : [
             {
               id: r.id,
-              pid: product.customerId!,
+              pid,
               author: r.author,
               stars: r.rating,
               title: r.title,
@@ -113,9 +124,9 @@ export function customerCatalog(snapshot: PublicSnapshot) {
               via: r.via ?? "delivery",
               t,
               sample: r.sample ?? r.id.startsWith("review-example"),
+              ...(choices && { choices }),
             },
-          ]
-        : [];
+          ];
     });
   const heroSlides = defaults.heroSlides
     .map((s, i) =>

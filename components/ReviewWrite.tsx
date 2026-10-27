@@ -9,7 +9,13 @@ import { useToast } from "./ToastProvider";
 import { useReviewableOrderItems } from "@/features/reviews/reviewable-orders";
 import { createReviewSubmission } from "@/features/reviews/submission";
 import { shrinkImage } from "@/features/shared/image";
-import { RATE_LABELS, REVIEW_PHOTO_MAX, type Review } from "@/modules/reviews/model";
+import {
+  CUSTOM_BOWL_PID,
+  CUSTOM_BOWL_REVIEWS_PATH,
+  RATE_LABELS,
+  REVIEW_PHOTO_MAX,
+  type Review,
+} from "@/modules/reviews/model";
 
 const len = (s: string) => [...s].length;
 
@@ -45,7 +51,8 @@ export default function ReviewWriteProvider({ children }: { children: React.Reac
     (pid: number | null, options?: OpenOptions) => {
       if (!isLoggedIn) {
         toast("리뷰를 쓰려면 로그인해주세요");
-        const back = pid === null ? "/reviews" : `/product/${pid}/reviews`;
+        const back =
+          pid === null ? "/reviews" : pid === CUSTOM_BOWL_PID ? CUSTOM_BOWL_REVIEWS_PATH : `/product/${pid}/reviews`;
         router.push(`/login?next=${encodeURIComponent(`${back}#write`)}`);
         return;
       }

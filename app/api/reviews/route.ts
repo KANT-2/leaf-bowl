@@ -14,6 +14,7 @@ import { resolveMemberId } from "@/application/fastapi-member";
 import { requireGuest } from "@/modules/identity/guard";
 import { readCookie } from "@/modules/identity/cookies";
 import { GUEST_COOKIE } from "@/modules/identity/service";
+import { CUSTOM_BOWL_PID } from "@/modules/reviews/model";
 import { run, jsonResponse } from "@/infrastructure/http/response";
 import { normalizeImage, saveImage, removeImage } from "@/infrastructure/images/files";
 import { maintainImages } from "@/application/images";
@@ -23,7 +24,8 @@ const schema = z.object({
     .string()
     .regex(/^[a-zA-Z0-9_-]+$/)
     .max(80),
-  pid: z.number().int().nonnegative(),
+  /** 메뉴 번호. 내 취향 볼은 CUSTOM_BOWL_PID */
+  pid: z.number().int().min(CUSTOM_BOWL_PID),
   orderItemId: z
     .string()
     .regex(/^[1-9][0-9]{0,18}$/)
