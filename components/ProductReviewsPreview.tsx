@@ -9,7 +9,16 @@ import { newest } from "@/modules/reviews/model";
 
 const PAGE = 3;
 
-export default function ProductReviewsPreview({ id }: { id: number }) {
+/** 메뉴 상세의 리뷰 미리 보기. 내 취향 찾기(/match)는 id=CUSTOM_BOWL_PID 와 제목·주소를 넘겨 함께 쓴다 */
+export default function ProductReviewsPreview({
+  id,
+  title = "이 메뉴의 리뷰",
+  href = `/product/${id}/reviews`,
+}: {
+  id: number;
+  title?: string;
+  href?: string;
+}) {
   const list = useReviews().reviewsFor(id);
   const { openWrite } = useReviewWrite();
   const [shown, setShown] = useState(PAGE);
@@ -38,10 +47,11 @@ export default function ProductReviewsPreview({ id }: { id: number }) {
         <div>
           <div className="eyebrow">FRESH WORDS</div>
           <h2 id="pvRvTitle">
-            이 메뉴의 리뷰<span>리뷰 {list.length}개</span>
+            {title}
+            <span>리뷰 {list.length}개</span>
           </h2>
         </div>
-        <Link href={`/product/${id}/reviews`}>리뷰 전체 보기 ↗</Link>
+        <Link href={href}>리뷰 전체 보기 ↗</Link>
       </div>
       <div className="review-cards pv-reviews" ref={cardsRef}>
         {visible.map((r) => (

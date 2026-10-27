@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import BowlMatch from "@/components/BowlMatch";
 import Breadcrumb from "@/components/Breadcrumb";
 import PageHeading from "@/components/PageHeading";
+import ProductReviewsPreview from "@/components/ProductReviewsPreview";
+import { CUSTOM_BOWL_NAME, CUSTOM_BOWL_PID, CUSTOM_BOWL_REVIEWS_PATH } from "@/modules/reviews/model";
 
 export const metadata: Metadata = {
   title: "내 취향 찾기 — bowl match | leaf & bowl",
@@ -26,6 +28,13 @@ export default async function MatchPage() {
         </p>
       </section>
       <BowlMatch />
+      <div className="wrap">
+        <ProductReviewsPreview
+          id={CUSTOM_BOWL_PID}
+          title={`${CUSTOM_BOWL_NAME} 리뷰`}
+          href={CUSTOM_BOWL_REVIEWS_PATH}
+        />
+      </div>
       <section className="bottom-strip" aria-hidden="true">
         <span>FRESH INGREDIENTS</span>
         <span>YOUR OWN COMBINATION</span>

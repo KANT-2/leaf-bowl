@@ -6,7 +6,7 @@ import { useCustomerCatalog } from "@/components/CustomerCatalogProvider";
 import { useReviews } from "@/components/ReviewsProvider";
 import { loadServerOrders, type ServerOrderPage } from "@/features/orders/client";
 import { loadMemberOrders } from "@/features/member/client";
-import { dateStr } from "@/modules/reviews/model";
+import { CUSTOM_BOWL_PID, dateStr } from "@/modules/reviews/model";
 
 export interface ReviewableOrderItem {
   orderItemId: string;
@@ -18,6 +18,8 @@ export interface ReviewableOrderItem {
   t: number;
 }
 
+const FALLBACK_IMAGE = "/images/hero-cutout.png";
+
 /** 전체 페이지를 다 돌기엔 과하니, 최근 이 만큼만 본다 */
 const MAX_PAGES = 10;
 
@@ -27,8 +29,8 @@ type LoadOrders = (cursor?: string) => Promise<ServerOrderPage>;
 const SOURCES: LoadOrders[] = [loadServerOrders, (cursor) => loadMemberOrders(cursor, { statuses: ["completed"] })];
 
 /**
- * 로그인한 사용자가 받은(완료) 주문(회원 주문 + 이 브라우저의 비회원 주문) 중 아직 리뷰를 쓰지 않은 샐러드 메뉴 품목.
- * 음료·내 취향 볼은 리뷰 대상이 아니라서 뺀다.
+ * 로그인한 사용자가 받은(완료) 주문(회원 주문 + 이 브라우저의 비회원 주문) 중 아직 리뷰를 쓰지 않은
+ * 샐러드 메뉴·내 취향 볼 품목. 음료는 리뷰 대상이 아니라서 뺀다.
  */
 export function useReviewableOrderItems(): { loading: boolean; items: ReviewableOrderItem[] } {
   const { isLoggedIn } = useAuth();
@@ -51,7 +53,20 @@ export function useReviewableOrderItems(): { loading: boolean; items: Reviewable
             continue;
           }
           for (const item of order.items) {
-            if (item.productType !== "salad" || !item.productId || !item.id) {
+            if (!item.id) {
+              continue;
+            }
+            const base = {
+              orderItemId: item.id,
+              name: item.name,
+              dateLabel: dateStr(order.createdAt),
+              t: order.createdAt,
+            };
+            if (item.productType === "custom") {
+              collected.push({ ...base, pid: CUSTOM_BOWL_PID, image: FALLBACK_IMAGE });
+              continue;
+            }
+            if (item.productType !== "salad" || !item.productId) {
               continue;
             }
             const pid = catalog.products.find((p) => p.id === item.productId)?.customerId;
@@ -59,14 +74,7 @@ export function useReviewableOrderItems(): { loading: boolean; items: Reviewable
             if (pid === undefined || !product) {
               continue;
             }
-            collected.push({
-              orderItemId: item.id,
-              pid,
-              name: item.name,
-              image: product.imageUrl || "/images/hero-cutout.png",
-              dateLabel: dateStr(order.createdAt),
-              t: order.createdAt,
-            });
+            collected.push({ ...base, pid, image: product.imageUrl || FALLBACK_IMAGE });
           }
         }
         if (!result.nextCursor) {
