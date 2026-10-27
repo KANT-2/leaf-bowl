@@ -50,6 +50,10 @@ class AdminOrderStatusService:
                     "최신 주문 정보를 다시 조회해주세요."
                 )
 
+            # 취소는 고객 주문 흐름에서 처리한다. 관리자 API는 순방향 운영 상태만 변경한다.
+            if to_status == OrderStatus.CANCELED:
+                raise Conflict("관리자 주문 상태 변경에서 취소할 수 없습니다.")
+
             # C 담당 공통 도메인의 상태 전이 규칙 재사용
             assert_transition(order.status, to_status)
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/admin/button";
 import { Textarea } from "@/components/admin/textarea";
 import { nextStatuses, STATUS_LABEL, type OrderStatus } from "@/modules/orders/status";
@@ -13,19 +13,21 @@ interface Props {
 }
 
 export default function OrderStatusEditor({ id, status, version, onUpdated }: Props) {
-  const options = nextStatuses(status);
+  const options = nextStatuses(status).filter((value) => value !== "canceled");
   const [next, setNext] = useState<OrderStatus | "">(options[0] ?? "");
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
+  const submitting = useRef(false);
   const [message, setMessage] = useState("");
   const [conflict, setConflict] = useState(false);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (saving || !next) {
+    if (submitting.current || !next) {
       return;
     }
 
+    submitting.current = true;
     setSaving(true);
     setMessage("");
     setConflict(false);
@@ -58,6 +60,7 @@ export default function OrderStatusEditor({ id, status, version, onUpdated }: Pr
     } catch {
       setMessage("서버 연결에 실패했습니다.");
     } finally {
+      submitting.current = false;
       setSaving(false);
     }
   }

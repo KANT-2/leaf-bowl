@@ -197,6 +197,18 @@ def test_date_filter(orders: list[Order]) -> None:
     assert len(response.json()["items"]) == 1
 
 
+def test_date_filter_includes_kst_day_boundaries(orders: list[Order]) -> None:
+    client = make_client(orders)
+    orders[0].created_at = datetime(2026, 10, 23, 15, tzinfo=UTC)  # 10/24 00:00 KST
+    orders[1].created_at = datetime(2026, 10, 24, 14, 59, 59, tzinfo=UTC)
+    orders[2].created_at = datetime(2026, 10, 24, 15, tzinfo=UTC)  # 10/25 00:00 KST
+
+    response = client.get("/api/admin/orders?from=2026-10-24&to=2026-10-24")
+
+    assert response.status_code == 200
+    assert {item["id"] for item in response.json()["items"]} == {str(orders[0].id), str(orders[1].id)}
+
+
 def test_empty_list(orders: list[Order]) -> None:
     client = make_client(orders)
 
