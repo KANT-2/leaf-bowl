@@ -16,9 +16,9 @@ from sqlalchemy.pool import NullPool
 
 from admin_orders.application.order_status import AdminOrderStatusService
 from core import security
-from core.config import get_settings
+from core.config import Settings, get_settings
 from core.exceptions import Conflict
-from database import Base, async_database_url, get_session
+from database import Base, async_database_url, create_db_engine, get_session
 from main import create_app
 from orders.domain.order import OrderStatus
 from orders.infrastructure.repositories import SqlOrderRepository
@@ -156,6 +156,25 @@ async def test_status_history_and_invalid_transitions(sessions, admin):
     with pytest.raises(Conflict):
         await change(sessions, order_id, status=OrderStatus.CONFIRMED, version=5)
     assert await snapshot(sessions, order_id) == completed
+
+
+async def test_configured_pool_preserves_status_transaction(sessions, admin):
+    engine = create_db_engine(
+        Settings(_env_file=None, database_url=os.environ["TEST_DATABASE_URL"],
+                 database_pool_size=2, database_max_overflow=1)
+    )
+    pooled_sessions = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        order_id = await make_order(sessions)
+        before = await snapshot(sessions, order_id)
+        await change(pooled_sessions, order_id)
+        after = await snapshot(sessions, order_id)
+        assert after[0] == ("confirmed", 2)
+        assert len(after[1]) == len(before[1]) + 1
+        assert after[1][-1].changed_by == "admin"
+        assert engine.sync_engine.pool.checkedout() == 0
+    finally:
+        await engine.dispose()
 
 
 async def test_concurrent_patches_commit_once(sessions, admin):
