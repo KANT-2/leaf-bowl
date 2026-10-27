@@ -1446,17 +1446,6 @@
   padding: 8px 12px;
   font-size: 13px;
 }
-.menu-ingredient-search {
-  position: relative;
-}
-.menu-ingredient-search > svg {
-  position: absolute;
-  left: 12px;
-  top: 12px;
-}
-.menu-ingredient-search > input {
-  padding-left: 38px;
-}
 .menu-ingredient-filters {
   display: flex;
   flex-wrap: wrap;
@@ -1648,19 +1637,6 @@
   gap: 24px;
   margin-bottom: 14px;
 }
-.origin-search {
-  position: relative;
-  flex: 1;
-  max-width: 560px;
-}
-.origin-search > svg {
-  position: absolute;
-  top: 12px;
-  left: 14px;
-}
-.origin-search > input {
-  padding-left: 42px;
-}
 .origin-filters > select {
   min-width: 220px;
   border: 1px solid var(--border);
@@ -1715,9 +1691,6 @@
     align-items: stretch;
     flex-direction: column;
     gap: 10px;
-  }
-  .origin-search {
-    max-width: none;
   }
   .origin-table th,
   .origin-table td {

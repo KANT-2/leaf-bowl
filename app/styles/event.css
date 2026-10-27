@@ -55,73 +55,6 @@
     margin-left: 0;
   }
 }
-.ev-filters {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.ev-filters button {
-  min-width: 96px;
-  height: 42px;
-  padding: 0 20px;
-  border: 1px solid var(--color-input-border);
-  border-radius: 999px;
-  background: var(--color-surface);
-  color: var(--color-ink);
-  font: inherit;
-  font-size: 15px;
-  cursor: pointer;
-  transition:
-    background-color 0.15s,
-    border-color 0.15s,
-    color 0.15s;
-}
-.ev-filters button:hover {
-  border-color: var(--color-brand);
-}
-.ev-filters button[aria-pressed="true"] {
-  background: var(--color-brand);
-  border-color: var(--color-brand);
-  color: #fff;
-  font-weight: 600;
-}
-.ev-search {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: min(330px, 100%);
-  height: 42px;
-  padding: 0 18px;
-  border: 1px solid var(--color-input-border);
-  border-radius: 999px;
-  background: var(--color-surface);
-}
-.ev-search:focus-within {
-  border-color: var(--color-focus);
-}
-.ev-search svg {
-  width: 18px;
-  height: 18px;
-  flex: none;
-  fill: none;
-  stroke: var(--color-ink);
-  stroke-width: 1.8;
-  stroke-linecap: round;
-}
-.ev-search input {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  font: inherit;
-  font-size: 14px;
-  color: var(--color-ink);
-}
-.ev-search input::placeholder {
-  color: var(--color-muted-text);
-}
 .ev-count {
   flex: none;
   font-size: 14px;
@@ -235,21 +168,10 @@ a.ev-card:hover h2 {
 .ev-row.is-ended .ev-photo img {
   filter: saturate(0.6);
 }
-.ev-empty {
-  padding: 80px 0;
-  text-align: center;
-  color: var(--color-subtle-text);
-  border-top: 1px solid var(--color-line);
-}
 
 @media (max-width: 900px) {
   .ev-toolbar {
     flex-wrap: wrap;
-  }
-  .ev-search {
-    margin-left: 0;
-    flex: 1;
-    width: auto;
   }
   .ev-card {
     gap: 22px;
@@ -264,17 +186,6 @@ a.ev-card:hover h2 {
   }
   .ev-head h1 {
     font-size: 32px;
-  }
-  .ev-filters {
-    width: 100%;
-    gap: 8px;
-  }
-  .ev-filters button {
-    flex: 1;
-    min-width: 0;
-    padding: 0 10px;
-    height: 38px;
-    font-size: 14px;
   }
   .ev-card {
     grid-template-columns: minmax(0, 1fr) 20px;
