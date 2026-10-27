@@ -31,9 +31,29 @@
 
 .ev-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 16px;
   margin-bottom: 24px;
+}
+.ev-toolbar-search {
+  margin-left: auto;
+  flex: 1 1 220px;
+  max-width: 360px;
+}
+.ev .ev-reset {
+  height: var(--control-height);
+  padding-block: 0;
+  border-radius: var(--radius-control);
+  font-size: var(--type-control);
+}
+@media (max-width: 700px) {
+  .ev-toolbar-search {
+    width: 100%;
+    max-width: none;
+    flex-basis: 100%;
+    margin-left: 0;
+  }
 }
 .ev-filters {
   display: flex;

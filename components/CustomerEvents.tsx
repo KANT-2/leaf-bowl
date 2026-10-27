@@ -3,6 +3,9 @@ import Link from "next/link";
 import { useState } from "react";
 import EventPicture from "./EventPicture";
 import { eventStatusLabel, type CustomerEvent, type EventStatus } from "@/modules/events/schema";
+import SearchField from "./controls/SearchField";
+import FilterGroup from "./controls/FilterGroup";
+import StatusFeedback from "./controls/StatusFeedback";
 
 type Filter = "all" | EventStatus;
 
@@ -76,26 +79,20 @@ export default function CustomerEvents({ events }: { events: CustomerEvent[] }) 
         <span className="ev-eyebrow">THIS MONTH’S EVENT</span>
       </header>
       <div className="ev-toolbar">
-        <div className="ev-filters" role="group" aria-label="이벤트 상태">
-          {filters.map((f) => (
-            <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)}>
-              {f === "all" ? "전체" : eventStatusLabel[f]}
-            </button>
-          ))}
-        </div>
-        <label className="ev-search">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="11" cy="11" r="6.5" />
-            <path d="m16 16 4.5 4.5" />
-          </svg>
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="이벤트 제목 검색"
-            aria-label="이벤트 제목 검색"
-          />
-        </label>
+        <FilterGroup
+          label="이벤트 상태"
+          options={filters.map((key) => ({ key, label: key === "all" ? "전체" : eventStatusLabel[key] }))}
+          value={filter}
+          onChange={setFilter}
+          solid
+        />
+        <SearchField
+          className="ev-toolbar-search"
+          label="이벤트 제목 검색"
+          value={query}
+          onChange={setQuery}
+          placeholder="이벤트 제목 검색"
+        />
         <span className="ev-count" role="status" aria-live="polite">
           총 {shown.length}건
         </span>
@@ -107,11 +104,20 @@ export default function CustomerEvents({ events }: { events: CustomerEvent[] }) 
           ))}
         </ul>
       ) : (
-        <p className="ev-empty">
-          {events.length
-            ? "조건에 맞는 이벤트가 없어요."
-            : "지금 준비 중인 이벤트가 없어요. 곧 새로운 소식으로 찾아올게요."}
-        </p>
+        <StatusFeedback title={events.length ? "조건에 맞는 이벤트가 없습니다" : "등록된 이벤트가 없습니다"}>
+          {events.length > 0 && (
+            <button
+              className="ghost-btn ev-reset"
+              type="button"
+              onClick={() => {
+                setFilter("all");
+                setQuery("");
+              }}
+            >
+              조건 모두 지우기
+            </button>
+          )}
+        </StatusFeedback>
       )}
     </section>
   );
