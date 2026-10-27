@@ -680,3 +680,117 @@ test("관리자 배달일·시간대 필터는 전체 주문에 적용되고 최
   assert.equal((await list("deliveryDate=2026-10-13&deliveryHour=24")).status, 400);
   assert.equal((await list("deliveryDate=2026-02-30")).status, 400);
 });
+
+test("FastAPI 관리자 브리지는 서버에서 JWT를 전달하고 목록·상세·PATCH·로그아웃 계약을 유지한다", async () => {
+  await setup();
+  const originalFetch = global.fetch;
+  const originalFlag = process.env.ADMIN_FASTAPI_BRIDGE_ENABLED;
+  const token = `header.${Buffer.from(JSON.stringify({ sub: "admin-1", role: "admin" })).toString("base64url")}.signature`;
+  const id = "11111111-1111-4111-8111-111111111111";
+  const calls = [];
+  let failStatus = 0;
+  process.env.ADMIN_FASTAPI_BRIDGE_ENABLED = "true";
+  global.fetch = async (url, init) => {
+    calls.push({ url: String(url), init });
+    if (String(url).endsWith("/api/admin/token")) {
+      return Response.json({ access_token: token, expires_in: 3600 });
+    }
+    assert.equal(init.headers.Authorization, `Bearer ${token}`);
+    if (failStatus) {
+      return Response.json({}, { status: failStatus });
+    }
+    if (String(url).includes("/status")) {
+      assert.deepEqual(JSON.parse(init.body), { status: "confirmed", version: 1, reason: "확인" });
+      return Response.json({ id, status: "confirmed", version: 2 });
+    }
+    if (String(url).endsWith(`/orders/${id}`)) {
+      return Response.json({ id, version: 2, history: [{ toStatus: "confirmed" }] });
+    }
+    if (String(url).endsWith("/api/admin/logout")) {
+      return new Response(null, { status: 204 });
+    }
+    return Response.json({ items: [{ id }], nextCursor: null });
+  };
+  try {
+    const login = await routes.login.POST(
+      req("/api/v1/auth/login", {
+        method: "POST",
+        body: { loginId: "admin", password: "test-password" },
+      }),
+    );
+    assert.equal(login.status, 200);
+    assert.ok(!JSON.stringify(await login.json()).includes(token));
+    const cookies = login.headers.getSetCookie();
+    assert.equal(cookies.length, 2);
+    assert.ok(cookies.every((cookie) => cookie.includes("HttpOnly")));
+    const cookie = cookies.map((value) => value.split(";")[0]).join("; ");
+    const list = await routes.adminOrders.GET(req("/api/v1/admin/orders?limit=2", { cookie }));
+    assert.equal(list.status, 200);
+    assert.equal((await list.json()).items[0].id, id);
+    const detail = await require("../app/api/v1/admin/orders/[id]/route.ts").GET(
+      req(`/api/v1/admin/orders/${id}`, { cookie }),
+      ctx(id),
+    );
+    assert.equal(detail.status, 200);
+    assert.equal((await detail.json()).history[0].toStatus, "confirmed");
+    const patch = await routes.adminStatus.PATCH(
+      req(`/api/v1/admin/orders/${id}/status`, {
+        method: "PATCH",
+        cookie,
+        body: { status: "confirmed", version: 1, reason: "확인" },
+      }),
+      ctx(id),
+    );
+    assert.equal(patch.status, 200);
+    assert.equal((await patch.json()).version, 2);
+    for (const [status, invoke] of [
+      [401, () => routes.adminOrders.GET(req("/api/v1/admin/orders", { cookie }))],
+      [
+        404,
+        () =>
+          require("../app/api/v1/admin/orders/[id]/route.ts").GET(
+            req(`/api/v1/admin/orders/${id}`, { cookie }),
+            ctx(id),
+          ),
+      ],
+      [
+        409,
+        () =>
+          routes.adminStatus.PATCH(
+            req(`/api/v1/admin/orders/${id}/status`, {
+              method: "PATCH",
+              cookie,
+              body: { status: "confirmed", version: 1 },
+            }),
+            ctx(id),
+          ),
+      ],
+      [
+        422,
+        () =>
+          routes.adminStatus.PATCH(
+            req(`/api/v1/admin/orders/${id}/status`, {
+              method: "PATCH",
+              cookie,
+              body: { status: "confirmed", version: 1 },
+            }),
+            ctx(id),
+          ),
+      ],
+    ]) {
+      failStatus = status;
+      assert.equal((await invoke()).status, status);
+    }
+    failStatus = 0;
+    const logout = await routes.logout.POST(req("/api/v1/auth/logout", { method: "POST", cookie }));
+    assert.equal(logout.status, 200);
+    assert.ok(calls.some((call) => call.url.endsWith("/api/admin/logout")));
+  } finally {
+    global.fetch = originalFetch;
+    if (originalFlag === undefined) {
+      delete process.env.ADMIN_FASTAPI_BRIDGE_ENABLED;
+    } else {
+      process.env.ADMIN_FASTAPI_BRIDGE_ENABLED = originalFlag;
+    }
+  }
+});

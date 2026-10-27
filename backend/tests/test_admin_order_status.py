@@ -188,6 +188,18 @@ def test_invalid_transition_returns_409(order):
     assert transaction.rollbacks == 1
 
 
+def test_admin_cannot_cancel_customer_order(order):
+    client, transaction, _ = make_client(order)
+
+    response = patch(client, order.id, status="canceled")
+
+    assert response.status_code == 409
+    assert order.status == OrderStatus.RECEIVED
+    assert order.version == 1
+    assert not order.history
+    assert transaction.commits == 0
+
+
 def test_stale_version_returns_409(order):
     client, transaction, _ = make_client(order)
 
