@@ -176,3 +176,31 @@ cd backend
 `tests/test_database_pool.py`에서 설정 범위·기본값·엔진 옵션·종료 시 엔진 해제, 실DB checkout 타임아웃·관리자 주문 조회·연결 반환을 검증한다. 기존 관리자 상태 변경 서비스와 UC-C 세션 코드는 변경하지 않았다. 공용 DB, 실제 주문, 팀 공용 계정에는 벤치마크나 쓰기 테스트를 실행하지 않는다.
 
 실행 결과: 풀 설정 및 관리자 상태 변경 단위 테스트 27개, UC-C 주문 API Fake 테스트 44개, 새 풀 설정(2/1)을 적용한 실DB 관리자 상태 변경 트랜잭션 테스트 1개 통과. 수정 파일 Ruff와 `git diff --check` 통과. 벤치마크 직후 주문 수는 6건으로 시작 시와 같고 테스트 DB 접속 세션은 확인 쿼리 자체의 1개뿐이었다. 이후 별도 상태 변경 시험 주문 1건을 생성해 status/version/history가 함께 영속화되고 연결이 반환되는지 확인했다. 기존 동시성·롤백 검증은 변경 범위 밖이므로 반복 실행하지 않았다.
+
+## Redmine #887 · W102 낙관적·비관적 잠금 비교 (2026-10-27)
+
+### 격리 환경과 방법
+
+- 기존 전용 PostgreSQL 18.4 클러스터의 `127.0.0.1:55432`, `leaf_bowl_uc_d_test`, 데이터 디렉터리 `C:\dev\leaf-bowl\.data\uc-d-postgres-20261026`, 시스템 식별자 `7700979184671432628`을 쓰기 전에 다시 대조했다. 연결 한도는 100, 실험 전 주문 수는 7건이었다. 기존 env 파일·공용 Supabase는 사용하지 않았다.
+- `tools/uc_d_locking_comparison.py`는 기존 `test_admin_order_postgres.py`의 시험 주문 생성·스냅샷, `AdminOrderStatusService`, 공통 `SqlOrderRepository`를 재사용한다. 운영 코드의 version 조건 UPDATE는 그대로 둔다. 실험용 비관적 경로에서만 `SELECT ... FOR UPDATE` 후 status/version을 다시 확인하고 같은 서비스를 호출한다.
+- 두 방식 모두 초기 `received`/version 1/이력 1건, 동시 요청 2개, 풀 5/overflow 10, `lock_timeout=2초`, `statement_timeout=5초`를 사용했다. 방식별 워밍업 2쌍, 본 측정 10쌍 × 3회(요청 60건). 반복별 실행 순서를 교차했다. 시험 주문 생성과 결과 확인 시간은 아래 응답 지연·처리량에서 제외했다.
+
+| 방식 | 성공 / 충돌 / 오류 | 평균 ms | p50 / p95 ms | 처리량 req/s | FOR UPDATE 획득 평균 / p95 ms | 타임아웃 / 데드락 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 기존 낙관적 잠금 | 30 / 30 / 0 | 14.69 | 14.98 / 16.95 | 132.9 | 해당 없음 | 0 / 0 |
+| 실험용 비관적 잠금 | 30 / 30 / 0 | 13.39 | 12.85 / 15.23 | 145.7 | 5.72 / 12.14 | 0 / 0 |
+
+모든 시험 쌍에서 정확히 한 요청만 성공했고, 종료 후 각 주문이 `confirmed`/version 2/이력 2건(관리자 변경 1건)임을 확인했다. 실험 후 DB에서 W102 사유의 관리자 이력 **65건**(워밍업 4 + 측정 60 + 대기 제어 1)을 별도 조회했고, 풀의 종료 시 대여 연결은 0개, 확인 쿼리 시 DB 세션은 1개였다. 첫 세션이 행 잠금을 보유한 상태에서 두 번째 세션의 획득 시간이 **91.77 ms**였고, `lock_timeout=30 ms`를 강제한 경우 PostgreSQL `55P03` 잠금 타임아웃과 주문 불변을 확인했다. 위 표의 획득 시간은 네트워크 왕복과 SQL 실행 시간도 포함하므로 순수 DB 잠금 대기 시간은 아니다.
+
+**판정:** 두 방식 모두 정합성 PASS. 이 작은 로컬 워크로드에서 `FOR UPDATE` 경로의 p95는 낮고 처리량은 높게 측정됐지만, 단일 환경·동시 요청 2개·3회 반복만으로 운영 우월성을 확정할 수 없다. 비교 경로도 공통 서비스를 재사용하므로 잠금 획득 뒤 version 조건 UPDATE를 실행하는 **추가 잠금 실험**이다. 기존 낙관적 잠금을 유지한다. W102 실험에서 FAIL/BLOCKED 항목은 없다.
+
+### 재실행
+
+이 스크립트는 테스트 주문을 INSERT/UPDATE한다. 반드시 위의 격리 클러스터가 같은 식별자로 실행 중일 때만 현재 PowerShell 프로세스에 아래 값을 설정한다. 스크립트도 접속 주소·DB명·데이터 디렉터리·시스템 식별자를 검사한 뒤 쓰기를 시작한다. 비밀번호·JWT·고객 정보는 출력하지 않는다.
+
+```powershell
+$env:TEST_DATABASE_URL = 'postgresql://<local-test-user>@127.0.0.1:55432/leaf_bowl_uc_d_test'
+$env:UC_D_TEST_DATA_DIRECTORY = 'C:\dev\leaf-bowl\.data\uc-d-postgres-20261026'
+$env:UC_D_TEST_SYSTEM_ID = '7700979184671432628'
+backend\.venv\Scripts\python.exe tools\uc_d_locking_comparison.py
+```
