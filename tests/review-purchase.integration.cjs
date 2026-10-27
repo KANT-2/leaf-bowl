@@ -11,14 +11,16 @@ const { publicSnapshot } = require("../modules/catalog/public-snapshot.ts");
 const { applyDefaultSql } = require("../seed/sql.ts");
 const { createOrderSchema } = require("../modules/orders/schema.ts");
 const { hashPassword } = require("../modules/identity/crypto.ts");
+const { customerCatalog } = require("../modules/catalog/customer-view.ts");
+const { CUSTOM_BOWL_PID } = require("../modules/reviews/model.ts");
 
 const db = prisma();
 assert.match(decodeURIComponent(new URL(process.env.DATABASE_URL).pathname.slice(1)), /(?:^|[_-])test$/);
 after(() => db.$disconnect());
 const guest = (customerSessionId) => ({ customerSessionId });
 
-/** 완료 직전까지 갈 수 있는 샐러드 1품목 주문을 만든다 */
-async function placeSaladOrder(session) {
+/** 완료 직전까지 갈 수 있는 1품목 주문을 만든다 (기본은 샐러드, line 으로 내 취향 볼 등) */
+async function placeSaladOrder(session, line) {
   const catalog = await readCatalog();
   const product = catalog.catalog.products.find((p) => p.type === "salad" && !p.deleted && p.status === "active");
   const future = new Date(Date.now() + 3 * 86400_000);
@@ -34,7 +36,9 @@ async function placeSaladOrder(session) {
       addressDetail: "",
       desiredStartAt: future.toISOString(),
       desiredEndAt: new Date(future.getTime() + 3600_000).toISOString(),
-      items: [{ productId: product.customerId, dressingKeys: ["dressing-0"], drinkKeys: ["drink-1"], quantity: 2 }],
+      items: [
+        line ?? { productId: product.customerId, dressingKeys: ["dressing-0"], drinkKeys: ["drink-1"], quantity: 2 },
+      ],
     }),
   );
   return { orders, order, product };
@@ -150,6 +154,69 @@ test("member orders are reviewed by the member only, once per item, with the mem
     }
   } finally {
     await db.reviewSubmission.deleteMany({ where: { customerId: member.customerId } });
+    await db.order.delete({ where: { id: order.id } });
+    await db.adminUser.delete({ where: { id: admin.id } });
+  }
+});
+
+test("custom bowl items are reviewed with the chosen ingredients and kept out of menu ratings", async () => {
+  await applyDefaultSql(process.env.DATABASE_URL);
+  const session = randomUUID();
+  const admin = await db.adminUser.create({
+    data: { loginId: "review-custom-" + randomUUID(), passwordHash: await hashPassword("test-only-password") },
+  });
+  const { orders, order, product } = await placeSaladOrder(session, {
+    ingredientKeys: ["romaine", "shrimp", "tofu", "mango"],
+    dressingKeys: ["dressing-0"],
+    quantity: 3,
+  });
+  const item = order.items[0];
+  assert.equal(item.productType, "custom");
+  const review = {
+    id: "custom-" + randomUUID(),
+    pid: CUSTOM_BOWL_PID,
+    orderItemId: item.id,
+    author: "볼**",
+    stars: 5,
+    title: "내 조합 최고",
+    text: "고른 재료 그대로 잘 담겨 왔어요.",
+    via: "delivery",
+  };
+  try {
+    await assert.rejects(verifyReviewPurchase(guest(session), review), (e) => e.status === 400);
+    await complete(orders, admin.id, order);
+    await assert.rejects(verifyReviewPurchase(guest(randomUUID()), review), (e) => e.status === 404);
+    // 내 취향 볼 품목을 샐러드 메뉴 리뷰로 쓸 수는 없다
+    await assert.rejects(
+      verifyReviewPurchase(guest(session), { ...review, pid: product.customerId }),
+      (e) => e.status === 400,
+    );
+    const before = customerCatalog(await readCatalog()).reviews.filter((r) => r.pid === product.customerId).length;
+
+    const saved = await appendPurchasedReview(guest(session), review);
+    const stored = saved.catalog.reviews.find((r) => r.id === review.id);
+    assert.equal(stored.productId, undefined);
+    assert.match(stored.menu, /^내 취향 볼 \(레몬 올리브, 아삭한 로메인, 탱글한 새우, 고소한 두부, 달콤한 망고\)$/);
+    const row = await db.review.findUnique({ where: { id: review.id } });
+    assert.equal(row.productId, null);
+    assert.equal(row.originalProductId, null);
+
+    const view = customerCatalog(await readCatalog());
+    const shown = view.reviews.find((r) => r.id === review.id);
+    assert.equal(shown.pid, CUSTOM_BOWL_PID);
+    assert.match(shown.choices, /아삭한 로메인/);
+    assert.equal(view.reviews.filter((r) => r.pid === product.customerId).length, before);
+
+    assert.equal((await appendPurchasedReview(guest(session), review)).revision, saved.revision);
+    await assert.rejects(
+      appendPurchasedReview(guest(session), { ...review, id: "custom-again-" + randomUUID() }),
+      (e) => e.status === 409,
+    );
+  } finally {
+    const current = await readCatalog();
+    current.catalog.reviews = current.catalog.reviews.filter((r) => r.id !== review.id);
+    await writeCatalog(current.catalog, current.revision);
+    await db.reviewSubmission.deleteMany({ where: { customerSessionId: session } });
     await db.order.delete({ where: { id: order.id } });
     await db.adminUser.delete({ where: { id: admin.id } });
   }

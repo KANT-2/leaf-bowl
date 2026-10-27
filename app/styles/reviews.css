@@ -237,6 +237,12 @@
   max-width: 760px;
   overflow-wrap: anywhere;
 }
+.rv-item p.rv-item-choices {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-muted);
+}
 .rv-item-meta {
   display: flex;
   flex-wrap: wrap;

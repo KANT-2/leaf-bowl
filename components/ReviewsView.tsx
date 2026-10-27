@@ -12,12 +12,23 @@ import StarRating from "./StarRating";
 import { useReducedMotion } from "@/features/shared/hooks";
 import { useCustomerCatalog } from "./CustomerCatalogProvider";
 import { money } from "@/modules/shared/format";
-import { SORTERS, SORT_LABELS, statsOf, type SortKey } from "@/modules/reviews/model";
+import {
+  CUSTOM_BOWL_NAME,
+  CUSTOM_BOWL_PID,
+  CUSTOM_BOWL_REVIEWS_PATH,
+  SORTERS,
+  SORT_LABELS,
+  statsOf,
+  type SortKey,
+} from "@/modules/reviews/model";
 
 const PAGE = 10;
+/** 메뉴 선택에서 「내 취향 볼」을 뜻하는 값 */
+const CUSTOM_OPTION = "custom-bowl";
 
 /**
- * 고객 리뷰 화면. /reviews(전체 메뉴, pid=null)와 /product/[id]/reviews(한 메뉴)가 함께 쓴다.
+ * 고객 리뷰 화면. /reviews(전체 메뉴, pid=null), /product/[id]/reviews(한 메뉴),
+ * /reviews/custom-bowl(내 취향 볼, pid=CUSTOM_BOWL_PID)이 함께 쓴다.
  * 메뉴를 바꾸면 해당 주소로 이동하고, 별점 막대를 누르면 그 별점만 걸러 본다.
  */
 export default function ReviewsView({ pid }: { pid: number | null }) {
@@ -35,7 +46,8 @@ export default function ReviewsView({ pid }: { pid: number | null }) {
   const focusFrom = useRef<number | null>(null);
 
   const { visibleProducts: PRODUCTS, getProduct } = useCustomerCatalog();
-  const product = pid === null ? null : getProduct(pid);
+  const custom = pid === CUSTOM_BOWL_PID;
+  const product = pid === null || custom ? null : getProduct(pid);
   const all = pid === null ? allReviews : reviewsFor(pid);
   const s = statsOf(all);
   const list = all.filter((r) => star === null || r.stars === star).sort(SORTERS[sort]);
@@ -82,7 +94,10 @@ export default function ReviewsView({ pid }: { pid: number | null }) {
     return () => clearTimeout(t);
   }, []);
 
-  const changeMenu = (value: string) => router.push(value === "" ? "/reviews" : `/product/${value}/reviews`);
+  const changeMenu = (value: string) =>
+    router.push(
+      value === "" ? "/reviews" : value === CUSTOM_OPTION ? CUSTOM_BOWL_REVIEWS_PATH : `/product/${value}/reviews`,
+    );
 
   return (
     <div className="rv">
@@ -90,9 +105,9 @@ export default function ReviewsView({ pid }: { pid: number | null }) {
         <div>
           <span className="eyebrow">CUSTOMER REVIEWS</span>
           <PageHeading>
-            {product ? (
+            {product || custom ? (
               <>
-                {product.name} <span>리뷰</span>
+                {product?.name ?? CUSTOM_BOWL_NAME} <span>리뷰</span>
               </>
             ) : (
               "고객 리뷰"
@@ -104,7 +119,7 @@ export default function ReviewsView({ pid }: { pid: number | null }) {
         </button>
       </div>
 
-      <section className={`rv-sum${product ? " has-product" : ""}`} aria-label="평점 요약">
+      <section className={`rv-sum${product || custom ? " has-product" : ""}`} aria-label="평점 요약">
         <div className="rv-score">
           <strong>{s.avg.toFixed(1)}</strong>
           <div>
@@ -143,18 +158,27 @@ export default function ReviewsView({ pid }: { pid: number | null }) {
             </span>
           </Link>
         )}
+        {custom && (
+          <Link className="rv-product" href="/match">
+            <span>
+              <b>{CUSTOM_BOWL_NAME}</b>
+              좋아하는 재료만 골라 담는 나만의 볼<i>만들러 가기 →</i>
+            </span>
+          </Link>
+        )}
       </section>
 
       <div className="rv-toolbar" ref={toolbarRef}>
         <label className="rv-menu">
           <span>메뉴</span>
-          <select value={pid ?? ""} onChange={(e) => changeMenu(e.target.value)}>
+          <select value={custom ? CUSTOM_OPTION : (pid ?? "")} onChange={(e) => changeMenu(e.target.value)}>
             <option value="">전체 메뉴</option>
             {PRODUCTS.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
             ))}
+            <option value={CUSTOM_OPTION}>{CUSTOM_BOWL_NAME}</option>
           </select>
         </label>
         {star !== null && (
