@@ -52,6 +52,7 @@ function runAiDiagnosis() {
     child.stdin.end();
   });
 }
+
 async function main() {
   await fs.mkdir(output, { recursive: true });
   const browser = await chromium.launch({ headless: true });
