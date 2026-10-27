@@ -1,0 +1,8 @@
+# Vercel(Next.js 화면 프로젝트)로 올리지 않을 것. 비밀값은 Vercel 환경 변수로 따로 넣는다.
+# FastAPI(backend/)는 별도 Vercel 프로젝트(leaf-bowl-api)로 배포한다.
+.env
+.env.*
+!.env.example
+backend/
+ops/
+.venv/
