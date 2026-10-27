@@ -1,0 +1,16 @@
+.feedback {
+  grid-column: 1 / -1;
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
+  color: var(--color-ink);
+  font-size: var(--type-body);
+  line-height: var(--leading-body);
+}
+.title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--type-input);
+  font-weight: 600;
+}
+.feedback[role="alert"] .title {
+  color: var(--control-error);
+}

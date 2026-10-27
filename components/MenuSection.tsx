@@ -9,6 +9,10 @@ import { useReviews } from "./ReviewsProvider";
 import { MATCH_URL } from "@/features/customer/routes";
 import { type Product, type ProductTag } from "@/modules/catalog/customer-product";
 import { searchMenus, type MenuPage, type MenuSearch } from "@/features/catalog/client";
+import { ChevronDown } from "lucide-react";
+import SearchField from "./controls/SearchField";
+import FilterGroup from "./controls/FilterGroup";
+import StatusFeedback from "./controls/StatusFeedback";
 
 type Filter = string;
 
@@ -191,8 +195,11 @@ export default function MenuSection() {
     setExcluded([]);
     setMinPrice("");
     setMaxPrice("");
+    setSort("default");
     setPage(1);
   };
+
+  const hasFilters = filter !== "all" || !!term.trim() || excluded.length > 0 || minPrice !== "" || maxPrice !== "";
 
   return (
     <section className="menu-page" id="menu">
@@ -201,50 +208,37 @@ export default function MenuSection() {
           <div className="eyebrow">FIND YOUR DAILY BOWL</div>
           <PageHeading>매일 먹고 싶은 메뉴</PageHeading>
         </div>
-        <label className="search">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-            <circle cx="10" cy="10" r="6" />
-            <path d="m15 15 5 5" />
-          </svg>
-          <input
-            type="search"
-            placeholder="메뉴 검색"
-            aria-label="메뉴 검색"
-            value={term}
-            onChange={(e) => {
-              setTerm(e.target.value);
-              setPage(1);
-            }}
-          />
-        </label>
+        <SearchField
+          label="메뉴 검색"
+          placeholder="메뉴 검색"
+          value={term}
+          loading={loading}
+          onChange={(value) => {
+            setTerm(value);
+            setPage(1);
+          }}
+        />
       </div>
-      <div className="filters" role="group" aria-label="메뉴 분류">
-        {FILTERS.map((f) => (
-          <button
-            key={f.key}
-            type="button"
-            className={filter === f.key ? "active" : ""}
-            aria-pressed={filter === f.key}
-            onClick={() => {
-              setFilter(f.key);
-              setPage(1);
-            }}
-          >
-            {f.label}
-            {false && <span>NEW</span>}
-          </button>
-        ))}
-      </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "end", marginBottom: 16 }}>
+      <FilterGroup
+        label="메뉴 분류"
+        options={FILTERS}
+        value={filter}
+        className="menu-filters"
+        onChange={(value) => {
+          setFilter(value);
+          setPage(1);
+        }}
+      />
+      <div className="menu-price-range" role="group" aria-label="가격 범위">
         <label>
           최소 가격 (원)
           <input
-            type="number"
-            min="0"
-            step="1"
+            type="text"
+            inputMode="numeric"
+            aria-invalid={!!priceError}
+            aria-describedby={priceError ? "menu-price-error" : "menu-price-help"}
             value={minPrice}
             placeholder="제한 없음"
-            style={{ display: "block", width: 140 }}
             onChange={(event) => {
               setMinPrice(event.target.value);
               setPage(1);
@@ -254,12 +248,12 @@ export default function MenuSection() {
         <label>
           최대 가격 (원)
           <input
-            type="number"
-            min="0"
-            step="1"
+            type="text"
+            inputMode="numeric"
+            aria-invalid={!!priceError}
+            aria-describedby={priceError ? "menu-price-error" : "menu-price-help"}
             value={maxPrice}
             placeholder="제한 없음"
-            style={{ display: "block", width: 140 }}
             onChange={(event) => {
               setMaxPrice(event.target.value);
               setPage(1);
@@ -270,6 +264,15 @@ export default function MenuSection() {
           조건 모두 지우기
         </button>
       </div>
+      {priceError ? (
+        <p className="menu-price-error" id="menu-price-error" role="alert">
+          {priceError}
+        </p>
+      ) : (
+        <p className="menu-price-help" id="menu-price-help">
+          쉼표 없이 정수로 입력하세요. 빈 가격은 제한 없이 조회합니다.
+        </p>
+      )}
       <div className="menu-tools">
         <button
           type="button"
@@ -279,10 +282,16 @@ export default function MenuSection() {
           onClick={() => setShowAllergy((v) => !v)}
         >
           알레르기 제외{excluded.length ? ` ${excluded.length}` : ""}{" "}
-          <span aria-hidden="true">{showAllergy ? "▴" : "▾"}</span>
+          <ChevronDown aria-hidden="true" className={showAllergy ? "is-expanded" : undefined} />
         </button>
         <span className="menu-count" aria-live="polite">
-          {loading ? "메뉴 불러오는 중…" : errorMessage ? "메뉴 조회 실패" : `전체 ${total}개 메뉴`}
+          {priceError
+            ? "가격 입력 중"
+            : loading
+              ? "메뉴 불러오는 중…"
+              : errorMessage
+                ? "메뉴 조회 실패"
+                : `전체 ${total}개 메뉴`}
         </span>
         <label className="menu-sort">
           <span className="sr-only">정렬</span>
@@ -299,6 +308,7 @@ export default function MenuSection() {
               </option>
             ))}
           </select>
+          <ChevronDown aria-hidden="true" />
         </label>
       </div>
       <div
@@ -332,11 +342,9 @@ export default function MenuSection() {
       </div>
       <div className="product-grid" aria-busy={loading}>
         {loading ? (
-          <p role="status" style={{ gridColumn: "1/-1" }}>
-            메뉴를 불러오고 있습니다.
-          </p>
-        ) : errorMessage ? (
-          <div role="alert" className="empty" style={{ gridColumn: "1/-1" }}>
+          <StatusFeedback title="메뉴를 불러오고 있습니다." />
+        ) : priceError ? null : errorMessage ? (
+          <StatusFeedback error title="메뉴를 불러오지 못했어요">
             <p>{errorMessage}</p>
             {!priceError && (
               <button
@@ -347,27 +355,24 @@ export default function MenuSection() {
                 {missingMetadata ? "화면 새로고침" : "다시 시도"}
               </button>
             )}
-          </div>
+          </StatusFeedback>
         ) : shown.length ? (
           shown.map((p, i) => <ProductCard key={p.id} product={p} eager={i < 4} />)
         ) : (
-          <div className="empty" style={{ gridColumn: "1/-1" }}>
-            조건에 맞는 메뉴가 없어요. 검색어나 필터를 줄여보세요.
-            <br />
-            <button type="button" className="ghost-btn empty-reset" onClick={resetAll}>
-              조건 모두 지우기
-            </button>
+          <StatusFeedback title={hasFilters ? "조건에 맞는 메뉴가 없습니다" : "등록된 메뉴가 없습니다"}>
+            {hasFilters && (
+              <button type="button" className="ghost-btn empty-reset" onClick={resetAll}>
+                조건 모두 지우기
+              </button>
+            )}
             <Link className="empty-match" href={MATCH_URL}>
               원하는 재료로 직접 만들기 ♡
             </Link>
-          </div>
+          </StatusFeedback>
         )}
       </div>
       {!loading && !errorMessage && total > 0 && (
-        <nav
-          aria-label="메뉴 페이지 이동"
-          style={{ display: "flex", gap: 16, justifyContent: "center", alignItems: "center", marginTop: 24 }}
-        >
+        <nav aria-label="메뉴 페이지 이동" className="menu-pagination">
           <button
             type="button"
             className="ghost-btn"
