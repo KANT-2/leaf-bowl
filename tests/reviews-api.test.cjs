@@ -156,3 +156,68 @@ test("review photos reject corrupt data, save three images and clean files after
     await fs.rm(directory, { recursive: true, force: true });
   }
 });
+
+test("member reviews are authorized by FastAPI /api/me together with this browser's guest session", async () => {
+  const { GET } = require("../app/api/reviews/route.ts");
+  const originalFetch = global.fetch;
+  const originalOwn = store.ownReviewSubmissions;
+  const calls = [];
+  const seen = [];
+  let me = { status: 200, body: { id: 42, email: "member@example.com" } };
+  global.fetch = async (url, init) => {
+    calls.push({ url: String(url), authorization: init.headers.authorization });
+    if (!me.status) {
+      throw new TypeError("fetch failed");
+    }
+    return Response.json(me.body, { status: me.status });
+  };
+  store.verifyReviewPurchase = async (identity) => {
+    seen.push(identity);
+    throw new AppError(404, "리뷰를 작성할 주문 품목을 찾을 수 없습니다.");
+  };
+  store.ownReviewSubmissions = async (identity) => {
+    seen.push(identity);
+    return [{ reviewId: "member-review", orderItemId: "7" }];
+  };
+  const memberRequest = (authorization, { cookie = "lb_guest=test-guest", method = "POST" } = {}) =>
+    new Request("http://localhost:3000/api/reviews", {
+      method,
+      headers: {
+        origin: "http://localhost:3000",
+        "content-type": "application/json",
+        authorization,
+        ...(cookie ? { cookie } : {}),
+      },
+      body: method === "POST" ? valid : undefined,
+    });
+  try {
+    assert.equal((await POST(memberRequest("Bearer a.b.c"))).status, 404);
+    assert.deepEqual(seen.at(-1), { customerId: 42n, customerSessionId: "own-session" });
+    assert.match(calls.at(-1).url, /\/api\/me$/);
+    assert.equal(calls.at(-1).authorization, "Bearer a.b.c");
+
+    // 회원 토큰만으로도 충분하다 (비회원 세션 쿠키 없음)
+    assert.equal((await POST(memberRequest("Bearer a.b.c", { cookie: null }))).status, 404);
+    assert.deepEqual(seen.at(-1), { customerId: 42n });
+    const listed = await GET(memberRequest("Bearer a.b.c", { cookie: null, method: "GET" }));
+    assert.equal(listed.status, 200);
+    assert.deepEqual((await listed.json()).submissions, [{ reviewId: "member-review", orderItemId: "7" }]);
+    assert.deepEqual(seen.at(-1), { customerId: 42n });
+
+    // 형식이 틀린 토큰은 FastAPI 에 보내지 않고 401
+    const before = calls.length;
+    assert.equal((await POST(memberRequest("Basic a.b.c"))).status, 401);
+    assert.equal(calls.length, before);
+
+    me = { status: 401, body: { error: { code: "unauthorized", message: "만료" } } };
+    assert.equal((await POST(memberRequest("Bearer a.b.c"))).status, 401);
+    me = { status: 0 };
+    assert.equal((await POST(memberRequest("Bearer a.b.c"))).status, 503);
+    me = { status: 200, body: { id: "42" } };
+    assert.equal((await POST(memberRequest("Bearer a.b.c"))).status, 503);
+    assert.equal(seen.length, 3);
+  } finally {
+    global.fetch = originalFetch;
+    store.ownReviewSubmissions = originalOwn;
+  }
+});

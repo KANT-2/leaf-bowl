@@ -1,0 +1,143 @@
+/* Menu toolbar: scoped contracts, leaving other customer surfaces unchanged. */
+.menu-page .section-title {
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+.menu-filters {
+  margin-bottom: var(--space-4);
+}
+.menu-price-range {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: end;
+}
+.menu-price-range label {
+  display: grid;
+  gap: var(--space-2);
+  flex: 1 1 140px;
+  max-width: 220px;
+  min-width: 0;
+  font-size: var(--type-body);
+}
+.menu-price-range input {
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-field);
+  background: var(--control-surface);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--type-input);
+  font-variant-numeric: tabular-nums;
+}
+.menu-price-range input[aria-invalid="true"] {
+  border-color: var(--control-error);
+}
+.menu-price-error,
+.menu-price-help {
+  margin: var(--space-2) 0 var(--space-4);
+  font-size: var(--type-body);
+}
+.menu-price-error {
+  color: var(--control-error);
+}
+.menu-price-help {
+  color: var(--color-subtle-text);
+}
+.menu-page .ghost-btn,
+.menu-page .allergy-toggle,
+.menu-page .menu-sort select,
+.menu-page .allergy-chips button {
+  box-sizing: border-box;
+  min-height: var(--control-height);
+  height: var(--control-height);
+  border-radius: var(--radius-control);
+  font-size: var(--type-control);
+}
+.menu-page .ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-block: 0;
+}
+.menu-page .allergy-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+}
+.menu-page .allergy-toggle svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  flex-shrink: 0;
+  transition: transform var(--motion-control);
+}
+.menu-page .allergy-toggle svg.is-expanded {
+  transform: rotate(180deg);
+}
+.menu-page .menu-sort {
+  display: inline-flex;
+  position: relative;
+  min-width: 0;
+}
+.menu-page .menu-sort select {
+  appearance: none;
+  height: var(--control-height);
+  max-width: 100%;
+  padding: 0 var(--space-10) 0 var(--space-3);
+}
+.menu-page .menu-sort > svg {
+  position: absolute;
+  right: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  pointer-events: none;
+}
+.menu-page .menu-count {
+  font-size: var(--type-body);
+}
+.menu-page .allergy-filter p {
+  font-size: var(--type-body);
+  line-height: var(--leading-body);
+}
+.menu-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  justify-content: center;
+  align-items: center;
+  margin-top: var(--space-6);
+  font-variant-numeric: tabular-nums;
+}
+.menu-page :is(button, select, input):focus-visible {
+  outline: var(--control-focus-width) solid var(--control-focus-color);
+  outline-offset: var(--control-focus-offset);
+}
+.menu-page :is(button, select):disabled {
+  opacity: var(--control-disabled-opacity);
+  cursor: not-allowed;
+}
+@media (max-width: 600px) {
+  .menu-price-range label {
+    max-width: none;
+    flex-basis: 120px;
+  }
+  .menu-page .section-title > :last-child {
+    flex-basis: 100%;
+    width: 100%;
+  }
+  .menu-page .menu-sort {
+    margin-left: auto;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .menu-page .allergy-toggle svg {
+    transition: none;
+  }
+}

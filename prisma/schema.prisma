@@ -360,10 +360,14 @@ model Review {
 model ReviewSubmission {
   orderItemId       BigInt   @id @map("order_item_id")
   reviewId          String   @unique(map: "uq_review_submission_id") @map("review_id") @db.VarChar(80)
-  customerSessionId String   @map("customer_session_id") @db.Uuid
+  /// 비회원 주문 품목의 세션. 회원 주문이면 NULL (chk_review_submission_owner: customerSessionId·customerId 중 정확히 하나)
+  customerSessionId String?  @map("customer_session_id") @db.Uuid
+  /// 회원 주문 품목의 FastAPI customers.id. Prisma 밖의 표라 외래키는 없다
+  customerId        BigInt?  @map("customer_id")
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([customerSessionId], map: "idx_review_submission_session")
+  @@index([customerId], map: "idx_review_submission_customer", where: raw("(customer_id IS NOT NULL)"))
   @@map("review_submissions")
 }
 

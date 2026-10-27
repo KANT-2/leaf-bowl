@@ -11,7 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
-from core.config import get_settings
+from core.config import Settings, get_settings
 
 
 class Base(DeclarativeBase):
@@ -39,16 +39,25 @@ def async_database_url(url: str) -> str:
     return url
 
 
+def create_db_engine(settings: Settings) -> AsyncEngine:
+    if not settings.database_url:
+        raise RuntimeError("DATABASE_URL 이 설정되지 않았습니다. backend/.env 를 확인하세요.")
+    connect_args = {"statement_cache_size": 0} if settings.database_disable_statement_cache else {}
+    return create_async_engine(
+        async_database_url(settings.database_url),
+        pool_pre_ping=True,
+        connect_args=connect_args,
+        pool_size=settings.database_pool_size,
+        max_overflow=settings.database_max_overflow,
+        pool_timeout=settings.database_pool_timeout,
+        pool_recycle=settings.database_pool_recycle,
+    )
+
+
 def get_engine() -> AsyncEngine:
     global _engine, _session_factory
     if _engine is None:
-        settings = get_settings()
-        if not settings.database_url:
-            raise RuntimeError("DATABASE_URL 이 설정되지 않았습니다. backend/.env 를 확인하세요.")
-        connect_args = {"statement_cache_size": 0} if settings.database_disable_statement_cache else {}
-        _engine = create_async_engine(
-            async_database_url(settings.database_url), pool_pre_ping=True, connect_args=connect_args
-        )
+        _engine = create_db_engine(get_settings())
         _session_factory = async_sessionmaker(_engine, expire_on_commit=False)
     return _engine
 

@@ -3,9 +3,18 @@ import { z } from "zod";
 import { unstable_rethrow } from "next/navigation";
 import { AppError } from "@/modules/shared/errors";
 import { readJsonBody } from "@/infrastructure/http/response";
-import { appendPurchasedReview, ownReviewSubmissions, verifyReviewPurchase } from "@/application/reviews";
+import {
+  appendPurchasedReview,
+  ownReviewSubmissions,
+  verifyReviewPurchase,
+  type ReviewIdentity,
+} from "@/application/reviews";
 import { services } from "@/application/container";
+import { resolveMemberId } from "@/application/fastapi-member";
 import { requireGuest } from "@/modules/identity/guard";
+import { readCookie } from "@/modules/identity/cookies";
+import { GUEST_COOKIE } from "@/modules/identity/service";
+import { CUSTOM_BOWL_PID } from "@/modules/reviews/model";
 import { run, jsonResponse } from "@/infrastructure/http/response";
 import { normalizeImage, saveImage, removeImage } from "@/infrastructure/images/files";
 import { maintainImages } from "@/application/images";
@@ -15,7 +24,8 @@ const schema = z.object({
     .string()
     .regex(/^[a-zA-Z0-9_-]+$/)
     .max(80),
-  pid: z.number().int().nonnegative(),
+  /** 메뉴 번호. 내 취향 볼은 CUSTOM_BOWL_PID */
+  pid: z.number().int().min(CUSTOM_BOWL_PID),
   orderItemId: z
     .string()
     .regex(/^[1-9][0-9]{0,18}$/)
@@ -28,6 +38,20 @@ const schema = z.object({
   /** 브라우저에서 줄인 사진 (data: 주소), 최대 3장 */
   photos: z.array(z.string().max(1_500_000)).max(3).optional(),
 });
+
+/**
+ * 회원 토큰이 있으면 FastAPI 가 확인한 회원과, 함께 온 비회원 세션(같은 브라우저의 비회원 주문용)을 쓴다.
+ * 토큰이 없으면 기존처럼 비회원 세션이 필요하다.
+ */
+async function reviewIdentity(request: Request): Promise<ReviewIdentity> {
+  const { identity } = services();
+  const customerId = await resolveMemberId(request);
+  if (customerId === null) {
+    return { customerSessionId: (await requireGuest(request, identity)).id };
+  }
+  const session = await identity.resolve(readCookie(request, GUEST_COOKIE), "guest");
+  return { customerId, ...(session && { customerSessionId: session.id }) };
+}
 
 /** 리뷰 사진 한 장 용량 한도 (줄인 뒤 기준) */
 const PHOTO_MAX_BYTES = 1024 * 1024;
@@ -50,17 +74,17 @@ export async function POST(request: Request) {
     return jsonError("허용되지 않은 요청입니다.", 403);
   }
   try {
-    const { identity, limits } = services();
-    const session = await requireGuest(request, identity);
+    const { limits } = services();
+    const owner = await reviewIdentity(request);
     limits.globalReview.hit("all");
-    limits.review.hit(session.id);
+    limits.review.hit(owner.customerId !== undefined ? "member:" + owner.customerId : owner.customerSessionId!);
     const body = await readJsonBody(request, 5 * 1024 * 1024);
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
       return jsonError("리뷰 내용을 확인해주세요.");
     }
     const { photos = [], ...review } = parsed.data;
-    await verifyReviewPurchase(session.id, review);
+    await verifyReviewPurchase(owner, review);
     const decoded = [];
     for (const photo of photos) {
       decoded.push(await decodePhoto(photo));
@@ -78,7 +102,7 @@ export async function POST(request: Request) {
       for (const d of decoded) {
         saved.push(await saveImage(d!, "review-"));
       }
-      const snapshot = await appendPurchasedReview(session.id, {
+      const snapshot = await appendPurchasedReview(owner, {
         ...review,
         images: saved.map((key) => "/api/admin/images/" + key),
       });
@@ -106,7 +130,6 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   return run(async () => {
-    const session = await requireGuest(request, services().identity);
-    return jsonResponse({ submissions: await ownReviewSubmissions(session.id) });
+    return jsonResponse({ submissions: await ownReviewSubmissions(await reviewIdentity(request)) });
   });
 }

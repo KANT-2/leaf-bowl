@@ -13,6 +13,7 @@
 
 @import "./styles/base.css";
 @import "./styles/home.css" layer(components);
+@import "./styles/menu.css" layer(components);
 @import "./styles/product.css" layer(components);
 @import "./styles/reviews.css" layer(components);
 @import "./styles/cart.css" layer(components);
