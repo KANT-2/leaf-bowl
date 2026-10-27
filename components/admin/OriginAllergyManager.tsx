@@ -2,7 +2,8 @@
 import type { CatalogConfig } from "@/modules/settings/schema";
 
 import { Fragment, useState } from "react";
-import { Plus, Pencil, Search, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
+import SearchField from "@/components/controls/SearchField";
 import { Button } from "./button";
 import { Input } from "./input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./dialog";
@@ -164,18 +165,16 @@ export default function OriginAllergyManager({
         ))}
       </div>
       <div className="origin-filters">
-        <div className="origin-search">
-          <Search size={18} aria-hidden="true" />
-          <Input
-            aria-label="원산지 재료 검색"
-            placeholder="재료 이름, 원산지 검색"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setPage(1);
-            }}
-          />
-        </div>
+        <SearchField
+          className="admin-search admin-search-wide"
+          label="원산지 재료 검색"
+          placeholder="재료 이름, 원산지 검색"
+          value={query}
+          onChange={(value) => {
+            setQuery(value);
+            setPage(1);
+          }}
+        />
         <select
           aria-label="알레르기 필터"
           value={allergen}

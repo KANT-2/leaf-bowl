@@ -2,6 +2,23 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "../styles/theme.css";
+
+/* Shared search contract, scoped to the administrator surface. */
+.admin-search {
+  width: 100%;
+  max-width: 320px;
+  flex: 1 1 240px;
+}
+.admin-search-wide {
+  max-width: none;
+}
+@media (max-width: 640px) {
+  .admin-search {
+    max-width: none;
+    flex-basis: 100%;
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

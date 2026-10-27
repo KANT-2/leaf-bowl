@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/admin/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/admin/dialog";
-import { Input } from "@/components/admin/input";
+import SearchField from "@/components/controls/SearchField";
 import { Tabs, TabsList, TabsTrigger } from "@/components/admin/tabs";
 import {
   DELIVERY_PAGE_SIZE,
@@ -136,12 +136,12 @@ function Results() {
             </TabsList>
           </Tabs>
         </div>
-        <Input
-          aria-label="주문 검색"
+        <SearchField
+          className="admin-search"
+          label="주문 검색"
           placeholder="주문자, 전화, 주소, 메뉴, 주문번호 검색"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          style={{ maxWidth: 320 }}
+          onChange={setQuery}
         />
       </div>
       <div className="review-calendar-controls">

@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/admin/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/admin/dialog";
 import { Input } from "@/components/admin/input";
+import SearchField from "@/components/controls/SearchField";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/admin/table";
 import { type Catalog, type Ingredient } from "@/modules/catalog/schema";
 import { GripVertical, Info, Pencil, Plus, Trash2 } from "lucide-react";
@@ -323,15 +324,17 @@ export default function BowlMatchManager({
           </ol>
           {choosing && (
             <div className="bowl-registration-selection">
-              <label className="field">
+              <div className="field">
                 등록 재료 선택
-                <Input
+                <SearchField
+                  className="admin-search admin-search-wide"
+                  label="등록 재료 선택"
                   value={search}
                   disabled={busy}
                   placeholder="재료 이름으로 검색하세요"
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={setSearch}
                 />
-              </label>
+              </div>
               <div className="bowl-registration-filters" aria-label="재료 분류">
                 {["", ...categories].map((category) => (
                   <Button

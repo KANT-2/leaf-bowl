@@ -11,7 +11,7 @@ import {
 } from "@/components/admin/alert-dialog";
 import { Button } from "@/components/admin/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/admin/dialog";
-import { Input } from "@/components/admin/input";
+import SearchField from "@/components/controls/SearchField";
 import { Tabs, TabsList, TabsTrigger } from "@/components/admin/tabs";
 import { reviewDateTime, reviewMenuLabel } from "@/features/admin/catalog-presentation";
 import { type Catalog, type Review } from "@/modules/catalog/schema";
@@ -152,15 +152,15 @@ export default function ReviewManager({
             노출 중 {visible.length}개 · 삭제된 리뷰 {removed.length}개
           </span>
         </div>
-        <Input
-          aria-label="리뷰 검색"
+        <SearchField
+          className="admin-search"
+          label="리뷰 검색"
           placeholder="작성자, 메뉴, 리뷰 내용 검색"
           value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
+          onChange={(value) => {
+            setQuery(value);
             setReviewPage(1);
           }}
-          style={{ maxWidth: 320 }}
         />
       </div>
       <div className="review-calendar-controls">
