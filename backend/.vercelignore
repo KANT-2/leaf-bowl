@@ -1,0 +1,13 @@
+# Vercel 로 올리지 않을 것. 비밀값(.env)은 Vercel 프로젝트 환경 변수로 따로 넣는다.
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.vercel/
+tests/
+docs/
+scripts/
