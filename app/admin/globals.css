@@ -983,7 +983,7 @@
     display: flex;
     align-items: center;
     gap: 14px;
-    font-size: 11px;
+    font-size: var(--type-meta);
   }
   .season-preview-arrows button {
     border: 0;
@@ -1567,6 +1567,9 @@
   height: 44px;
   display: grid;
   place-items: center;
+}
+.editor-dialog :is(.form-footer, [data-slot="dialog-footer"]) button {
+  min-height: var(--control-height);
 }
 .menu-editor-dialog .error {
   margin: 12px 28px;
