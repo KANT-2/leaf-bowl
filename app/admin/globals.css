@@ -322,15 +322,15 @@
   .editor-dialog {
     max-width: 820px !important;
     width: calc(100% - 32px);
-    max-height: 90dvh;
-    overflow-y: auto;
+    max-height: min(90dvh, 960px);
+    overflow: hidden;
     background: var(--card);
   }
   .preview-dialog {
     max-width: 1100px !important;
     width: calc(100% - 32px);
-    max-height: 92dvh;
-    overflow-y: auto;
+    max-height: min(90dvh, 960px);
+    overflow: hidden;
   }
   .form-grid {
     display: grid;
@@ -1105,8 +1105,8 @@
     border-radius: 4px;
   }
   .review-detail-dialog {
-    max-height: 88dvh;
-    overflow-y: auto;
+    max-height: min(90dvh, 960px);
+    overflow: hidden;
   }
 
   .review-filter-controls {
@@ -1526,8 +1526,47 @@
   margin: 0;
   padding: 18px 28px;
   background: var(--card);
-  position: sticky;
-  bottom: 0;
+  flex-shrink: 0;
+}
+
+/* Dialog headers and form actions stay visible; only their bodies scroll. */
+.editor-dialog > [data-slot="dialog-header"],
+.preview-dialog > [data-slot="dialog-header"] {
+  flex-shrink: 0;
+  padding-right: var(--space-12);
+}
+.menu-editor-dialog > [data-slot="dialog-header"] {
+  padding-right: 80px;
+}
+.editor-dialog > [data-slot="dialog-body"],
+.preview-dialog > [data-slot="dialog-body"] {
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+.editor-dialog > [data-slot="dialog-body"]:has(> form) {
+  overflow: hidden;
+}
+.editor-dialog > [data-slot="dialog-body"] > form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.editor-dialog > [data-slot="dialog-body"] > form > fieldset {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.editor-dialog > [data-slot="dialog-body"] > form > :is(.form-footer, .error) {
+  flex-shrink: 0;
+}
+.editor-dialog > [data-slot="dialog-close"] {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
 }
 .menu-editor-dialog .error {
   margin: 12px 28px;

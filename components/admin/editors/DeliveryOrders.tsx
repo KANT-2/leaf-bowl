@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/admin/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/admin/dialog";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/admin/dialog";
 import SearchField from "@/components/controls/SearchField";
 import { Tabs, TabsList, TabsTrigger } from "@/components/admin/tabs";
 import {
@@ -355,9 +362,11 @@ function Results() {
             <DialogTitle>배달 주문 상세</DialogTitle>
             <DialogDescription>주문 정보와 처리 이력을 확인하세요.</DialogDescription>
           </DialogHeader>
-          {selectedOrder && (
-            <OrderDetails key={selectedOrder} id={selectedOrder} onUpdated={() => setRefresh((value) => value + 1)} />
-          )}
+          <DialogBody>
+            {selectedOrder && (
+              <OrderDetails key={selectedOrder} id={selectedOrder} onUpdated={() => setRefresh((value) => value + 1)} />
+            )}
+          </DialogBody>
         </DialogContent>
       </Dialog>
       {more && (
