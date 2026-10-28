@@ -75,14 +75,16 @@ export default function OrderStatusEditor({ id, status, version, onUpdated }: Pr
       <form onSubmit={submit} className="grid gap-3">
         <label className="grid gap-1 text-sm">
           다음 상태
-          <Select
-            value={next}
-            disabled={saving || conflict}
-            onValueChange={(value) => setNext(value as OrderStatus)}
-          >
-            <SelectTrigger className="admin-filter-select" aria-label="다음 주문 상태"><SelectValue /></SelectTrigger>
+          <Select value={next} disabled={saving || conflict} onValueChange={(value) => setNext(value as OrderStatus)}>
+            <SelectTrigger className="admin-filter-select" aria-label="다음 주문 상태">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
-              {options.map((value) => <SelectItem key={value} value={value}>{STATUS_LABEL[value]}</SelectItem>)}
+              {options.map((value) => (
+                <SelectItem key={value} value={value}>
+                  {STATUS_LABEL[value]}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </label>

@@ -77,7 +77,10 @@ function PresetInput({
       const maxHeight = Math.min(desired, Math.max(64, opensAbove ? above : below), window.innerHeight - 16);
       const width = Math.min(rect.width, window.innerWidth - 16);
       setPopup({
-        top: Math.max(8, Math.min(opensAbove ? rect.top - maxHeight - 6 : rect.bottom + 6, window.innerHeight - maxHeight - 8)),
+        top: Math.max(
+          8,
+          Math.min(opensAbove ? rect.top - maxHeight - 6 : rect.bottom + 6, window.innerHeight - maxHeight - 8),
+        ),
         left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
         width,
         maxHeight,
@@ -125,14 +128,23 @@ function PresetInput({
           aria-expanded={open}
           aria-controls={listId}
           aria-activedescendant={open ? `${listId}-${active}` : undefined}
-          onFocus={() => { setActive(0); setOpen(true); }}
+          onFocus={() => {
+            setActive(0);
+            setOpen(true);
+          }}
           onClick={() => setOpen(true)}
-          onChange={(event) => { onChange(event.target.value); setActive(0); setOpen(true); }}
+          onChange={(event) => {
+            onChange(event.target.value);
+            setActive(0);
+            setOpen(true);
+          }}
           onKeyDown={(event) => {
             if (event.key === "ArrowDown" || event.key === "ArrowUp") {
               event.preventDefault();
               setOpen(true);
-              setActive((current) => Math.max(0, Math.min(choices.length, current + (event.key === "ArrowDown" ? 1 : -1))));
+              setActive((current) =>
+                Math.max(0, Math.min(choices.length, current + (event.key === "ArrowDown" ? 1 : -1))),
+              );
             } else if (event.key === "Enter" && open) {
               event.preventDefault();
               choose(active);
@@ -162,25 +174,35 @@ function PresetInput({
         >
           <ChevronDown size={16} aria-hidden="true" />
         </button>
-        {open && createPortal(
-          <div ref={optionsRef} id={listId} className="origin-preset-options" role="listbox" aria-label={`${label} 기존 항목`} style={popup}>
-            {["직접 입력", ...choices].map((choice, index) => (
-              <button
-                id={`${listId}-${index}`}
-                key={index === 0 ? "__custom" : choice}
-                type="button"
-                role="option"
-                tabIndex={-1}
-                aria-selected={index === 0 ? !choices.includes(value) : choice === value}
-                data-active={active === index}
-                onPointerDown={(event) => event.preventDefault()}
-                onMouseEnter={() => setActive(index)}
-                onClick={() => choose(index)}
-              >{choice}</button>
-            ))}
-          </div>,
-          document.body,
-        )}
+        {open &&
+          createPortal(
+            <div
+              ref={optionsRef}
+              id={listId}
+              className="origin-preset-options"
+              role="listbox"
+              aria-label={`${label} 기존 항목`}
+              style={popup}
+            >
+              {["직접 입력", ...choices].map((choice, index) => (
+                <button
+                  id={`${listId}-${index}`}
+                  key={index === 0 ? "__custom" : choice}
+                  type="button"
+                  role="option"
+                  tabIndex={-1}
+                  aria-selected={index === 0 ? !choices.includes(value) : choice === value}
+                  data-active={active === index}
+                  onPointerDown={(event) => event.preventDefault()}
+                  onMouseEnter={() => setActive(index)}
+                  onClick={() => choose(index)}
+                >
+                  {choice}
+                </button>
+              ))}
+            </div>,
+            document.body,
+          )}
       </div>
     </div>
   );
@@ -346,7 +368,11 @@ export default function OriginAllergyManager({
           <SelectContent>
             <SelectItem value="__all">알레르기 전체</SelectItem>
             <SelectItem value="__none">등록된 안내 없음</SelectItem>
-            {allergens.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}
+            {allergens.map((value) => (
+              <SelectItem key={value} value={value}>
+                {value}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -384,7 +410,11 @@ export default function OriginAllergyManager({
                       <TableCell>
                         <strong>{i.name}</strong>
                       </TableCell>
-                      <TableCell><span className="origin-category-badge" data-tone={categoryTone(i.category)}>{i.category}</span></TableCell>
+                      <TableCell>
+                        <span className="origin-category-badge" data-tone={categoryTone(i.category)}>
+                          {i.category}
+                        </span>
+                      </TableCell>
                       <TableCell>
                         {i.origin || "미입력"}
                         {i.originDetail && <div className="meta">{i.originDetail}</div>}

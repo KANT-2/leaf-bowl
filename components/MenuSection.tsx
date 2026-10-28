@@ -237,90 +237,92 @@ export default function MenuSection() {
         />
       </div>
       <div className="menu-filter-row">
-      <FilterGroup
-        label="메뉴 분류"
-        options={FILTERS}
-        value={filter}
-        className="menu-filters"
-        onChange={(value) => {
-          setFilter(value);
-          setPage(1);
-        }}
-      />
-      <div className="menu-price-range" role="group" aria-label="가격 범위">
-        <details
-          className="menu-price-filter"
-          ref={priceDetails}
-          onToggle={(event) => {
-            if (event.currentTarget.open) {
-              setDraftMinPrice(minPrice);
-              setDraftMaxPrice(maxPrice);
-            }
+        <FilterGroup
+          label="메뉴 분류"
+          options={FILTERS}
+          value={filter}
+          className="menu-filters"
+          onChange={(value) => {
+            setFilter(value);
+            setPage(1);
           }}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              event.preventDefault();
-              event.currentTarget.open = false;
-              event.currentTarget.querySelector("summary")?.focus();
-            }
-          }}
-        >
-          <summary>가격 {minPrice || maxPrice ? `· ${minPrice || "0"}~${maxPrice || "제한 없음"}원` : "전체"}</summary>
-          <form
-            className="menu-price-popover"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (priceError) {
-                return;
+        />
+        <div className="menu-price-range" role="group" aria-label="가격 범위">
+          <details
+            className="menu-price-filter"
+            ref={priceDetails}
+            onToggle={(event) => {
+              if (event.currentTarget.open) {
+                setDraftMinPrice(minPrice);
+                setDraftMaxPrice(maxPrice);
               }
-              setMinPrice(draftMinPrice);
-              setMaxPrice(draftMaxPrice);
-              setPage(1);
-              event.currentTarget.parentElement?.removeAttribute("open");
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                event.currentTarget.open = false;
+                event.currentTarget.querySelector("summary")?.focus();
+              }
             }}
           >
-            <div className="menu-price-fields">
-              <label>
-                최소 가격 (원)
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  aria-invalid={!!priceError}
-                  aria-describedby="menu-price-help"
-                  value={draftMinPrice}
-                  placeholder="제한 없음"
-                  onChange={(event) => setDraftMinPrice(event.target.value)}
-                />
-              </label>
-              <label>
-                최대 가격 (원)
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  aria-invalid={!!priceError}
-                  aria-describedby="menu-price-help"
-                  value={draftMaxPrice}
-                  placeholder="제한 없음"
-                  onChange={(event) => setDraftMaxPrice(event.target.value)}
-                />
-              </label>
-            </div>
-            <p
-              id="menu-price-help"
-              className={priceError ? "menu-price-error" : "menu-price-help"}
-              role={priceError ? "alert" : undefined}
+            <summary>
+              가격 {minPrice || maxPrice ? `· ${minPrice || "0"}~${maxPrice || "제한 없음"}원` : "전체"}
+            </summary>
+            <form
+              className="menu-price-popover"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (priceError) {
+                  return;
+                }
+                setMinPrice(draftMinPrice);
+                setMaxPrice(draftMaxPrice);
+                setPage(1);
+                event.currentTarget.parentElement?.removeAttribute("open");
+              }}
             >
-              {priceError || "쉼표 없이 정수로 입력하세요. 빈 가격은 제한 없이 조회합니다."}
-            </p>
-            <button type="submit" className="primary" disabled={!!priceError}>
-              가격 적용
-            </button>
-          </form>
-        </details>
-        <button type="button" className="ghost-btn" onClick={resetAll}>
-          전체 초기화
-        </button>
-      </div>
+              <div className="menu-price-fields">
+                <label>
+                  최소 가격 (원)
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    aria-invalid={!!priceError}
+                    aria-describedby="menu-price-help"
+                    value={draftMinPrice}
+                    placeholder="제한 없음"
+                    onChange={(event) => setDraftMinPrice(event.target.value)}
+                  />
+                </label>
+                <label>
+                  최대 가격 (원)
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    aria-invalid={!!priceError}
+                    aria-describedby="menu-price-help"
+                    value={draftMaxPrice}
+                    placeholder="제한 없음"
+                    onChange={(event) => setDraftMaxPrice(event.target.value)}
+                  />
+                </label>
+              </div>
+              <p
+                id="menu-price-help"
+                className={priceError ? "menu-price-error" : "menu-price-help"}
+                role={priceError ? "alert" : undefined}
+              >
+                {priceError || "쉼표 없이 정수로 입력하세요. 빈 가격은 제한 없이 조회합니다."}
+              </p>
+              <button type="submit" className="primary" disabled={!!priceError}>
+                가격 적용
+              </button>
+            </form>
+          </details>
+          <button type="button" className="ghost-btn" onClick={resetAll}>
+            전체 초기화
+          </button>
+        </div>
       </div>
       <div className="menu-tools">
         <button

@@ -488,7 +488,10 @@
   font-size: 17px;
   line-height: 1;
 }
-.bm .bowl-bits span { flex: 0 0 20px; text-align: center; }
+.bm .bowl-bits span {
+  flex: 0 0 20px;
+  text-align: center;
+}
 .bm .selected-ingredients {
   min-height: 110px;
   display: flex;
@@ -605,7 +608,9 @@
   color: #667866;
   font-size: var(--type-meta);
 }
-.bm > .wrap .pvsec { margin-bottom: var(--space-8); }
+.bm > .wrap .pvsec {
+  margin-bottom: var(--space-8);
+}
 
 /* 결과 창 */
 .bm-result {
@@ -620,14 +625,20 @@
   scrollbar-color: var(--color-subtle-text) var(--color-soft);
   scrollbar-gutter: stable;
 }
-.bm-result::-webkit-scrollbar { width: 8px; }
-.bm-result::-webkit-scrollbar-track { background: var(--color-soft); }
+.bm-result::-webkit-scrollbar {
+  width: 8px;
+}
+.bm-result::-webkit-scrollbar-track {
+  background: var(--color-soft);
+}
 .bm-result::-webkit-scrollbar-thumb {
   border: 2px solid var(--color-soft);
   border-radius: 999px;
   background: var(--color-subtle-text);
 }
-.bm-result::-webkit-scrollbar-thumb:hover { background: var(--color-brand); }
+.bm-result::-webkit-scrollbar-thumb:hover {
+  background: var(--color-brand);
+}
 .bm-result .dialog-top {
   display: flex;
   justify-content: space-between;

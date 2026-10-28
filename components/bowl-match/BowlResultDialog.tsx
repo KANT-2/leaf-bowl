@@ -59,10 +59,15 @@ export default function BowlResultDialog({
     return () => dialog.close();
   }, [resultOpen, selected.length]);
   return (
-    <dialog ref={dialogRef} className="bm-result" aria-labelledby="bmResultTitle" onClose={() => {
-      onClosed();
-      requestAnimationFrame(() => returnFocus.current?.focus());
-    }}>
+    <dialog
+      ref={dialogRef}
+      className="bm-result"
+      aria-labelledby="bmResultTitle"
+      onClose={() => {
+        onClosed();
+        requestAnimationFrame(() => returnFocus.current?.focus());
+      }}
+    >
       {resultOpen && selected.length > 0 && (
         <>
           <div className="dialog-top">

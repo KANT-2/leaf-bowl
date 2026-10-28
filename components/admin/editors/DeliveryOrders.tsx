@@ -183,7 +183,10 @@ function Results() {
               setDay("");
               setHour("");
             }}
-            options={[{ value: "", label: "전체 월" }, ...months.map((value) => ({ value, label: deliveryGroupLabel(value) }))]}
+            options={[
+              { value: "", label: "전체 월" },
+              ...months.map((value) => ({ value, label: deliveryGroupLabel(value) })),
+            ]}
           />
         </label>
         {groupBy === "day" && (
@@ -196,7 +199,10 @@ function Results() {
                 setDay(value);
                 setHour("");
               }}
-              options={[{ value: "", label: "전체 날짜" }, ...days.map((value) => ({ value, label: deliveryGroupLabel(value) }))]}
+              options={[
+                { value: "", label: "전체 날짜" },
+                ...days.map((value) => ({ value, label: deliveryGroupLabel(value) })),
+              ]}
             />
           </label>
         )}
@@ -207,10 +213,13 @@ function Results() {
               label="배달 시간대 선택"
               value={hour}
               onChange={setHour}
-              options={[{ value: "", label: "전체 시간" }, ...Array.from({ length: 24 }, (_, h) => ({
-                value: String(h),
-                label: `${String(h).padStart(2, "0")}:00–${String(h + 1).padStart(2, "0")}:00`,
-              }))]}
+              options={[
+                { value: "", label: "전체 시간" },
+                ...Array.from({ length: 24 }, (_, h) => ({
+                  value: String(h),
+                  label: `${String(h).padStart(2, "0")}:00–${String(h + 1).padStart(2, "0")}:00`,
+                })),
+              ]}
             />
           </label>
         )}
@@ -288,7 +297,10 @@ function Results() {
                   variant="ghost"
                   size="sm"
                   aria-label={order.ordererName + " 주문 상세 보기"}
-                  onClick={() => { setDetailStatus(null); setSelectedOrder(order.id); }}
+                  onClick={() => {
+                    setDetailStatus(null);
+                    setSelectedOrder(order.id);
+                  }}
                 >
                   상세 보기
                 </Button>
@@ -362,7 +374,12 @@ function Results() {
           </DialogHeader>
           <DialogBody>
             {selectedOrder && (
-              <OrderDetails key={selectedOrder} id={selectedOrder} onLoaded={setDetailStatus} onUpdated={() => setRefresh((value) => value + 1)} />
+              <OrderDetails
+                key={selectedOrder}
+                id={selectedOrder}
+                onLoaded={setDetailStatus}
+                onUpdated={() => setRefresh((value) => value + 1)}
+              />
             )}
           </DialogBody>
           <DialogFooter showCloseButton />
@@ -390,7 +407,15 @@ type OrderDetail = DeliveryOrder & {
   cancelReason: string | null;
   history: { toStatus: OrderStatus; reason: string | null; createdAt: string }[];
 };
-function OrderDetails({ id, onLoaded, onUpdated }: { id: string; onLoaded: (status: OrderStatus) => void; onUpdated: () => void }) {
+function OrderDetails({
+  id,
+  onLoaded,
+  onUpdated,
+}: {
+  id: string;
+  onLoaded: (status: OrderStatus) => void;
+  onUpdated: () => void;
+}) {
   const [data, setData] = useState<OrderDetail | null>(null);
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
@@ -436,52 +461,119 @@ function OrderDetails({ id, onLoaded, onUpdated }: { id: string; onLoaded: (stat
     );
   }
   if (!data) {
-    return <p role="status" className="delivery-detail-feedback">주문 상세 불러오는 중…</p>;
+    return (
+      <p role="status" className="delivery-detail-feedback">
+        주문 상세 불러오는 중…
+      </p>
+    );
   }
   return (
     <div className="delivery-detail">
       <dl className="delivery-detail-highlights" aria-label="주문 핵심 정보">
-        <div><dt>배달 예정</dt><dd>{data.desiredDate} {data.desiredSlot}</dd></div>
-        <div><dt>주문 총수량</dt><dd>{data.items.reduce((sum, item) => sum + item.quantity, 0)}개</dd></div>
-        <div><dt>결제 총액</dt><dd><strong>{Number(data.total).toLocaleString("ko-KR")}원</strong></dd></div>
+        <div>
+          <dt>배달 예정</dt>
+          <dd>
+            {data.desiredDate} {data.desiredSlot}
+          </dd>
+        </div>
+        <div>
+          <dt>주문 총수량</dt>
+          <dd>{data.items.reduce((sum, item) => sum + item.quantity, 0)}개</dd>
+        </div>
+        <div>
+          <dt>결제 총액</dt>
+          <dd>
+            <strong>{Number(data.total).toLocaleString("ko-KR")}원</strong>
+          </dd>
+        </div>
       </dl>
       <section className="delivery-detail-section">
-        <h3><span aria-hidden="true">01</span> 배달 정보</h3>
+        <h3>
+          <span aria-hidden="true">01</span> 배달 정보
+        </h3>
         <dl className="delivery-detail-grid">
-          <div><dt>배달 예정</dt><dd>{data.desiredDate} {data.desiredSlot}</dd></div>
-          <div><dt>주문자</dt><dd>{data.ordererName}</dd></div>
-          <div><dt>전화번호</dt><dd>{data.phone}</dd></div>
-          <div className="delivery-detail-wide"><dt>주소</dt><dd>{data.address} {data.addressDetail}</dd></div>
-          <div><dt>접수 시간</dt><dd><time dateTime={data.createdAt}>{receivedTime(data.createdAt)}</time></dd></div>
+          <div>
+            <dt>배달 예정</dt>
+            <dd>
+              {data.desiredDate} {data.desiredSlot}
+            </dd>
+          </div>
+          <div>
+            <dt>주문자</dt>
+            <dd>{data.ordererName}</dd>
+          </div>
+          <div>
+            <dt>전화번호</dt>
+            <dd>{data.phone}</dd>
+          </div>
+          <div className="delivery-detail-wide">
+            <dt>주소</dt>
+            <dd>
+              {data.address} {data.addressDetail}
+            </dd>
+          </div>
+          <div>
+            <dt>접수 시간</dt>
+            <dd>
+              <time dateTime={data.createdAt}>{receivedTime(data.createdAt)}</time>
+            </dd>
+          </div>
         </dl>
       </section>
       <section className="delivery-detail-section">
-        <h3><span aria-hidden="true">02</span> 주문 메뉴</h3>
+        <h3>
+          <span aria-hidden="true">02</span> 주문 메뉴
+        </h3>
         <ul className="delivery-detail-items">
           {data.items.map((item, index) => (
-            <li key={index}><strong>{item.name} × {item.quantity}</strong>{item.options && <p className="meta">{item.options}</p>}</li>
+            <li key={index}>
+              <strong>
+                {item.name} × {item.quantity}
+              </strong>
+              {item.options && <p className="meta">{item.options}</p>}
+            </li>
           ))}
         </ul>
       </section>
       <section className="delivery-detail-section">
-        <h3><span aria-hidden="true">03</span> 주문 상태 관리</h3>
-        <p className="delivery-current-status">현재 상태 <span className={"delivery-status delivery-status-" + data.status}>{STATUS_LABEL[data.status]}</span></p>
+        <h3>
+          <span aria-hidden="true">03</span> 주문 상태 관리
+        </h3>
+        <p className="delivery-current-status">
+          현재 상태{" "}
+          <span className={"delivery-status delivery-status-" + data.status}>{STATUS_LABEL[data.status]}</span>
+        </p>
         {data.cancelReason && <p>취소 사유: {data.cancelReason}</p>}
         <OrderStatusEditor
           key={`${data.id}:${data.version}`}
           id={data.id}
           status={data.status}
           version={data.version}
-          onUpdated={() => { onUpdated(); setRetry((value) => value + 1); }}
+          onUpdated={() => {
+            onUpdated();
+            setRetry((value) => value + 1);
+          }}
         />
       </section>
       <section className="delivery-detail-section">
-        <h3><span aria-hidden="true">04</span> 처리 이력</h3>
-        {data.history.length ? <ol className="delivery-history">
-          {data.history.map((entry, index) => (
-            <li key={index}><span className={`delivery-status delivery-status-${entry.toStatus}`}>{STATUS_LABEL[entry.toStatus]}</span><time dateTime={entry.createdAt}>{receivedTime(entry.createdAt)}</time>{entry.reason && <p>사유: {entry.reason}</p>}</li>
-          ))}
-        </ol> : <p className="meta delivery-detail-empty">등록된 처리 이력이 없습니다.</p>}
+        <h3>
+          <span aria-hidden="true">04</span> 처리 이력
+        </h3>
+        {data.history.length ? (
+          <ol className="delivery-history">
+            {data.history.map((entry, index) => (
+              <li key={index}>
+                <span className={`delivery-status delivery-status-${entry.toStatus}`}>
+                  {STATUS_LABEL[entry.toStatus]}
+                </span>
+                <time dateTime={entry.createdAt}>{receivedTime(entry.createdAt)}</time>
+                {entry.reason && <p>사유: {entry.reason}</p>}
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="meta delivery-detail-empty">등록된 처리 이력이 없습니다.</p>
+        )}
       </section>
     </div>
   );

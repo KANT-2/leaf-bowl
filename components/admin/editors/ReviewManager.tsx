@@ -215,7 +215,10 @@ export default function ReviewManager({
                 setDay(value);
                 setReviewPage(1);
               }}
-              options={[{ value: "", label: "전체 날짜" }, ...days.map((value) => ({ value, label: groupLabel(value) }))]}
+              options={[
+                { value: "", label: "전체 날짜" },
+                ...days.map((value) => ({ value, label: groupLabel(value) })),
+              ]}
             />
           </label>
         )}

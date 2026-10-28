@@ -366,9 +366,12 @@ export default function SalesRanking() {
                       label="샐러드 선택"
                       value={selectedSalad}
                       onChange={setCombinationSalad}
-                      options={[{ value: "", label: "전체 샐러드" }, ...report.rows
-                        .filter((row) => row.quantity > 0)
-                        .map((row) => ({ value: row.productId, label: row.name }))]}
+                      options={[
+                        { value: "", label: "전체 샐러드" },
+                        ...report.rows
+                          .filter((row) => row.quantity > 0)
+                          .map((row) => ({ value: row.productId, label: row.name })),
+                      ]}
                     />
                   </label>
                   <div className={`surface ${styles.table}`}>

@@ -180,7 +180,9 @@ export default function EventManager() {
               <div className="event-form-field">
                 <span>노출 설정</span>
                 <Select value={String(draft.visible)} onValueChange={(value) => update({ visible: value === "true" })}>
-                  <SelectTrigger aria-label="노출 설정"><SelectValue /></SelectTrigger>
+                  <SelectTrigger aria-label="노출 설정">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="true">노출</SelectItem>
                     <SelectItem value="false">숨김</SelectItem>
@@ -189,8 +191,13 @@ export default function EventManager() {
               </div>
               <div className="event-form-field">
                 <span>메인 배너</span>
-                <Select value={String(draft.heroVisible)} onValueChange={(value) => update({ heroVisible: value === "true" })}>
-                  <SelectTrigger aria-label="메인 배너"><SelectValue /></SelectTrigger>
+                <Select
+                  value={String(draft.heroVisible)}
+                  onValueChange={(value) => update({ heroVisible: value === "true" })}
+                >
+                  <SelectTrigger aria-label="메인 배너">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="true">진행 중일 때 표시</SelectItem>
                     <SelectItem value="false">표시 안 함</SelectItem>
