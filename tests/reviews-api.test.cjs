@@ -29,6 +29,36 @@ const valid = JSON.stringify({
   via: "delivery",
 });
 
+test("anonymous review history is empty while supplied invalid credentials remain unauthorized", async () => {
+  const { GET } = require("../app/api/reviews/route.ts");
+  const originalOwn = store.ownReviewSubmissions;
+  const seen = [];
+  store.ownReviewSubmissions = async (identity) => {
+    seen.push(identity);
+    return [{ reviewId: "own-review", orderItemId: "1" }];
+  };
+  try {
+    const anonymous = await GET(new Request("http://localhost:3000/api/reviews"));
+    assert.equal(anonymous.status, 200);
+    assert.deepEqual(await anonymous.json(), { submissions: [] });
+    assert.equal(anonymous.headers.get("cache-control"), "private, no-store");
+    assert.deepEqual(seen, []);
+    for (const headers of [{ cookie: "lb_guest=expired" }, { authorization: "Basic invalid" }]) {
+      assert.equal((await GET(new Request("http://localhost:3000/api/reviews", { headers }))).status, 401);
+    }
+    const own = await GET(
+      new Request("http://localhost:3000/api/reviews", {
+        headers: { cookie: "lb_guest=test-guest" },
+      }),
+    );
+    assert.equal(own.status, 200);
+    assert.deepEqual(await own.json(), { submissions: [{ reviewId: "own-review", orderItemId: "1" }] });
+    assert.deepEqual(seen, [{ customerSessionId: "own-session" }]);
+  } finally {
+    store.ownReviewSubmissions = originalOwn;
+  }
+});
+
 test("reviews return 400 for malformed JSON and 413 for oversized bodies", async () => {
   const original = store.appendPurchasedReview;
   let called = false;

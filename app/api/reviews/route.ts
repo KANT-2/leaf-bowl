@@ -130,6 +130,11 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   return run(async () => {
-    return jsonResponse({ submissions: await ownReviewSubmissions(await reviewIdentity(request)) });
+    // 첫 방문자는 제출 내역이 없다. 전달된 인증 정보의 검증은 생략하지 않는다.
+    const anonymous = !request.headers.has("authorization") && !readCookie(request, GUEST_COOKIE);
+    const submissions = anonymous ? [] : await ownReviewSubmissions(await reviewIdentity(request));
+    const response = jsonResponse({ submissions });
+    response.headers.set("Cache-Control", "private, no-store");
+    return response;
   });
 }
