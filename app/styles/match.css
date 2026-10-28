@@ -5,7 +5,7 @@
   overflow-x: clip;
 }
 .bm button:disabled {
-  opacity: 0.35;
+  opacity: 0.65;
 }
 .bm-head {
   display: flex;
@@ -142,7 +142,7 @@
 }
 .bm .card-stack {
   position: relative;
-  height: 435px;
+  min-height: 435px;
   margin-bottom: 20px;
 }
 .bm .swipe-card {
@@ -151,7 +151,7 @@
   background: #fff;
   overflow: hidden;
   box-shadow: 0 10px 35px #194b3814;
-  height: 100%;
+  min-height: 435px;
   touch-action: pan-y;
   user-select: none;
   cursor: grab;
@@ -221,7 +221,7 @@
   right: 20px;
 }
 .bm .ingredient-info {
-  padding: 22px 24px;
+  padding: 22px 24px 28px;
 }
 .bm .ingredient-info h2 {
   font-size: 23px;
@@ -333,8 +333,8 @@
 }
 .bm .swipe-actions .undo,
 .bm .swipe-actions .finish {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   color: #637561;
 }
 .bm .swipe-actions .undo svg,
@@ -368,7 +368,7 @@
 .bm .swipe-help {
   text-align: center;
   font-size: var(--type-body);
-  color: #7b8674;
+  color: var(--color-subtle-text);
   line-height: 1.8;
   margin: 14px 0 0;
 }
@@ -417,8 +417,9 @@
 }
 .bm .bowl-subtitle {
   font-size: var(--type-body);
-  color: #7b8674;
+  color: var(--color-subtle-text);
   margin: 0;
+  word-break: keep-all;
 }
 .bm .clear-area {
   display: flex;
@@ -479,15 +480,15 @@
   top: 37px;
   left: 50%;
   transform: translateX(-50%);
-  width: 140px;
+  width: 150px;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  font-size: 22px;
-  line-height: 1.2;
-  max-height: 63px;
-  overflow: hidden;
+  gap: 2px;
+  font-size: 17px;
+  line-height: 1;
 }
+.bm .bowl-bits span { flex: 0 0 20px; text-align: center; }
 .bm .selected-ingredients {
   min-height: 110px;
   display: flex;
@@ -500,25 +501,44 @@
   text-align: center;
   font-size: var(--type-body);
   line-height: 1.9;
-  color: #b0bbab;
+  color: var(--color-subtle-text);
   width: 100%;
   margin: 14px 0;
 }
 .bm .ingredient-chip {
   border: 1px solid var(--color-line);
   border-radius: 20px;
-  padding: 7px 9px;
-  font-size: var(--type-body);
+  padding: 0 3px 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: max(13px, var(--type-body));
+  line-height: 1.4;
   background: #f1f5e6;
+  color: #294d37;
+  font-weight: 600;
+  word-break: keep-all;
 }
 .bm .ingredient-chip button {
-  padding: 0 0 0 5px;
-  font-size: 12px;
-  color: #637561;
+  display: grid;
+  place-items: center;
+  min-height: 40px;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-size: 20px;
+  line-height: 1;
+  color: #294d37;
+}
+.bm .ingredient-chip button:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+.bm .ingredient-chip button:disabled {
+  opacity: 0.45;
 }
 .bm .bowl-footer {
   border-top: 1px solid var(--color-line);
-  padding-top: 18px;
+  padding: 18px 4px 4px;
 }
 .bm .bowl-footer > div {
   display: flex;
@@ -540,10 +560,16 @@
   font-size: 13px;
   gap: 12px;
 }
+.bm .bowl-footer .primary:disabled {
+  opacity: 1;
+  background: #e6edd7;
+  color: var(--color-ink);
+  cursor: not-allowed;
+}
 .bm .bowl-footer p {
   text-align: center;
   font-size: var(--type-body);
-  color: #9aa594;
+  color: var(--color-subtle-text);
   line-height: 1.9;
   margin: 13px 0 0;
 }
@@ -579,12 +605,29 @@
   color: #667866;
   font-size: var(--type-meta);
 }
+.bm > .wrap .pvsec { margin-bottom: var(--space-8); }
 
 /* 결과 창 */
 .bm-result {
   max-width: min(520px, calc(100vw - 26px));
+  max-height: calc(100dvh - 26px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 29px;
+  padding-right: 21px;
+  border-right: 8px solid var(--color-cream);
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-subtle-text) var(--color-soft);
+  scrollbar-gutter: stable;
 }
+.bm-result::-webkit-scrollbar { width: 8px; }
+.bm-result::-webkit-scrollbar-track { background: var(--color-soft); }
+.bm-result::-webkit-scrollbar-thumb {
+  border: 2px solid var(--color-soft);
+  border-radius: 999px;
+  background: var(--color-subtle-text);
+}
+.bm-result::-webkit-scrollbar-thumb:hover { background: var(--color-brand); }
 .bm-result .dialog-top {
   display: flex;
   justify-content: space-between;
@@ -596,13 +639,17 @@
   font-weight: 700;
 }
 .bm-result .close {
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   display: grid;
   place-items: center;
   border-radius: 50%;
   background: var(--color-pale);
   font-size: 22px;
+}
+.bm-result .close:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
 }
 .bm-result h2 {
   font-size: 28px;
@@ -611,7 +658,7 @@
   margin: 20px 0 12px;
 }
 .bm-result > p {
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.9;
   text-align: center;
   color: #687863;
@@ -623,7 +670,7 @@
   max-width: 100%;
   height: auto;
   aspect-ratio: 1;
-  margin: 20px auto 8px;
+  margin: 16px auto 8px;
   object-fit: contain;
   padding: 4%;
 }
@@ -636,25 +683,30 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: 6px;
-  margin: 15px 0 25px;
+  margin: 14px 0 20px;
 }
 .bm-result .result-chips span {
   padding: 8px 11px;
   background: var(--color-soft);
   color: #4a6150;
   border-radius: 20px;
-  font-size: var(--type-meta);
+  font-size: 13px;
 }
 .bm-result .field {
   margin: 15px 0;
 }
 .bm-result .field > span {
-  font-weight: 400;
-  margin-bottom: 9px;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+.bm-result .field :is(input, select) {
+  min-height: 48px;
+  font-size: 14px;
 }
 .bm-result .allergen-box {
   background: var(--color-pale);
-  padding: 14px;
+  padding: 16px;
   border-radius: 7px;
   font-size: var(--type-body);
   line-height: 1.9;
@@ -693,13 +745,13 @@
   padding: 13px;
   border-radius: 5px;
   color: #637561;
-  font-size: 12px;
+  font-size: 13px;
 }
 .bm-result .similar-link {
   display: block;
   margin-top: 16px;
   text-align: center;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--color-brand);
   font-weight: 600;
   text-decoration: underline;
@@ -707,6 +759,12 @@
 }
 
 @media (max-width: 1000px) {
+  .bm .bowl-sub-row {
+    flex-wrap: wrap;
+  }
+  .bm .bowl-subtitle {
+    flex-basis: 100%;
+  }
   .bm .workspace {
     grid-template-columns: 360px 290px;
     gap: 35px;
@@ -754,8 +812,11 @@
     width: min(100%, 360px);
   }
   .bm .card-stack {
-    height: 414px;
+    min-height: 414px;
     margin-bottom: 18px;
+  }
+  .bm .swipe-card {
+    min-height: 414px;
   }
   .bm .ingredient-visual {
     height: 278px;
@@ -764,7 +825,7 @@
     padding: 20px 25px 52px;
   }
   .bm .ingredient-info {
-    padding: 20px 22px;
+    padding: 20px 22px 26px;
   }
   .bm .ingredient-info h2 {
     font-size: 22px;

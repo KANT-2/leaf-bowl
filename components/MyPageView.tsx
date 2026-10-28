@@ -29,6 +29,27 @@ export default function MyPageView() {
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>("profile");
 
+  const onTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const last = TABS.length - 1;
+    const next =
+      event.key === "ArrowRight"
+        ? (index + 1) % TABS.length
+        : event.key === "ArrowLeft"
+          ? (index + last) % TABS.length
+          : event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? last
+              : null;
+    if (next === null) {
+      return;
+    }
+    event.preventDefault();
+    setTab(TABS[next].key);
+    const buttons = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+    buttons?.[next]?.focus();
+  };
+
   useEffect(() => {
     if (!isLoggedIn) {
       router.replace("/login");
@@ -44,26 +65,32 @@ export default function MyPageView() {
       <Breadcrumb items={[["홈", "/"], ["마이페이지"]]} />
       <PageHeading>마이페이지</PageHeading>
       <div className="mypage-tabs" role="tablist" aria-label="마이페이지 메뉴">
-        {TABS.map((t) => (
+        {TABS.map((t, index) => (
           <button
             key={t.key}
+            id={`mypage-tab-${t.key}`}
             type="button"
             role="tab"
             aria-selected={tab === t.key}
+            aria-controls="mypage-panel"
+            tabIndex={tab === t.key ? 0 : -1}
             className={tab === t.key ? "active" : ""}
             onClick={() => setTab(t.key)}
+            onKeyDown={(event) => onTabKeyDown(event, index)}
           >
             {t.label}
           </button>
         ))}
       </div>
-      {tab === "profile" && <ProfileTab />}
-      {tab === "address" && <AddressTab />}
-      {tab === "preferences" && <PreferencesTab />}
-      {tab === "orders" && <OrdersTab />}
-      {tab === "reviews" && <ReviewsTab />}
-      {tab === "bowls" && <BowlRecipesTab />}
-      {tab === "logins" && <LoginHistoryTab />}
+      <div id="mypage-panel" role="tabpanel" aria-labelledby={`mypage-tab-${tab}`} tabIndex={0}>
+        {tab === "profile" && <ProfileTab />}
+        {tab === "address" && <AddressTab />}
+        {tab === "preferences" && <PreferencesTab />}
+        {tab === "orders" && <OrdersTab />}
+        {tab === "reviews" && <ReviewsTab />}
+        {tab === "bowls" && <BowlRecipesTab />}
+        {tab === "logins" && <LoginHistoryTab />}
+      </div>
     </main>
   );
 }

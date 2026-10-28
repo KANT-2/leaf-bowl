@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { Button } from "@/components/admin/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/admin/select";
 import { Textarea } from "@/components/admin/textarea";
 import { nextStatuses, STATUS_LABEL, type OrderStatus } from "@/modules/orders/status";
 
@@ -70,28 +71,20 @@ export default function OrderStatusEditor({ id, status, version, onUpdated }: Pr
   }
 
   return (
-    <section className="mt-5 border-t pt-4" aria-label="주문 상태 변경">
-      <h3 className="mb-3 font-semibold">주문 상태 변경</h3>
-
-      <p className="meta mb-3">
-        현재 상태: {STATUS_LABEL[status]} · 버전 {version}
-      </p>
-
+    <section className="delivery-status-editor" aria-label="주문 상태 변경">
       <form onSubmit={submit} className="grid gap-3">
         <label className="grid gap-1 text-sm">
           다음 상태
-          <select
-            className="h-10 rounded-md border border-input bg-background px-3"
+          <Select
             value={next}
             disabled={saving || conflict}
-            onChange={(event) => setNext(event.target.value as OrderStatus)}
+            onValueChange={(value) => setNext(value as OrderStatus)}
           >
-            {options.map((value) => (
-              <option key={value} value={value}>
-                {STATUS_LABEL[value]}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="admin-filter-select" aria-label="다음 주문 상태"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {options.map((value) => <SelectItem key={value} value={value}>{STATUS_LABEL[value]}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </label>
 
         <label className="grid gap-1 text-sm">

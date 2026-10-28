@@ -6,6 +6,8 @@ import { Button } from "./button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "./table";
 import type { SalesProductType, SalesPeriod, SalesReport, SalesRow } from "@/modules/reports/sales";
 import { redirectIfAdminUnauthorized } from "@/features/admin/session-client";
+import EventRangeCalendar from "./editors/EventRangeCalendar";
+import AdminFilterSelect from "./AdminFilterSelect";
 import styles from "./SalesRanking.module.css";
 
 const periods: { value: SalesPeriod; label: string }[] = [
@@ -59,7 +61,9 @@ export default function SalesRanking() {
   const [endDate, setEndDate] = useState(today);
   const [appliedRange, setAppliedRange] = useState({ startDate: today, endDate: today });
   const [rangeError, setRangeError] = useState("");
-  const [report, setReport] = useState<SalesReport | null>(null);
+  const [reportState, setReportState] = useState<{ key: string; value: SalesReport } | null>(null);
+  const requestKey = JSON.stringify({ period, productType, range: period === "custom" ? appliedRange : null });
+  const report = reportState?.key === requestKey ? reportState.value : null;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [refresh, setRefresh] = useState(0);
@@ -68,7 +72,6 @@ export default function SalesRanking() {
     async function load() {
       setLoading(true);
       setError("");
-      setReport(null);
       try {
         const params = new URLSearchParams({ period, type: productType });
         if (period === "custom") {
@@ -88,7 +91,7 @@ export default function SalesRanking() {
         }
         const result: SalesReport = await response.json();
         if (!controller.signal.aborted) {
-          setReport(result);
+          setReportState({ key: requestKey, value: result });
         }
       } catch (cause) {
         if (!controller.signal.aborted) {
@@ -110,7 +113,7 @@ export default function SalesRanking() {
       controller.abort();
       window.clearInterval(timer);
     };
-  }, [period, productType, refresh, appliedRange]);
+  }, [period, productType, refresh, appliedRange, requestKey]);
   const selectedSalad = report?.combinations.some((row) => row.saladId === combinationSalad) ? combinationSalad : "";
   const combinations = report?.combinations.filter((row) => !selectedSalad || row.saladId === selectedSalad) ?? [];
   const leaders = report?.rows.filter((row) => row.rank !== null && row.rank <= 3) ?? [];
@@ -174,28 +177,17 @@ export default function SalesRanking() {
             setPeriod("custom");
           }}
         >
-          <label>
-            시작일
-            <input
-              type="date"
-              required
-              max={endDate || today}
-              value={startDate}
-              onChange={(event) => setStartDate(event.target.value)}
-            />
-          </label>
-          <span aria-hidden="true">~</span>
-          <label>
-            종료일
-            <input
-              type="date"
-              required
-              min={startDate}
-              max={today}
-              value={endDate}
-              onChange={(event) => setEndDate(event.target.value)}
-            />
-          </label>
+          <EventRangeCalendar
+            label="조회 기간"
+            startDate={startDate}
+            endDate={endDate}
+            maxDate={today}
+            onChange={(start, end) => {
+              setStartDate(start);
+              setEndDate(end);
+              setRangeError("");
+            }}
+          />
           <Button type="submit">기간 조회</Button>
           {period === "custom" && (
             <span className="meta">
@@ -211,9 +203,9 @@ export default function SalesRanking() {
       </div>
       <p className="meta">한국 시간 기준 · 1분마다 자동 갱신</p>
       <div aria-live="polite" aria-busy={loading}>
-        {loading || (report !== null && report.productType !== productType) ? (
+        {loading && !report ? (
           <section className="surface empty">제품 판매 현황을 불러오는 중입니다…</section>
-        ) : error ? (
+        ) : error && !report ? (
           <section className="surface empty">
             <p role="alert" className="error">
               {error}
@@ -225,6 +217,19 @@ export default function SalesRanking() {
         ) : (
           report && (
             <>
+              {loading && (
+                <p className="meta" role="status">
+                  최신 판매 현황을 확인하는 중입니다…
+                </p>
+              )}
+              {error && (
+                <div className="surface" role="alert">
+                  <p className="error">{error}</p>
+                  <Button variant="outline" onClick={() => setRefresh((value) => value + 1)}>
+                    다시 시도
+                  </Button>
+                </div>
+              )}
               {!report.connected && (
                 <section className={styles.connection}>
                   <BarChart3 size={28} aria-hidden="true" />
@@ -357,20 +362,14 @@ export default function SalesRanking() {
                   </p>
                   <label className="field" style={{ maxWidth: 360, marginBottom: 16 }}>
                     샐러드 선택
-                    <select
+                    <AdminFilterSelect
+                      label="샐러드 선택"
                       value={selectedSalad}
-                      onChange={(e) => setCombinationSalad(e.target.value)}
-                      style={{ padding: 10, border: "1px solid #d5dfcc", borderRadius: 8 }}
-                    >
-                      <option value="">전체 샐러드</option>
-                      {report.rows
+                      onChange={setCombinationSalad}
+                      options={[{ value: "", label: "전체 샐러드" }, ...report.rows
                         .filter((row) => row.quantity > 0)
-                        .map((row) => (
-                          <option key={row.productId} value={row.productId}>
-                            {row.name}
-                          </option>
-                        ))}
-                    </select>
+                        .map((row) => ({ value: row.productId, label: row.name }))]}
+                    />
                   </label>
                   <div className={`surface ${styles.table}`}>
                     <Table>

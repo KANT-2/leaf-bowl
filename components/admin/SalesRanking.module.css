@@ -319,27 +319,17 @@
   gap: 12px;
   margin-bottom: 0;
 }
-.dateRange label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
+.dateRange :global(.event-range) {
+  width: clamp(260px, 24vw, 340px);
+  max-width: 100%;
 }
-.dateRange input {
-  box-sizing: border-box;
-  height: 36px;
-  width: 144px;
-  padding: 6px 10px;
-  font-size: 14px;
-  line-height: 20px;
-  border: 1px solid #cdd7c7;
-  border-radius: 8px;
-  background: #fff;
-  color: #173f32;
+.dateRange :global(.event-range-trigger) {
+  width: 100%;
+  white-space: nowrap;
 }
 .periodRow .segmented button,
-.dateRange button {
-  height: 36px;
+.dateRange > button {
+  min-height: 40px;
   padding: 6px 16px;
   font-size: 14px;
   line-height: 20px;
@@ -351,15 +341,5 @@
 @media (max-width: 600px) {
   .dateRange {
     width: 100%;
-  }
-  .dateRange label {
-    flex-direction: column;
-    align-items: stretch;
-    flex: 1;
-    min-width: 0;
-  }
-  .dateRange input {
-    width: 100%;
-    min-width: 0;
   }
 }

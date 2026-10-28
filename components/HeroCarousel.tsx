@@ -181,7 +181,7 @@ export default function HeroCarousel({
                 aria-hidden={!active}
                 inert={!active}
               >
-                <HeroBanner content={entry.content} />
+                <HeroBanner content={entry.content} eager={i === 0} />
               </div>
             );
           }
@@ -221,7 +221,7 @@ export default function HeroCarousel({
                     height={1024}
                     sizes="(max-width: 600px) 90vw, 57vw"
                     preload={i === 0}
-                    loading="eager"
+                    loading={i === 0 ? "eager" : "lazy"}
                     alt={s.alt}
                   />
                   <svg className="hero-ring" viewBox="0 0 100 100" aria-hidden="true">

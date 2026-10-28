@@ -83,7 +83,9 @@ body.lock {
 }
 .cart-item h4 {
   margin: 0 0 6px;
-  font-size: 13px;
+  font-size: var(--type-body);
+  line-height: 1.5;
+  word-break: keep-all;
 }
 .cart-item h4 a:hover {
   text-decoration: underline;
@@ -189,7 +191,7 @@ body.lock {
   border-radius: 6px;
   background: #fbf1e6;
   color: #8a4b1f !important;
-  font-size: 12px;
+  font-size: var(--type-support);
   line-height: 1.6;
 }
 .custom-badge {

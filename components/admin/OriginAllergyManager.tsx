@@ -1,11 +1,13 @@
 "use client";
 import type { CatalogConfig } from "@/modules/settings/schema";
 
-import { Fragment, useState } from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Fragment, useEffect, useId, useRef, useState } from "react";
+import { ChevronDown, Plus, Pencil, Trash2 } from "lucide-react";
+import { createPortal } from "react-dom";
 import SearchField from "@/components/controls/SearchField";
 import { Button } from "./button";
 import { Input } from "./input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select";
 import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./dialog";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "./table";
 import { type Catalog, type Ingredient } from "@/modules/catalog/schema";
@@ -22,11 +24,167 @@ import {
 } from "./alert-dialog";
 
 const PAGE_SIZE = 15;
+
+const categoryTone = (value: string) =>
+  /채소|과일/.test(value) ? "produce" : /단백질/.test(value) ? "protein" : /토핑/.test(value) ? "topping" : "neutral";
+
 const split = (value: string) =>
   value
     .split(/[,·，、;\n]+/)
     .map((x) => x.trim())
     .filter(Boolean);
+
+function PresetInput({
+  id,
+  label,
+  value,
+  onChange,
+  options,
+  placeholder,
+  required,
+  maxLength,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: string[];
+  placeholder?: string;
+  required?: boolean;
+  maxLength: number;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  const control = useRef<HTMLDivElement>(null);
+  const optionsRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const [popup, setPopup] = useState({ top: 0, left: 0, width: 0, maxHeight: 240 });
+  const choices = [...new Set(options.filter(Boolean))];
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const place = () => {
+      const rect = control.current?.getBoundingClientRect();
+      if (!rect) {
+        return;
+      }
+      const desired = Math.min(240, (choices.length + 1) * 36 + 8);
+      const below = window.innerHeight - rect.bottom - 14;
+      const above = rect.top - 14;
+      const opensAbove = below < desired && above > below;
+      const maxHeight = Math.min(desired, Math.max(64, opensAbove ? above : below), window.innerHeight - 16);
+      const width = Math.min(rect.width, window.innerWidth - 16);
+      setPopup({
+        top: Math.max(8, Math.min(opensAbove ? rect.top - maxHeight - 6 : rect.bottom + 6, window.innerHeight - maxHeight - 8)),
+        left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
+        width,
+        maxHeight,
+      });
+    };
+    place();
+    const closeOutside = (event: PointerEvent) => {
+      if (!control.current?.contains(event.target as Node) && !optionsRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      document.removeEventListener("pointerdown", closeOutside);
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open, choices.length]);
+  useEffect(() => {
+    if (open) {
+      document.getElementById(`${listId}-${active}`)?.scrollIntoView({ block: "nearest" });
+    }
+  }, [active, listId, open]);
+  const choose = (index: number) => {
+    if (index > 0) {
+      onChange(choices[index - 1]);
+    }
+    setOpen(false);
+    input.current?.focus();
+  };
+  return (
+    <div className="field origin-preset-field">
+      <label htmlFor={id}>{label}</label>
+      <div ref={control} className="origin-preset-control" data-state={open ? "open" : "closed"}>
+        <Input
+          ref={input}
+          id={id}
+          required={required}
+          maxLength={maxLength}
+          value={value}
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={open}
+          aria-controls={listId}
+          aria-activedescendant={open ? `${listId}-${active}` : undefined}
+          onFocus={() => { setActive(0); setOpen(true); }}
+          onClick={() => setOpen(true)}
+          onChange={(event) => { onChange(event.target.value); setActive(0); setOpen(true); }}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+              event.preventDefault();
+              setOpen(true);
+              setActive((current) => Math.max(0, Math.min(choices.length, current + (event.key === "ArrowDown" ? 1 : -1))));
+            } else if (event.key === "Enter" && open) {
+              event.preventDefault();
+              choose(active);
+            } else if (event.key === "Escape" && open) {
+              event.stopPropagation();
+              setOpen(false);
+            } else if (event.key === "Tab") {
+              setOpen(false);
+            }
+          }}
+          placeholder={placeholder}
+        />
+        <button
+          type="button"
+          className="origin-preset-trigger"
+          aria-label={`${label} 기존 항목 ${open ? "닫기" : "열기"}`}
+          aria-expanded={open}
+          aria-controls={listId}
+          onClick={() => {
+            if (open) {
+              setOpen(false);
+            } else {
+              setOpen(true);
+              input.current?.focus();
+            }
+          }}
+        >
+          <ChevronDown size={16} aria-hidden="true" />
+        </button>
+        {open && createPortal(
+          <div ref={optionsRef} id={listId} className="origin-preset-options" role="listbox" aria-label={`${label} 기존 항목`} style={popup}>
+            {["직접 입력", ...choices].map((choice, index) => (
+              <button
+                id={`${listId}-${index}`}
+                key={index === 0 ? "__custom" : choice}
+                type="button"
+                role="option"
+                tabIndex={-1}
+                aria-selected={index === 0 ? !choices.includes(value) : choice === value}
+                data-active={active === index}
+                onPointerDown={(event) => event.preventDefault()}
+                onMouseEnter={() => setActive(index)}
+                onClick={() => choose(index)}
+              >{choice}</button>
+            ))}
+          </div>,
+          document.body,
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function OriginAllergyManager({
   catalog,
@@ -175,22 +333,22 @@ export default function OriginAllergyManager({
             setPage(1);
           }}
         />
-        <select
-          aria-label="알레르기 필터"
-          value={allergen}
-          onChange={(e) => {
-            setAllergen(e.target.value);
+        <Select
+          value={allergen || "__all"}
+          onValueChange={(value) => {
+            setAllergen(value === "__all" ? "" : value);
             setPage(1);
           }}
         >
-          <option value="">알레르기 전체</option>
-          <option value="__none">등록된 안내 없음</option>
-          {allergens.map((value) => (
-            <option key={value} value={value}>
-              {value}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger className="origin-allergen-trigger" aria-label="알레르기 필터">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all">알레르기 전체</SelectItem>
+            <SelectItem value="__none">등록된 안내 없음</SelectItem>
+            {allergens.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
       <p className="origin-result-count" role="status">
         {category || "전체"} 재료 {filteredIngredients.length}개
@@ -204,7 +362,7 @@ export default function OriginAllergyManager({
               <TableHead>원산지</TableHead>
               <TableHead>알레르기</TableHead>
               <TableHead>사용 중인 메뉴</TableHead>
-              <TableHead className="text-right">관리</TableHead>
+              <TableHead className="origin-actions-column text-right">관리</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -215,7 +373,7 @@ export default function OriginAllergyManager({
               }
               return (
                 <Fragment key={group}>
-                  <TableRow className="origin-group-heading">
+                  <TableRow className="origin-group-heading" data-tone={categoryTone(group)}>
                     <TableCell colSpan={6}>
                       <strong>{group}</strong>
                       <span>{filteredIngredients.filter((ingredient) => ingredient.category === group).length}</span>
@@ -226,7 +384,7 @@ export default function OriginAllergyManager({
                       <TableCell>
                         <strong>{i.name}</strong>
                       </TableCell>
-                      <TableCell>{i.category}</TableCell>
+                      <TableCell><span className="origin-category-badge" data-tone={categoryTone(i.category)}>{i.category}</span></TableCell>
                       <TableCell>
                         {i.origin || "미입력"}
                         {i.originDetail && <div className="meta">{i.originDetail}</div>}
@@ -239,11 +397,11 @@ export default function OriginAllergyManager({
                             ))}
                           </div>
                         ) : (
-                          "등록된 안내 없음"
+                          <span className="origin-neutral-label">등록된 안내 없음</span>
                         )}
                       </TableCell>
                       <TableCell>{usedBy(i).length}개</TableCell>
-                      <TableCell>
+                      <TableCell className="origin-actions-column">
                         <div className="row-actions">
                           <Button
                             variant="outline"
@@ -388,7 +546,7 @@ export default function OriginAllergyManager({
           }
         }}
       >
-        <DialogContent className="editor-dialog" onInteractOutside={(e) => e.preventDefault()}>
+        <DialogContent className="editor-dialog origin-editor-dialog" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>재료 수정</DialogTitle>
             <DialogDescription>저장하면 이 재료를 사용하는 메뉴의 알레르기 안내에 반영됩니다.</DialogDescription>
@@ -412,36 +570,24 @@ export default function OriginAllergyManager({
                         onChange={(e) => setEditing({ ...editing, name: e.target.value })}
                       />
                     </label>
-                    <label className="field">
-                      분류
-                      <Input
-                        required
-                        maxLength={80}
-                        list="origin-categories"
-                        value={editing.category}
-                        onChange={(e) => setEditing({ ...editing, category: e.target.value })}
-                      />
-                      <datalist id="origin-categories">
-                        {config.ingredientCategories.map((x) => (
-                          <option key={x} value={x} />
-                        ))}
-                      </datalist>
-                    </label>
-                    <label className="field">
-                      원산지
-                      <Input
-                        maxLength={100}
-                        list="origin-countries"
-                        value={editing.origin ?? ""}
-                        onChange={(e) => setEditing({ ...editing, origin: e.target.value })}
-                        placeholder="예: 국내산, 미국산"
-                      />
-                      <datalist id="origin-countries">
-                        {config.originCountries.map((x) => (
-                          <option key={x} value={x} />
-                        ))}
-                      </datalist>
-                    </label>
+                    <PresetInput
+                      id="origin-category"
+                      label="분류"
+                      required
+                      maxLength={80}
+                      value={editing.category}
+                      onChange={(value) => setEditing({ ...editing, category: value })}
+                      options={config.ingredientCategories}
+                    />
+                    <PresetInput
+                      id="origin-country"
+                      label="원산지"
+                      maxLength={100}
+                      value={editing.origin ?? ""}
+                      onChange={(value) => setEditing({ ...editing, origin: value })}
+                      options={config.originCountries}
+                      placeholder="예: 국내산, 미국산"
+                    />
                     <label className="field">
                       원산지 상세 (선택)
                       <Input

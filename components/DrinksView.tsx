@@ -7,6 +7,7 @@ import { useCustomerCatalog } from "./CustomerCatalogProvider";
 import PageHeading from "./PageHeading";
 import SoldOutCover from "./SoldOutCover";
 import { money } from "@/modules/shared/format";
+import { Plus } from "lucide-react";
 
 /** 음료만 따로 고르는 페이지. + 를 누르면 장바구니에 음료 한 줄로 담기고 장바구니가 열린다. */
 export default function DrinksView() {
@@ -52,7 +53,7 @@ export default function DrinksView() {
                     open(e.currentTarget);
                   }}
                 >
-                  +
+                  <Plus size={17} strokeWidth={2} aria-hidden="true" />
                 </button>
               )}
             </div>

@@ -9,6 +9,7 @@ import ReviewItem from "./ReviewItem";
 import { useReviewWrite } from "./ReviewWrite";
 import { useReviews } from "./ReviewsProvider";
 import StarRating from "./StarRating";
+import CustomerSelect from "./CustomerSelect";
 import { useReducedMotion } from "@/features/shared/hooks";
 import { useCustomerCatalog } from "./CustomerCatalogProvider";
 import { money } from "@/modules/shared/format";
@@ -171,15 +172,16 @@ export default function ReviewsView({ pid }: { pid: number | null }) {
       <div className="rv-toolbar" ref={toolbarRef}>
         <label className="rv-menu">
           <span>메뉴</span>
-          <select value={custom ? CUSTOM_OPTION : (pid ?? "")} onChange={(e) => changeMenu(e.target.value)}>
-            <option value="">전체 메뉴</option>
-            {PRODUCTS.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-            <option value={CUSTOM_OPTION}>{CUSTOM_BOWL_NAME}</option>
-          </select>
+          <CustomerSelect
+            label="리뷰 메뉴"
+            value={custom ? CUSTOM_OPTION : String(pid ?? "")}
+            onValueChange={changeMenu}
+            options={[
+              { value: "", label: "전체 메뉴" },
+              ...PRODUCTS.map((p) => ({ value: String(p.id), label: p.name })),
+              { value: CUSTOM_OPTION, label: CUSTOM_BOWL_NAME },
+            ]}
+          />
         </label>
         {star !== null && (
           <button type="button" className="rv-filter" onClick={() => pickStar(null)} aria-label={`${star}점 필터 해제`}>
@@ -191,19 +193,15 @@ export default function ReviewsView({ pid }: { pid: number | null }) {
         </span>
         <label className="rv-sort">
           <span className="sr-only">정렬</span>
-          <select
+          <CustomerSelect
+            label="리뷰 정렬"
             value={sort}
-            onChange={(e) => {
-              setSort(e.target.value as SortKey);
+            onValueChange={(value) => {
+              setSort(value as SortKey);
               setShown(PAGE);
             }}
-          >
-            {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
-              <option key={k} value={k}>
-                {SORT_LABELS[k]}
-              </option>
-            ))}
-          </select>
+            options={(Object.keys(SORT_LABELS) as SortKey[]).map((k) => ({ value: k, label: SORT_LABELS[k] }))}
+          />
         </label>
       </div>
 

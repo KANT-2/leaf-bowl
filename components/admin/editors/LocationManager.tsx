@@ -33,13 +33,16 @@ export default function LocationManager({
         <div>
           <div className="eyebrow">FIND OUR STORE</div>
           <h1>위치 및 배달 관리</h1>
-          <p className="muted">매장 위치를 설정하고 지도에서 확인하세요.</p>
+          <p className="muted">배달 주문을 확인하고, 아래에서 매장 위치를 설정하세요.</p>
         </div>
       </div>
       <DeliveryOrders />
       <section className="surface">
         <div className="section-heading">
-          <h2>매장 위치</h2>
+          <div>
+            <h2>매장 위치</h2>
+            <p className="meta">{catalog.location?.address || "매장 주소 미등록"}</p>
+          </div>
           <Button
             type="button"
             variant="ghost"

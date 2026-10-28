@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from "@/components/admin/dialog";
 import SearchField from "@/components/controls/SearchField";
+import AdminFilterSelect from "@/components/admin/AdminFilterSelect";
 import { Tabs, TabsList, TabsTrigger } from "@/components/admin/tabs";
 import { reviewDateTime, reviewMenuLabel } from "@/features/admin/catalog-presentation";
 import { type Catalog, type Review } from "@/modules/catalog/schema";
@@ -193,41 +194,29 @@ export default function ReviewManager({
         </div>
         <label>
           월 선택
-          <select
-            aria-label="리뷰 월 선택"
+          <AdminFilterSelect
+            label="리뷰 월 선택"
             value={month}
-            onChange={(e) => {
-              setMonth(e.target.value);
+            onChange={(value) => {
+              setMonth(value);
               setDay("");
               setReviewPage(1);
             }}
-          >
-            <option value="">전체 월</option>
-            {months.map((value) => (
-              <option key={value} value={value}>
-                {groupLabel(value)}
-              </option>
-            ))}
-          </select>
+            options={[{ value: "", label: "전체 월" }, ...months.map((value) => ({ value, label: groupLabel(value) }))]}
+          />
         </label>
         {groupBy === "day" && (
           <label>
             날짜 선택
-            <select
-              aria-label="리뷰 날짜 선택"
+            <AdminFilterSelect
+              label="리뷰 날짜 선택"
               value={day}
-              onChange={(e) => {
-                setDay(e.target.value);
+              onChange={(value) => {
+                setDay(value);
                 setReviewPage(1);
               }}
-            >
-              <option value="">전체 날짜</option>
-              {days.map((value) => (
-                <option key={value} value={value}>
-                  {groupLabel(value)}
-                </option>
-              ))}
-            </select>
+              options={[{ value: "", label: "전체 날짜" }, ...days.map((value) => ({ value, label: groupLabel(value) }))]}
+            />
           </label>
         )}
         <span className="meta" role="status">

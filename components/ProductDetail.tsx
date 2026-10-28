@@ -105,7 +105,7 @@ export default function ProductDetail({ product: p }: { product: Product }) {
             <fieldset key={g.id} className="option-list">
               <legend>
                 {g.name}
-                {g.required ? " (필수)" : ""}
+                {g.required ? " (필수)" : ""} · {g.multiple ? "여러 개 선택 가능" : "하나 선택"}
               </legend>
               {/* 모바일에서는 접힌 드롭다운으로, 데스크톱에서는 기존처럼 항상 펼쳐 보여준다(CSS 로만 제어). */}
               <div className={`option-picker${openGroupId === g.id ? " open" : ""}`}>
@@ -145,9 +145,15 @@ export default function ProductDetail({ product: p }: { product: Product }) {
                                   ? [c.id]
                                   : [],
                             }));
-                            // 골랐으면(체크 해제가 아니라 선택했으면) 드롭다운을 접는다.
-                            if (e.target.checked) {
+                            // 복수 선택은 목록을 열어 두고, 단일 선택만 접는다.
+                            if (!g.multiple && e.target.checked) {
+                              const trigger = e.currentTarget
+                                .closest(".option-picker")
+                                ?.querySelector<HTMLButtonElement>(".option-picker-trigger");
                               setOpenGroupId(null);
+                              if (window.matchMedia("(max-width: 700px)").matches) {
+                                requestAnimationFrame(() => trigger?.focus());
+                              }
                             }
                           }}
                         />

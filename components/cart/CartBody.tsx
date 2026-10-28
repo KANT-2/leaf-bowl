@@ -34,7 +34,7 @@ export default function CartBody({ closeBtn }: BodyProps) {
     const taken = new Set(items.map(itemKey));
     const pick = slot.choices.find((c) => c.available && !taken.has(itemKey(withChoice(cur, slot.groupId, c.value))));
     if (!pick) {
-      toast(`고를 수 있는 ${slot.label}이(가) 모두 담겨 있어요. 수량을 늘려주세요`);
+      toast(`${slot.label}: 고를 수 있는 항목을 모두 담았어요. 수량을 늘려주세요.`);
       return;
     }
     focusLine.current = addVariant(index, slot.groupId, pick.value);

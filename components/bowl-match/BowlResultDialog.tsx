@@ -46,18 +46,23 @@ export default function BowlResultDialog({
   onAdd,
 }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const returnFocus = useRef<HTMLElement | null>(null);
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog || !resultOpen || !selected.length) {
       return;
     }
     if (!dialog.open) {
+      returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       dialog.showModal();
     }
     return () => dialog.close();
   }, [resultOpen, selected.length]);
   return (
-    <dialog ref={dialogRef} className="bm-result" aria-labelledby="bmResultTitle" onClose={() => onClosed()}>
+    <dialog ref={dialogRef} className="bm-result" aria-labelledby="bmResultTitle" onClose={() => {
+      onClosed();
+      requestAnimationFrame(() => returnFocus.current?.focus());
+    }}>
       {resultOpen && selected.length > 0 && (
         <>
           <div className="dialog-top">

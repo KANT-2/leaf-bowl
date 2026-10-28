@@ -8,6 +8,7 @@ import SoldOutCover from "./SoldOutCover";
 import { useReviews } from "./ReviewsProvider";
 import { money } from "@/modules/shared/format";
 import { type Product } from "@/modules/catalog/customer-product";
+import { Plus } from "lucide-react";
 
 export const CARD_SIZES = "(max-width: 600px) 50vw, (max-width: 1240px) 25vw, 300px";
 
@@ -46,7 +47,7 @@ export default function ProductCard({ product: p, eager = false }: { product: Pr
             disabled={!initialItem}
             onClick={quickAdd}
           >
-            +
+            <Plus size={17} strokeWidth={2} aria-hidden="true" />
           </button>
         )}
       </div>

@@ -426,8 +426,13 @@ function BowlMatchBody({ ingredients }: { ingredients: Ingredient[] }) {
           {selected.length ? (
             selected.map((i) => (
               <span className="ingredient-chip" key={i.id}>
-                {i.name}
-                <button type="button" aria-label={`${i.name} 빼기`} onClick={() => removeIngredient(i.id)}>
+                <span>{i.name}</span>
+                <button
+                  type="button"
+                  aria-label={`${i.name} 빼기`}
+                  disabled={busy}
+                  onClick={() => removeIngredient(i.id)}
+                >
                   ×
                 </button>
               </span>

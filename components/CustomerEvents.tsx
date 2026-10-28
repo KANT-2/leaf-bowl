@@ -114,7 +114,7 @@ export default function CustomerEvents({ events }: { events: CustomerEvent[] }) 
                 setQuery("");
               }}
             >
-              조건 모두 지우기
+              검색·상태 초기화
             </button>
           )}
         </StatusFeedback>

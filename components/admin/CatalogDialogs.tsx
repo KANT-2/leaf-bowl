@@ -10,9 +10,11 @@ import {
   AlertDialogTitle,
 } from "@/components/admin/alert-dialog";
 import { Button } from "@/components/admin/button";
+import { XIcon } from "lucide-react";
 import {
   Dialog,
   DialogBody,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -56,7 +58,7 @@ export default function CatalogDialogs({
       >
         <DialogContent
           className="editor-dialog menu-editor-dialog"
-          closeDisabled={busy || uploading}
+          showCloseButton={false}
           onEscapeKeyDown={(e) => {
             if (busy || uploading) {
               e.preventDefault();
@@ -64,11 +66,14 @@ export default function CatalogDialogs({
           }}
           onInteractOutside={(e) => e.preventDefault()}
         >
-          <DialogHeader>
+          <DialogHeader className="menu-editor-header">
             <DialogTitle>
               {product && catalog.products.some((p) => p.id === product.id) ? "메뉴 수정" : "새 메뉴 등록"}
             </DialogTitle>
             <DialogDescription className="sr-only">메뉴 정보와 구성 재료를 수정합니다.</DialogDescription>
+            <DialogClose className="menu-editor-close" disabled={busy || uploading} aria-label="메뉴 수정 닫기">
+              <XIcon size={18} aria-hidden="true" />
+            </DialogClose>
           </DialogHeader>
           <DialogBody>
             {product && (

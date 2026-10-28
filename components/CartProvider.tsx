@@ -22,8 +22,8 @@ interface CartContextValue {
   add: (item: MenuItem) => void;
   /** bowl match 에서 만든 커스텀 볼 1개를 담는다. 같은 조합이면 수량만 늘린다. */
   addCustom: (item: Omit<CustomItem, "kind" | "qty">) => void;
-  /** 음료 한 잔을 따로 담는다. 이미 있으면 수량만 늘린다. */
-  addDrink: (drink: number) => void;
+  /** 음료를 담는다. 이미 있으면 수량만 늘린다. */
+  addDrink: (drink: number, quantity?: number) => void;
   update: (index: number, qty: number) => void;
   /**
    * 한 줄의 단일 선택 옵션(드레싱 등)을 바꾼다. groupId 가 null 이면 예전 방식(dressing 번호) 줄이다.
@@ -89,9 +89,9 @@ export default function CartProvider({ children }: { children: React.ReactNode }
   );
 
   const addDrink = useCallback(
-    (drink: number) => {
+    (drink: number, quantity = 1) => {
       const selected = DRINKS[drink];
-      if (!selected?.available) {
+      if (!selected?.available || !Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
         return;
       }
       store.set(
@@ -99,7 +99,7 @@ export default function CartProvider({ children }: { children: React.ReactNode }
           kind: "drink",
           drink,
           drinkKey: selected.id,
-          qty: 1,
+          qty: quantity,
         }),
       );
     },

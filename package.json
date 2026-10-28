@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint && npm run format:check",
     "test": "node --require ./tests/register-typescript.cjs --test tests/*.test.cjs",
+    "qa:ui": "node tests/ui-ux-local-qa.cjs",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:validate": "prisma validate",
