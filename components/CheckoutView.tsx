@@ -115,7 +115,7 @@ export default function CheckoutView({ hours, clientKey }: { hours: DeliveryHour
       return;
     }
     if (missingFields.length) {
-      toast(`${missingFields.join(", ")}을(를) 입력해주세요.`);
+      toast(`다음 항목을 확인해주세요: ${missingFields.join(", ")}`);
       return;
     }
     const controller = new AbortController();
@@ -439,9 +439,11 @@ export default function CheckoutView({ hours, clientKey }: { hours: DeliveryHour
             aria-disabled={!canPay}
             onClick={pay}
           >
-            {missingFields.length
-              ? `${missingFields[0]} 입력 필요`
-              : `${money(total)} ${member ? "주문하기" : "결제하기"}`}
+            {paying
+              ? "처리 중…"
+              : missingFields.length
+                ? `${missingFields[0]} 입력 필요`
+                : `${money(total)} ${member ? "주문하기" : "결제하기"}`}
           </button>
         </aside>
       </div>

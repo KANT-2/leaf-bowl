@@ -2,7 +2,7 @@
 
 import { useCustomerCatalog } from "./CustomerCatalogProvider";
 import Link from "next/link";
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import PageHeading from "./PageHeading";
 import ProductCard from "./ProductCard";
 import { useReviews } from "./ReviewsProvider";
@@ -13,6 +13,7 @@ import { ChevronDown } from "lucide-react";
 import SearchField from "./controls/SearchField";
 import FilterGroup from "./controls/FilterGroup";
 import StatusFeedback from "./controls/StatusFeedback";
+import CustomerSelect from "./CustomerSelect";
 
 type Filter = string;
 
@@ -80,7 +81,7 @@ function useMenuResults(query: MenuSearch, complete: boolean, revision: number, 
 
   const current = result?.key === requestKey ? result : null;
   return {
-    data: enabled ? current?.data : undefined,
+    data: enabled ? (current?.data ?? result?.data) : undefined,
     loading: enabled && current === null,
     error: enabled ? current?.error : undefined,
     retry: () => setAttempt((value) => value + 1),
@@ -113,6 +114,18 @@ export default function MenuSection() {
   const [page, setPage] = useState(1);
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
+  const [draftMinPrice, setDraftMinPrice] = useState("");
+  const [draftMaxPrice, setDraftMaxPrice] = useState("");
+  const priceDetails = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      if (priceDetails.current?.open && !priceDetails.current.contains(event.target as Node)) {
+        priceDetails.current.open = false;
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, []);
   // 다른 페이지로 갔다 돌아와도(Activity로 숨겨졌다 다시 보여도) 알레르기 제외 선택은
   // 유지하지 않고 매번 새로 고르게 한다.
   useLayoutEffect(() => {
@@ -125,9 +138,9 @@ export default function MenuSection() {
   const localSort = sort === "kcalLow" || sort === "proteinHigh" || sort === "rating";
   const serverSort: MenuSearch["sort"] = sort === "priceLow" || sort === "priceHigh" ? sort : "default";
   const priceError =
-    !validPrice(minPrice) || !validPrice(maxPrice)
+    !validPrice(draftMinPrice) || !validPrice(draftMaxPrice)
       ? "가격은 0 이상의 정수로 입력해주세요."
-      : minPrice !== "" && maxPrice !== "" && Number(minPrice) > Number(maxPrice)
+      : draftMinPrice !== "" && draftMaxPrice !== "" && Number(draftMinPrice) > Number(draftMaxPrice)
         ? "최소 가격은 최대 가격보다 클 수 없습니다."
         : "";
   const { data, loading, error, retry } = useMenuResults(
@@ -143,7 +156,7 @@ export default function MenuSection() {
     },
     localSort,
     revision,
-    !priceError,
+    true,
   );
 
   // 상세·장바구니용 기존 메타데이터에 API가 반환한 최신 표시값을 합친다.
@@ -169,8 +182,7 @@ export default function MenuSection() {
       : [];
   });
   const missingMetadata = data !== undefined && found.length !== data.items.length;
-  const errorMessage =
-    priceError || error || (missingMetadata ? "상품 정보가 변경되었습니다. 화면을 새로고침해주세요." : "");
+  const errorMessage = error || (missingMetadata ? "상품 정보가 변경되었습니다. 화면을 새로고침해주세요." : "");
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const compare: Record<SortKey, (a: Product, b: Product) => number> = {
@@ -195,6 +207,11 @@ export default function MenuSection() {
     setExcluded([]);
     setMinPrice("");
     setMaxPrice("");
+    setDraftMinPrice("");
+    setDraftMaxPrice("");
+    if (priceDetails.current) {
+      priceDetails.current.open = false;
+    }
     setSort("default");
     setPage(1);
   };
@@ -219,60 +236,94 @@ export default function MenuSection() {
           }}
         />
       </div>
-      <FilterGroup
-        label="메뉴 분류"
-        options={FILTERS}
-        value={filter}
-        className="menu-filters"
-        onChange={(value) => {
-          setFilter(value);
-          setPage(1);
-        }}
-      />
-      <div className="menu-price-range" role="group" aria-label="가격 범위">
-        <label>
-          최소 가격 (원)
-          <input
-            type="text"
-            inputMode="numeric"
-            aria-invalid={!!priceError}
-            aria-describedby={priceError ? "menu-price-error" : "menu-price-help"}
-            value={minPrice}
-            placeholder="제한 없음"
-            onChange={(event) => {
-              setMinPrice(event.target.value);
-              setPage(1);
+      <div className="menu-filter-row">
+        <FilterGroup
+          label="메뉴 분류"
+          options={FILTERS}
+          value={filter}
+          className="menu-filters"
+          onChange={(value) => {
+            setFilter(value);
+            setPage(1);
+          }}
+        />
+        <div className="menu-price-range" role="group" aria-label="가격 범위">
+          <details
+            className="menu-price-filter"
+            ref={priceDetails}
+            onToggle={(event) => {
+              if (event.currentTarget.open) {
+                setDraftMinPrice(minPrice);
+                setDraftMaxPrice(maxPrice);
+              }
             }}
-          />
-        </label>
-        <label>
-          최대 가격 (원)
-          <input
-            type="text"
-            inputMode="numeric"
-            aria-invalid={!!priceError}
-            aria-describedby={priceError ? "menu-price-error" : "menu-price-help"}
-            value={maxPrice}
-            placeholder="제한 없음"
-            onChange={(event) => {
-              setMaxPrice(event.target.value);
-              setPage(1);
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                event.currentTarget.open = false;
+                event.currentTarget.querySelector("summary")?.focus();
+              }
             }}
-          />
-        </label>
-        <button type="button" className="ghost-btn" onClick={resetAll}>
-          조건 모두 지우기
-        </button>
+          >
+            <summary>
+              가격 {minPrice || maxPrice ? `· ${minPrice || "0"}~${maxPrice || "제한 없음"}원` : "전체"}
+            </summary>
+            <form
+              className="menu-price-popover"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (priceError) {
+                  return;
+                }
+                setMinPrice(draftMinPrice);
+                setMaxPrice(draftMaxPrice);
+                setPage(1);
+                event.currentTarget.parentElement?.removeAttribute("open");
+              }}
+            >
+              <div className="menu-price-fields">
+                <label>
+                  최소 가격 (원)
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    aria-invalid={!!priceError}
+                    aria-describedby="menu-price-help"
+                    value={draftMinPrice}
+                    placeholder="제한 없음"
+                    onChange={(event) => setDraftMinPrice(event.target.value)}
+                  />
+                </label>
+                <label>
+                  최대 가격 (원)
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    aria-invalid={!!priceError}
+                    aria-describedby="menu-price-help"
+                    value={draftMaxPrice}
+                    placeholder="제한 없음"
+                    onChange={(event) => setDraftMaxPrice(event.target.value)}
+                  />
+                </label>
+              </div>
+              <p
+                id="menu-price-help"
+                className={priceError ? "menu-price-error" : "menu-price-help"}
+                role={priceError ? "alert" : undefined}
+              >
+                {priceError || "쉼표 없이 정수로 입력하세요. 빈 가격은 제한 없이 조회합니다."}
+              </p>
+              <button type="submit" className="primary" disabled={!!priceError}>
+                가격 적용
+              </button>
+            </form>
+          </details>
+          <button type="button" className="ghost-btn" onClick={resetAll}>
+            전체 초기화
+          </button>
+        </div>
       </div>
-      {priceError ? (
-        <p className="menu-price-error" id="menu-price-error" role="alert">
-          {priceError}
-        </p>
-      ) : (
-        <p className="menu-price-help" id="menu-price-help">
-          쉼표 없이 정수로 입력하세요. 빈 가격은 제한 없이 조회합니다.
-        </p>
-      )}
       <div className="menu-tools">
         <button
           type="button"
@@ -285,30 +336,20 @@ export default function MenuSection() {
           <ChevronDown aria-hidden="true" className={showAllergy ? "is-expanded" : undefined} />
         </button>
         <span className="menu-count" aria-live="polite">
-          {priceError
-            ? "가격 입력 중"
-            : loading
-              ? "메뉴 불러오는 중…"
-              : errorMessage
-                ? "메뉴 조회 실패"
-                : `전체 ${total}개 메뉴`}
+          {loading ? "메뉴 불러오는 중…" : errorMessage ? "메뉴 조회 실패" : `전체 ${total}개 메뉴`}
         </span>
         <label className="menu-sort">
           <span className="sr-only">정렬</span>
-          <select
+          <CustomerSelect
+            label="정렬"
+            showAllOptions
             value={sort}
-            onChange={(e) => {
-              setSort(e.target.value as SortKey);
+            onValueChange={(value) => {
+              setSort(value as SortKey);
               setPage(1);
             }}
-          >
-            {SORTS.map((o) => (
-              <option key={o.key} value={o.key}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-          <ChevronDown aria-hidden="true" />
+            options={SORTS.map((o) => ({ value: o.key, label: o.label }))}
+          />
         </label>
       </div>
       <div
@@ -335,26 +376,24 @@ export default function MenuSection() {
                 setPage(1);
               }}
             >
-              초기화
+              알레르기 제외 초기화
             </button>
           )}
         </div>
       </div>
-      <div className="product-grid" aria-busy={loading}>
-        {loading ? (
+      <div className={`product-grid${loading && data ? " is-updating" : ""}`} aria-busy={loading}>
+        {loading && !data ? (
           <StatusFeedback title="메뉴를 불러오고 있습니다." />
-        ) : priceError ? null : errorMessage ? (
+        ) : errorMessage ? (
           <StatusFeedback error title="메뉴를 불러오지 못했어요">
             <p>{errorMessage}</p>
-            {!priceError && (
-              <button
-                type="button"
-                className="ghost-btn"
-                onClick={missingMetadata ? () => window.location.reload() : retry}
-              >
-                {missingMetadata ? "화면 새로고침" : "다시 시도"}
-              </button>
-            )}
+            <button
+              type="button"
+              className="ghost-btn"
+              onClick={missingMetadata ? () => window.location.reload() : retry}
+            >
+              {missingMetadata ? "화면 새로고침" : "다시 시도"}
+            </button>
           </StatusFeedback>
         ) : shown.length ? (
           shown.map((p, i) => <ProductCard key={p.id} product={p} eager={i < 4} />)
@@ -362,13 +401,18 @@ export default function MenuSection() {
           <StatusFeedback title={hasFilters ? "조건에 맞는 메뉴가 없습니다" : "등록된 메뉴가 없습니다"}>
             {hasFilters && (
               <button type="button" className="ghost-btn empty-reset" onClick={resetAll}>
-                조건 모두 지우기
+                검색·필터·정렬 초기화
               </button>
             )}
             <Link className="empty-match" href={MATCH_URL}>
               원하는 재료로 직접 만들기 ♡
             </Link>
           </StatusFeedback>
+        )}
+        {loading && data && (
+          <p className="menu-update-status" role="status">
+            새 조건으로 메뉴를 불러오는 중입니다…
+          </p>
         )}
       </div>
       {!loading && !errorMessage && total > 0 && (

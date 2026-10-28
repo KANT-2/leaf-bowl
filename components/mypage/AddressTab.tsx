@@ -73,11 +73,7 @@ function AddressForm({
           <div className="address-input-row">
             <input required value={address} maxLength={200} onChange={(e) => setAddress(e.target.value)} />
             <button type="button" className="ghost-btn address-search-btn" onClick={() => setSearchOpen(true)}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-                <circle cx="10" cy="10" r="6" />
-                <path d="m15 15 5 5" />
-              </svg>
-              주소 검색
+              주소 입력 도움말
             </button>
           </div>
         </label>

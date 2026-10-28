@@ -1,5 +1,17 @@
 # 회귀 검증
 
+## 로컬 UI/UX 읽기 전용 QA
+
+VS Code PowerShell에서 저장소 루트로 이동한 뒤 실행한다. 기존 `localhost:3000` 서버를 재사용하며 서버·DB를 시작하거나 변경하지 않는다. Playwright가 없다면 아래 공식 패키지와 Chromium을 **사용자가 직접** 설치한다. 이 설치는 네트워크 다운로드를 포함한다.
+
+```powershell
+npm install --no-save --package-lock=false playwright
+npx playwright install chromium
+npm run qa:ui
+```
+
+러너는 새 브라우저 컨텍스트에서 공개 고객 화면을 390/768/1024/1440px로 캡처한다. Bowl Match 선택 0/1/4/8/12/18개, 합성 장바구니의 긴 목록·스크롤·하단 액션과 고객 Select 3곳의 열림·키보드를 확인한다. GET/HEAD/OPTIONS 외 네트워크 요청은 차단하며 결제·저장·삭제 버튼은 누르지 않는다. 실행 결과는 `.next/ui-ux-local-qa/<실행시각>/report.md`, `results.json`, PNG에 저장된다. 자동 기능 결과와 사람이 판정할 시각 QA를 분리하므로 캡처만으로 통합 작업 목록의 상태를 `VERIFIED_DONE`으로 바꾸지 않는다. 리뷰 작성 모달 및 관리자 배달·Select·이벤트 기간은 인증과 격리된 로컬 테스트 DB가 확인되기 전까지 `NOT RUN`이다. 현재 `package.json`에 `health:pages` 명령은 없다.
+
 `npm test`는 TypeScript 로더를 공유하는 도메인·API 테스트를 실행한다. 모듈 그래프 검사는 상대 경로·alias·타입·동적 import를 확인하며 런타임 순환과 클라이언트의 서버 모듈 로드를 차단한다. 장바구니 불변성·수량·변형 병합, 프로필 기본 배송지, 시드 없는 카탈로그 저장, 필수 DB 설정·미등록 영양정보도 검증한다. `npm run build` 다음 `npx tsc --noEmit`으로 생성된 Next.js 타입을 포함해 검사한다.
 
 `npm run lint`는 ESLint와 Prettier 검사를 함께 실행하며 CI에서 스타일 차이를 실패로 처리한다. 스타일 수정은 `npx eslint --fix` 다음 `npm run format` 순서로 수행한다. 2칸·쌍따옴표·세미콜론·120자, 제어문 중괄호, 함수 사이 빈 줄 1개, 연속 빈 줄 최대 1개를 검사한다. CSS도 포맷 대상이다.

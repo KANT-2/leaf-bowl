@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/admin/button";
 import { Input } from "@/components/admin/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/admin/select";
 import SearchField from "@/components/controls/SearchField";
 import {
   eventSchema,
@@ -13,6 +14,7 @@ import {
 } from "@/modules/events/schema";
 import { kstDate } from "@/modules/shared/time";
 import { Photo, Upload } from "./EditorFields";
+import EventRangeCalendar from "./EventRangeCalendar";
 
 async function api(init?: RequestInit): Promise<EventSnapshot> {
   const response = await fetch("/api/admin/events", { cache: "no-store", ...init });
@@ -125,7 +127,7 @@ export default function EventManager() {
         </p>
       )}
       <div className="event-toolbar">
-        <div>
+        <div className="event-status-filters">
           {(["all", "ongoing", "scheduled", "ended"] as const).map((value) => (
             <Button key={value} variant={filter === value ? "default" : "secondary"} onClick={() => setFilter(value)}>
               {value === "all" ? "전체" : eventStatusLabel[value]}
@@ -175,42 +177,39 @@ export default function EventManager() {
                   onChange={(e) => update({ title: e.target.value })}
                 />
               </label>
-              <label>
-                노출 설정
-                <select value={String(draft.visible)} onChange={(e) => update({ visible: e.target.value === "true" })}>
-                  <option value="true">노출</option>
-                  <option value="false">숨김</option>
-                </select>
-              </label>
-              <label>
-                메인 배너
-                <select
+              <div className="event-form-field">
+                <span>노출 설정</span>
+                <Select value={String(draft.visible)} onValueChange={(value) => update({ visible: value === "true" })}>
+                  <SelectTrigger aria-label="노출 설정">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">노출</SelectItem>
+                    <SelectItem value="false">숨김</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="event-form-field">
+                <span>메인 배너</span>
+                <Select
                   value={String(draft.heroVisible)}
-                  onChange={(e) => update({ heroVisible: e.target.value === "true" })}
+                  onValueChange={(value) => update({ heroVisible: value === "true" })}
                 >
-                  <option value="true">진행 중일 때 표시</option>
-                  <option value="false">표시 안 함</option>
-                </select>
-              </label>
-              <label>
-                시작일
-                <Input
-                  required
-                  type="date"
-                  value={draft.startDate}
-                  onChange={(e) => update({ startDate: e.target.value })}
-                />
-              </label>
-              <label>
-                종료일
-                <Input
-                  required
-                  type="date"
-                  min={draft.startDate}
-                  value={draft.endDate}
-                  onChange={(e) => update({ endDate: e.target.value })}
-                />
-              </label>
+                  <SelectTrigger aria-label="메인 배너">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">진행 중일 때 표시</SelectItem>
+                    <SelectItem value="false">표시 안 함</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <EventRangeCalendar
+                key={draft.id}
+                startDate={draft.startDate}
+                endDate={draft.endDate}
+                onChange={(startDate, endDate) => update({ startDate, endDate })}
+              />
               <label className="event-wide">
                 소개 내용
                 <textarea
@@ -219,11 +218,12 @@ export default function EventManager() {
                   onChange={(e) => update({ description: e.target.value })}
                 />
               </label>
-              <div>
+              <h3 className="event-wide event-form-section-title">이미지 설정</h3>
+              <div className="event-form-image">
                 PC 이벤트 이미지
                 <Upload value={draft.image} onChange={(image) => update({ image })} onBusy={setUploading} />
               </div>
-              <div>
+              <div className="event-form-image">
                 모바일 이벤트 이미지
                 <Upload
                   value={draft.mobileImage}
@@ -232,6 +232,7 @@ export default function EventManager() {
                 />
                 <p className="meta">미등록 시 PC 이미지를 사용할 수 있습니다.</p>
               </div>
+              <h3 className="event-wide event-form-section-title">추가 정보</h3>
               <label>
                 이미지 설명
                 <Input maxLength={300} value={draft.alt} onChange={(e) => update({ alt: e.target.value })} />

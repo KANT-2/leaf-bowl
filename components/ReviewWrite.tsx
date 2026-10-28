@@ -154,6 +154,8 @@ function WriteDialog({ fixedPid, onAdded, onClosed }: DialogProps) {
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
         setPickerOpen(false);
         menuRef.current?.focus();
       }
@@ -317,8 +319,8 @@ function WriteDialog({ fixedPid, onAdded, onClosed }: DialogProps) {
                 ref={menuRef}
                 type="button"
                 className="rw-order-trigger"
-                aria-haspopup="listbox"
                 aria-expanded={pickerOpen}
+                aria-controls={pickerOpen ? "rw-order-list" : undefined}
                 onClick={() => setPickerOpen((v) => !v)}
               >
                 {selected ? (
@@ -337,15 +339,17 @@ function WriteDialog({ fixedPid, onAdded, onClosed }: DialogProps) {
                 </span>
               </button>
               {pickerOpen && (
-                <ul className="rw-order-list" role="listbox">
+                <ul id="rw-order-list" className="rw-order-list" aria-label="리뷰를 작성할 주문 메뉴">
                   {options.map((it) => (
-                    <li key={it.orderItemId} role="option" aria-selected={effectiveOrderItemId === it.orderItemId}>
+                    <li key={it.orderItemId}>
                       <button
                         type="button"
                         className={effectiveOrderItemId === it.orderItemId ? "on" : ""}
+                        aria-current={effectiveOrderItemId === it.orderItemId ? "true" : undefined}
                         onClick={() => {
                           setOrderItemId(it.orderItemId);
                           setPickerOpen(false);
+                          menuRef.current?.focus();
                         }}
                       >
                         <Image src={it.image} alt="" width={40} height={40} unoptimized />

@@ -66,7 +66,7 @@ export default function LoginView() {
       <div className="auth-card">
         <span className="eyebrow">YOUR DAILY BOWL</span>
         <PageHeading>{signingUp ? "회원가입" : "로그인"}</PageHeading>
-        <form onSubmit={submit}>
+        <form onSubmit={submit} aria-busy={busy}>
           {signingUp && (
             <label className="field">
               <span>이름</span>
@@ -132,6 +132,7 @@ export default function LoginView() {
         <button
           type="button"
           className="ghost-btn form-btn full"
+          disabled={busy}
           onClick={() => {
             setMode(signingUp ? "login" : "signup");
             setError("");

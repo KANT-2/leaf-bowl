@@ -174,10 +174,19 @@ function Sidebar({
             } as React.CSSProperties
           }
           side={side}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            document.querySelector<HTMLButtonElement>('[data-sidebar="trigger"]')?.focus();
+          }}
+          onClick={(event) => {
+            if ((event.target as HTMLElement).closest('[data-sidebar="menu-button"]')) {
+              setOpenMobile(false);
+            }
+          }}
         >
           <SheetHeader className="sr-only">
-            <SheetTitle>Sidebar</SheetTitle>
-            <SheetDescription>Displays the mobile sidebar.</SheetDescription>
+            <SheetTitle>관리 메뉴</SheetTitle>
+            <SheetDescription>관리할 화면을 선택하세요.</SheetDescription>
           </SheetHeader>
           <div className="flex h-full w-full flex-col">{children}</div>
         </SheetContent>
@@ -234,7 +243,7 @@ function Sidebar({
 }
 
 function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar } = useSidebar();
+  const { isMobile, openMobile, open, toggleSidebar } = useSidebar();
 
   return (
     <Button
@@ -242,7 +251,7 @@ function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<t
       data-slot="sidebar-trigger"
       variant="ghost"
       size="icon"
-      className={cn("size-7", className)}
+      className={cn("size-11", className)}
       onClick={(event) => {
         onClick?.(event);
         toggleSidebar();
@@ -250,7 +259,7 @@ function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<t
       {...props}
     >
       <PanelLeftIcon />
-      <span className="sr-only">Toggle Sidebar</span>
+      <span className="sr-only">관리 메뉴 {isMobile ? (openMobile ? "닫기" : "열기") : open ? "접기" : "펼치기"}</span>
     </Button>
   );
 }
@@ -285,7 +294,7 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
     <main
       data-slot="sidebar-inset"
       className={cn(
-        "relative flex w-full flex-1 flex-col bg-background",
+        "relative flex min-w-0 w-full flex-1 flex-col bg-background",
         "md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2",
         className,
       )}

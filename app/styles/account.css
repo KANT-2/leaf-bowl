@@ -280,6 +280,7 @@
 }
 .address-search-form input {
   flex: 1;
+  min-width: 0;
   padding: 13px;
   border: 1px solid #bccdb0;
   border-radius: 6px;
@@ -300,6 +301,11 @@
 .address-search-tip h3 {
   font-size: 13px;
   margin: 0 0 8px;
+}
+.address-search-tip p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.6;
 }
 .address-search-tip ul {
   margin: 0;

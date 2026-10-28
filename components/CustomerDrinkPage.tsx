@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import Breadcrumb from "./Breadcrumb";
@@ -13,6 +14,7 @@ import { money } from "@/modules/shared/format";
 export default function CustomerDrinkPage({ id }: { id: string }) {
   const { DRINKS, DRINK_KCAL, visibleProducts: PRODUCTS } = useCustomerCatalog();
   const { addDrink, open } = useCart();
+  const [qty, setQty] = useState(1);
   const index = DRINKS.findIndex((d) => d.id === id && d.name);
   const d = index >= 0 ? DRINKS[index] : undefined;
   if (!d) {
@@ -67,16 +69,35 @@ export default function CustomerDrinkPage({ id }: { id: string }) {
             </p>
           )}
           <div className="dialog-bottom pv-buy">
+            <div className="qty" role="group" aria-label="음료 수량">
+              <button
+                type="button"
+                disabled={!d.available || qty === 1}
+                aria-label="수량 줄이기"
+                onClick={() => setQty((current) => current - 1)}
+              >
+                −
+              </button>
+              <span aria-live="polite">{qty}</span>
+              <button
+                type="button"
+                disabled={!d.available || qty === 99}
+                aria-label="수량 늘리기"
+                onClick={() => setQty((current) => current + 1)}
+              >
+                +
+              </button>
+            </div>
             <button
               className="primary"
               type="button"
               disabled={!d.available}
               onClick={(e) => {
-                addDrink(index);
+                addDrink(index, qty);
                 open(e.currentTarget);
               }}
             >
-              {d.available ? `${money(d.price)} · 담기` : "품절 · 주문할 수 없어요"}
+              {d.available ? `${money(d.price * qty)} · ${qty}잔 담기` : "품절 · 주문할 수 없어요"}
             </button>
           </div>
         </div>

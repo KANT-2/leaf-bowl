@@ -1,13 +1,26 @@
 import type { Content } from "@/modules/catalog/schema";
 import styles from "./HeroBanner.module.css";
 
-export default function HeroBanner({ content, preview = false }: { content: Content; preview?: boolean }) {
+export default function HeroBanner({
+  content,
+  preview = false,
+  eager = true,
+}: {
+  content: Content;
+  preview?: boolean;
+  eager?: boolean;
+}) {
   const picture = (
     <picture>
       {content.heroMobileImage && <source media="(max-width: 640px)" srcSet={content.heroMobileImage} />}
       {/* Native picture preserves the separate artwork's natural aspect ratio. */}
       {}
-      <img src={content.heroImage} alt={content.heroAlt || "leaf & bowl 광고"} fetchPriority="high" />
+      <img
+        src={content.heroImage}
+        alt={content.heroAlt || "leaf & bowl 광고"}
+        loading={eager ? "eager" : "lazy"}
+        fetchPriority={eager ? "high" : "auto"}
+      />
     </picture>
   );
   return (

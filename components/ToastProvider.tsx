@@ -12,8 +12,14 @@ export default function ToastProvider({ children }: { children: React.ReactNode 
   const [message, setMessage] = useState("");
   const [shown, setShown] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const lastToast = useRef({ text: "", at: 0 });
 
   const toast = useCallback((text: string) => {
+    const now = Date.now();
+    if (lastToast.current.text === text && now - lastToast.current.at < 2400) {
+      return;
+    }
+    lastToast.current = { text, at: now };
     setMessage(text);
     setShown(true);
     clearTimeout(timer.current);

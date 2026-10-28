@@ -73,7 +73,7 @@ export default function ProductForm({
         }
       }}
     >
-      <fieldset disabled={busy}>
+      <fieldset disabled={busy} tabIndex={0} aria-label="메뉴 입력 항목">
         <div className="menu-basics">
           <label className="field">
             메뉴 이름
@@ -129,7 +129,7 @@ export default function ProductForm({
           </label>
         </div>
         <details className="menu-extra">
-          <summary>분류·판매 상태·배지·옵션 설정</summary>
+          <summary>판매 정보 및 옵션</summary>
           <div className="menu-settings-grid">
             <label className="field">
               메뉴 분류

@@ -166,18 +166,20 @@
   gap: 8px;
 }
 .option-choices label {
+  position: relative;
   display: inline-flex;
   align-items: center;
   border: 1px solid #d0dbcb;
   padding: 10px 12px;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 14px;
 }
 .option-choices label:has(input:checked) {
   border-color: #78905f;
   background: var(--color-soft);
   color: var(--color-brand);
+  font-weight: 600;
 }
 .option-choices label:has(input:focus-visible) {
   outline: 3px solid var(--color-focus);
@@ -186,6 +188,13 @@
 .option-choices input {
   accent-color: var(--color-brand);
   margin: 0 5px 0 0;
+}
+.option-choices input[type="radio"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
 }
 /* 데스크톱은 기존처럼 항상 펼쳐 보여준다. 드롭다운 버튼은 모바일에서만 쓴다. */
 .option-picker-trigger {
